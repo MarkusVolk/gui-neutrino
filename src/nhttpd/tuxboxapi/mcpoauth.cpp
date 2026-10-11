@@ -318,11 +318,24 @@ std::string mcp_oauth::baseUrl(CyhookHandler *hh)
 	return "http://" + hh->HeaderList["Host"];
 }
 
+/* exactly these paths, so that no other one rides along with them */
+static const char *oauth_paths[] =
+{
+	"/.well-known/oauth-protected-resource",
+	"/.well-known/oauth-protected-resource/mcp",
+	"/.well-known/oauth-authorization-server",
+	"/oauth/register",
+	"/oauth/authorize",
+	"/oauth/wait",
+	"/oauth/token"
+};
+
 bool mcp_oauth::handles(const std::string &url)
 {
-	return starts_with(url, "/oauth/")
-	       || starts_with(url, "/.well-known/oauth-authorization-server")
-	       || starts_with(url, "/.well-known/oauth-protected-resource");
+	for (size_t i = 0; i < sizeof(oauth_paths) / sizeof(oauth_paths[0]); i++)
+		if (url == oauth_paths[i])
+			return true;
+	return false;
 }
 
 bool mcp_oauth::validAccessToken(const std::string &token)
@@ -636,9 +649,9 @@ static void do_token(CyhookHandler *hh)
 void mcp_oauth::respond(CyhookHandler *hh)
 {
 	const std::string &url = hh->UrlData["url"];
-	if (starts_with(url, "/.well-known/oauth-protected-resource"))
+	if (url == "/.well-known/oauth-protected-resource" || url == "/.well-known/oauth-protected-resource/mcp")
 		metadata(hh, true);
-	else if (starts_with(url, "/.well-known/oauth-authorization-server"))
+	else if (url == "/.well-known/oauth-authorization-server")
 		metadata(hh, false);
 	else if (url == "/oauth/register")
 		do_register(hh);
