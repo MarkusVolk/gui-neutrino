@@ -1,0 +1,15 @@
+subdir('connection')
+subdir('libeventserver')
+subdir('sectionsdclient')
+subdir('timerdclient')
+subdir('libconfigfile')
+subdir('libmd5sum')
+subdir('libnet')
+subdir('xmltree')
+subdir('jsoncpp')
+subdir('libtuxtxt')
+subdir('libdvbsub')
+subdir('luaclient')
+if enable_upnp
+	subdir('libupnpclient')
+endif

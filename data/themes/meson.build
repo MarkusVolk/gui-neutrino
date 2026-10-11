@@ -1,0 +1,25 @@
+subdir('Neutrino-3.0/icons/buttons')
+subdir('Grey-3.0/icons/buttons')
+subdir('Grey-Blue/icons/buttons')
+subdir('Meridian/icons/buttons')
+subdir('Olive-3.0/icons/buttons')
+install_data(
+	'Bluemoon-3.0.theme',
+	'Classic.theme',
+	'Crema.theme',
+	'DVB2000.theme',
+	'DarkBlue.theme',
+	'DarkBrown.theme',
+	'Grey.theme',
+	'Grey-3.0.theme',
+	'Grey-Blue.theme',
+	'Meridian.theme',
+	'MonoChrom.theme',
+	'Neutrino-3.0.theme',
+	'Olive.theme',
+	'Olive-3.0.theme',
+	'Origin.theme',
+	'Red.theme',
+	'VirginMedia.theme',
+	install_dir : themesdir,
+)

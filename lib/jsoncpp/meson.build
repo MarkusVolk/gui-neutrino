@@ -1,0 +1,7 @@
+libjsoncpp = static_library('jsoncpp',
+	'jsoncpp.cpp',
+	include_directories : nt_inc,
+	implicit_include_directories : false,
+	dependencies : nt_deps,
+	override_options : ['cpp_eh=default'],
+)

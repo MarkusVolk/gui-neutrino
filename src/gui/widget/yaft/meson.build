@@ -1,0 +1,10 @@
+libneutrino_gui_terminal = static_library('neutrino_gui_terminal',
+	'ctrlseq/esc.cpp',
+	'ctrlseq/csi.cpp',
+	'ctrlseq/osc.cpp',
+	'yaft_priv.cpp',
+	'yaft_class.cpp',
+	include_directories : [nt_inc, include_directories('.')],
+	implicit_include_directories : false,
+	dependencies : nt_deps,
+)

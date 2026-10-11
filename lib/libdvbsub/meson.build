@@ -1,0 +1,11 @@
+libdvbsub = static_library('dvbsub',
+	'dvbsub.cpp',
+	'dvbsubtitle.cpp',
+	'tools.cpp',
+	'PacketQueue.cpp',
+	'helpers.cpp',
+	'Debug.cpp',
+	include_directories : nt_inc,
+	implicit_include_directories : false,
+	dependencies : nt_deps,
+)

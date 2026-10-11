@@ -1,0 +1,10 @@
+libneutrino_driver_glcd = static_library('neutrino_driver_glcd',
+	'analogclock.cpp',
+	'digitalclock.cpp',
+	'simpleclock.cpp',
+	'weather.cpp',
+	'glcd.cpp',
+	include_directories : nt_inc,
+	implicit_include_directories : false,
+	dependencies : nt_deps,
+)

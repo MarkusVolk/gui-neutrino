@@ -1,0 +1,2 @@
+subdir('backgrounds')
+subdir('screensaver')

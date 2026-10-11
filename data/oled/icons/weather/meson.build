@@ -1,0 +1,16 @@
+install_data(
+	'clear-day.png',
+	'clear-night.png',
+	'cloudy.png',
+	'fog.png',
+	'hail.png',
+	'partly-cloudy-day.png',
+	'partly-cloudy-night.png',
+	'rain.png',
+	'sleet.png',
+	'snow.png',
+	'thunderstorm.png',
+	'unknown.png',
+	'wind.png',
+	install_dir : iconsdir / 'oled/weather',
+)

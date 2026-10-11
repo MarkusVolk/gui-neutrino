@@ -1,0 +1,2 @@
+subdir('fonts')
+subdir('icons')
