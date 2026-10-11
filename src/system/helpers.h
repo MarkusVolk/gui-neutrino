@@ -263,6 +263,8 @@ bool isDigitWord(std::string str);
 time_t GetBuildTime();
 int getBoxMode();
 int getActivePartition();
+/* a network interface with hardware below it, not lo, a tunnel, a bridge or a VPN */
+bool isHardwareNetworkInterface(const std::string &name);
 bool getDefaultNetworkInterface(std::string &ifname, bool prefer_route = true);
 
 std::string GetSpecialName(std::string NormalName);

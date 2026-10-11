@@ -225,13 +225,10 @@ static const struct button_label CNetworkSetupFooterButtons[] =
 };
 #define CNetworkSetupFooterButtonCount (sizeof(CNetworkSetupFooterButtons)/sizeof(CNetworkSetupFooterButtons[0]))
 
+/* only what can be configured here: Ethernet and WLAN, not tunnels such as tailscale0 */
 static int my_filter(const struct dirent *dent)
 {
-	if (dent->d_name[0] == 'l' && dent->d_name[1] == 'o')
-		return 0;
-	if (dent->d_name[0] == '.')
-		return 0;
-	return 1;
+	return isHardwareNetworkInterface(dent->d_name);
 }
 
 void CNetworkSetup::setBroadcast(void)

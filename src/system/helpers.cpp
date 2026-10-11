@@ -2419,6 +2419,13 @@ int getActivePartition()
 	return c;
 }
 
+bool isHardwareNetworkInterface(const std::string &name)
+{
+	if (name.empty() || name[0] == '.' || name.find('/') != std::string::npos)
+		return false;
+	return access(("/sys/class/net/" + name + "/device").c_str(), F_OK) == 0;
+}
+
 bool getDefaultNetworkInterface(std::string &ifname, bool prefer_route)
 {
 	std::vector<std::string> ifnames;
@@ -2429,9 +2436,7 @@ bool getDefaultNetworkInterface(std::string &ifname, bool prefer_route)
 	struct dirent *entry;
 	while ((entry = readdir(dir)) != NULL)
 	{
-		if (entry->d_name[0] == '.')
-			continue;
-		if (!strcmp(entry->d_name, "lo"))
+		if (!isHardwareNetworkInterface(entry->d_name))
 			continue;
 		ifnames.push_back(entry->d_name);
 	}
