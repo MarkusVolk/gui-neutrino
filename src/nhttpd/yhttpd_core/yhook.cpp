@@ -279,8 +279,10 @@ std::string CyhookHandler::BuildHeader(bool cache) {
 	result = string_printf(HTTP_PROTOCOL " %d %s\r\nContent-Type: %s\r\n", httpStatus, responseString, ResponseMimeType.c_str());
 	log_level_printf(2, "Response: HTTP/1.1 %d %s\r\nContent-Type: %s\r\n", httpStatus, responseString, ResponseMimeType.c_str());
 
-	switch (httpStatus) {
-	case HTTP_UNAUTHORIZED:
+	/* a 401 gets the other headers and the end of the header too; the
+	 * response used to stop after this line, which strict clients and
+	 * proxies take for a broken connection */
+	if (httpStatus == HTTP_UNAUTHORIZED) {
 		/* a hook with its own scheme, such as a bearer token, names it */
 		if (!HookVarList["WWW-Authenticate"].empty())
 			result += "WWW-Authenticate: " + HookVarList["WWW-Authenticate"] + "\r\n";
@@ -288,8 +290,9 @@ std::string CyhookHandler::BuildHeader(bool cache) {
 			result += "WWW-Authenticate: Basic realm=\"";
 			result += AUTH_NAME_MSG "\"\r\n";
 		}
-		break;
+	}
 
+	switch (httpStatus) {
 	case HTTP_MOVED_TEMPORARILY:
 	case HTTP_MOVED_PERMANENTLY:
 		// Status HTTP_*_TEMPORARILY (redirection)
