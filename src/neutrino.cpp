@@ -136,6 +136,7 @@
 #include <system/debug.h>
 #include <system/fsmounter.h>
 #include <system/hddstat.h>
+#include <system/main_call.h>
 #include <system/secrets.h>
 #include <system/udev_hotplug.h>
 #include <system/setting_helpers.h>
@@ -1119,6 +1120,8 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	setSettingsText(g_settings.assistant_stt_model, configfile.getString("assistant_stt_model", "whisper-1"));
 	setSettingsText(g_settings.assistant_stt_language, configfile.getString("assistant_stt_language", ""));
 	setSettingsText(g_settings.assistant_stt_device, configfile.getString("assistant_stt_device", "default"));
+	g_settings.assistant_box_server = configfile.getInt32("assistant_box_server", 0);
+	loadSecret(configfile, "assistant_box_server_token", g_settings.assistant_box_server_token);
 #endif
 
 	if (g_settings.softupdate_proxyserver.empty())
@@ -2082,6 +2085,8 @@ void CNeutrinoApp::saveSetup(const char *fname)
 	configfile.setString("assistant_stt_model", g_settings.assistant_stt_model);
 	configfile.setString("assistant_stt_language", g_settings.assistant_stt_language);
 	configfile.setString("assistant_stt_device", g_settings.assistant_stt_device);
+	configfile.setInt32("assistant_box_server", g_settings.assistant_box_server);
+	saveSecret(configfile, "assistant_box_server_token", g_settings.assistant_box_server_token);
 #endif
 
 	configfile.setInt32("flashupdate_createimage_add_env", g_settings.flashupdate_createimage_add_env);
@@ -5091,6 +5096,10 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 	}
 	else if (msg == NeutrinoMessages::EVT_SET_VOLUME) {
 		g_volume->setVolumeExt((int)data);
+		return messages_return::handled;
+	}
+	else if (msg == NeutrinoMessages::EVT_CALL_IN_MAIN) {
+		main_call::handle(data);
 		return messages_return::handled;
 	}
 	else if (msg == NeutrinoMessages::EVT_RELOAD_XMLTV) {

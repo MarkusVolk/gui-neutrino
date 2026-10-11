@@ -129,6 +129,7 @@ struct NeutrinoMessages
 		EVT_SET_VOLUME				= CRCInput::RC_Events + 44,
 		EVT_STREAM_START			= CRCInput::RC_Events + 45, /* data = fd */
 		EVT_STREAM_STOP				= CRCInput::RC_Events + 46,
+		EVT_CALL_IN_MAIN			= CRCInput::RC_Events + 47, /* data = job of main_call::run */
 
 		/* NEVER CHANGE THIS */
 		EVT_CA_MESSAGE				= CRCInput::RC_Events + 60, /* data = CA_MESSAGE pointer */

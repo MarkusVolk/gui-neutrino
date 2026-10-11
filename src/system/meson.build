@@ -8,6 +8,7 @@ libneutrino_system_sources = [
 	'lastchannel.cpp',
 	'luaserver.cpp',
 	'localize.cpp',
+	'main_call.cpp',
 	'zap_failure_analyzer.cpp',
 	'helpers.cpp',
 	'mdb-tools.cpp',

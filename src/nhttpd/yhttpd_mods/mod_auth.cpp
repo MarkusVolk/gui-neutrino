@@ -15,7 +15,8 @@ THandleStatus CmAuth::Hook_PrepareResponse(CyhookHandler *hh) {
 	THandleStatus status = HANDLED_CONTINUE;
 
 	// dont check local calls or calls from NoAuthClient
-	if (authenticate) {
+	// the MCP server checks its own bearer token
+	if (authenticate && hh->UrlData["url"] != "/mcp") {
 		if ((hh->UrlData["clientaddr"]).find(IADDR_LOCAL) > 0
 			&& (no_auth_client.empty() || (hh->UrlData["clientaddr"]).compare(no_auth_client) != 0))
 		{

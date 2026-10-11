@@ -59,7 +59,8 @@ bool CWebserverResponse::SendResponse() {
 	// Init Hookhandler
 	Connection->HookHandler.session_init(Connection->Request.ParameterList,
 			Connection->Request.UrlData, (Connection->Request.HeaderList),
-			(Cyhttpd::ConfigList), Connection->Method, Connection->keep_alive);
+			(Cyhttpd::ConfigList), Connection->Method, Connection->keep_alive,
+			Connection->Request.Body);
 	//--------------------------------------------------------------
 	// HOOK Handling Loop [ PREPARE response hook ]
 	// Checking and Preperation: Auth, static, cache, ...

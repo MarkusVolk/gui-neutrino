@@ -167,6 +167,8 @@ assistant.transcribing Transcribing
 assistant_setup.backend Language model
 assistant_setup.backend_claude Claude
 assistant_setup.backend_openai OpenAI compatible server
+assistant_setup.box_server This box as MCP server
+assistant_setup.box_server_enabled MCP server
 assistant_setup.effort Effort
 assistant_setup.effort_default Default of the model
 assistant_setup.effort_high high
@@ -1356,6 +1358,10 @@ menu.hint_aplay Audio player
 menu.hint_aplay_setup Change title display, start directory, screen saver etc.
 menu.hint_assistant Ask a language model: it answers and operates the box
 menu.hint_assistant_backend Which language model answers: Claude, or a server in your network that speaks the OpenAI protocol
+menu.hint_assistant_box_server Claude Desktop, Home Assistant and other MCP clients in the network use the assistant's tools
+menu.hint_assistant_box_server_enabled Answer MCP clients at the address below. Switching on makes an access token.
+menu.hint_assistant_box_server_token Clients send it as bearer token. Empty: the server stays off.
+menu.hint_assistant_box_server_url Enter this address in the MCP client
 menu.hint_assistant_claude_key The key of your Anthropic account. It is stored on the box in plain text.
 menu.hint_assistant_effort How thoroughly Claude thinks before it answers. Low answers fastest.
 menu.hint_assistant_enabled Offer the assistant in the multimedia menu: a language model that answers and operates the box, or its built-in commands

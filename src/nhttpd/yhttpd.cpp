@@ -60,6 +60,10 @@ static CmodCache mod_cache; // static instance
 #include "neutrinoapi.h"
 #include <config.h>
 static CNeutrinoAPI *NeutrinoAPI;
+#ifdef ENABLE_ASSISTANT
+#include "mcpapi.h"
+static CMcpAPI mcpAPI;
+#endif
 #endif
 
 //=============================================================================
@@ -253,6 +257,9 @@ void Cyhttpd::hooks_attach() {
 	NeutrinoAPI = new CNeutrinoAPI();
 	CyhookHandler::attach(NeutrinoAPI->NeutrinoYParser);
 	CyhookHandler::attach(NeutrinoAPI->ControlAPI);
+#ifdef ENABLE_ASSISTANT
+	CyhookHandler::attach(&mcpAPI);
+#endif
 #else
 #ifdef Y_CONFIG_USE_YPARSER
 	CyhookHandler::attach(&yParser);

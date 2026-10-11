@@ -34,6 +34,7 @@ class CAssistantSetup : public CMenuTarget
 		int showServers();
 		int showServer(int n);
 		int showVoice();
+		int showBoxServer();
 
 	public:
 		CAssistantSetup();

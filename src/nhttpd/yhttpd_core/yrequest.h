@@ -23,6 +23,7 @@ class CWebserverRequest
 {
 private:
 	bool HandlePost();
+	bool ReadBody(unsigned int content_len, std::string &body);
 	unsigned int HandlePostBoundary(std::string boundary, unsigned int content_len);
 	bool ParseStartLine(std::string start_line);
 	bool ParseParams(std::string param_string);
@@ -40,6 +41,7 @@ public:
 	CStringList ParameterList;
 	CStringList HeaderList;
 	CStringList UrlData;	// url, fullurl, path, filename, fileext, paramstring 
+	std::string Body;	// message body of a POST with JSON
 	void analyzeURL(std::string);
 
 	// constructor & destructor

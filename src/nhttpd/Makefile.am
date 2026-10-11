@@ -16,6 +16,7 @@ AM_CPPFLAGS += \
 	-I$(top_srcdir)/lib/libeventserver \
 	-I$(top_srcdir)/lib/libconfigfile \
 	-I$(top_srcdir)/lib/connection \
+	-I$(top_srcdir)/lib/jsoncpp \
 	@FREETYPE_CFLAGS@
 
 

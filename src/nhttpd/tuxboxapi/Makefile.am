@@ -13,6 +13,7 @@ AM_CPPFLAGS += \
 	-I$(top_srcdir)/lib/libeventserver \
 	-I$(top_srcdir)/lib/libconfigfile \
 	-I$(top_srcdir)/lib/xmltree \
+	-I$(top_srcdir)/lib/jsoncpp \
 	@SIGC_CFLAGS@ \
 	@FREETYPE_CFLAGS@ \
 	@AVFORMAT_CFLAGS@ \
@@ -25,4 +26,9 @@ libnhttpd_tuxboxapi_a_SOURCES = \
 	controlapi.cpp \
 	neutrinoapi.cpp \
 	neutrinoyparser.cpp
+
+if ENABLE_ASSISTANT
+libnhttpd_tuxboxapi_a_SOURCES += \
+	mcpapi.cpp
+endif
 	

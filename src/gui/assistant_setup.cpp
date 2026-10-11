@@ -28,10 +28,17 @@
 #include <driver/rcinput.h>
 #include <gui/components/cc_input_dialog.h>
 #include <gui/widget/icons.h>
+#include <gui/widget/menue_options.h>
 #include <system/helpers.h>
 #include <system/llm_client.h>
+#include <nhttpd/yconfig.h>
+#include <libconfigfile/configfile.h>
+#include <libnet/libnet.h>
 
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #define BACKEND_OPTION_COUNT 2
 static const CMenuOptionChooser::keyval BACKEND_OPTIONS[BACKEND_OPTION_COUNT] =
@@ -91,6 +98,8 @@ class CTextSetting : public CChangeObserver
 				item->setHint("", hint);
 			menu->addItem(item);
 		}
+
+		CMenuForwarder *forwarder() { return item; }
 };
 
 CAssistantSetup::CAssistantSetup()
@@ -107,6 +116,8 @@ int CAssistantSetup::exec(CMenuTarget *parent, const std::string &actionKey)
 		return showServers();
 	if (actionKey == "voice")
 		return showVoice();
+	if (actionKey == "box_server")
+		return showBoxServer();
 	if (!actionKey.compare(0, 6, "server"))
 		return showServer(atoi(actionKey.c_str() + 6));
 	return showSetup();
@@ -149,6 +160,89 @@ int CAssistantSetup::showSetup()
 	mf->setHint("", LOCALE_MENU_HINT_ASSISTANT_VOICE);
 	menu.addItem(mf);
 #endif
+	mf = new CMenuForwarder(LOCALE_ASSISTANT_SETUP_BOX_SERVER, true, NULL, this, "box_server", CRCInput::RC_yellow);
+	mf->setHint("", LOCALE_MENU_HINT_ASSISTANT_BOX_SERVER);
+	menu.addItem(mf);
+
+	return menu.exec(NULL, "");
+}
+
+/* 32 hex digits from the kernel's random source */
+static std::string new_token()
+{
+	unsigned char raw[16];
+	int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return "";
+	ssize_t got = read(fd, raw, sizeof(raw));
+	close(fd);
+	if (got != (ssize_t) sizeof(raw))
+		return "";
+	std::string token;
+	char hex[3];
+	for (size_t i = 0; i < sizeof(raw); i++)
+	{
+		snprintf(hex, sizeof(hex), "%02x", raw[i]);
+		token += hex;
+	}
+	return token;
+}
+
+/* where clients in the network reach the MCP endpoint */
+static std::string box_server_address()
+{
+	std::string ip, mask, broadcast;
+	netGetIP(g_settings.ifname, ip, mask, broadcast);
+	if (ip.empty())
+		return "-";
+	CConfigFile config(',');
+	config.loadConfig(HTTPD_CONFIGFILE);
+	int port = config.getInt32("WebsiteMain.port", HTTPD_STANDARD_PORT);
+	/* without root nhttpd falls back from port 80 */
+	if (port == HTTPD_STANDARD_PORT && geteuid() != 0)
+		port = HTTPD_FALLBACK_PORT;
+	return "http://" + ip + (port == 80 ? "" : ":" + to_string(port)) + "/mcp";
+}
+
+/* the switch makes a token the first time, so the server is never open without one */
+class CBoxServerNotifier : public CChangeObserver
+{
+	private:
+		CMenuForwarder *token;
+
+	public:
+		CBoxServerNotifier() : token(NULL) {}
+		void setTokenItem(CMenuForwarder *item) { token = item; }
+		bool changeNotify(const neutrino_locale_t, void *)
+		{
+			if (g_settings.assistant_box_server && g_settings.assistant_box_server_token.empty())
+			{
+				g_settings.assistant_box_server_token = new_token();
+				if (token)
+					token->setOption(g_settings.assistant_box_server_token);
+			}
+			return false;
+		}
+};
+
+int CAssistantSetup::showBoxServer()
+{
+	CMenuWidget menu(LOCALE_ASSISTANT_SETUP_BOX_SERVER, NEUTRINO_ICON_SETTINGS, width);
+	menu.addIntroItems(LOCALE_ASSISTANT_SETUP_BOX_SERVER);
+
+	CBoxServerNotifier notifier;
+	CMenuOptionChooser *mc = new CMenuOptionChooser(LOCALE_ASSISTANT_SETUP_BOX_SERVER_ENABLED, &g_settings.assistant_box_server,
+			OPTIONS_OFF0_ON1_OPTIONS, OPTIONS_OFF0_ON1_OPTION_COUNT, true, &notifier);
+	mc->setHint("", LOCALE_MENU_HINT_ASSISTANT_BOX_SERVER_ENABLED);
+	menu.addItem(mc);
+
+	CMenuForwarder *address = new CMenuForwarder(LOCALE_ASSISTANT_SETUP_URL, false, box_server_address());
+	address->setHint("", LOCALE_MENU_HINT_ASSISTANT_BOX_SERVER_URL);
+	menu.addItem(address);
+
+	CTextSetting token(LOCALE_ASSISTANT_SETUP_MCP_TOKEN, &g_settings.assistant_box_server_token);
+	token.addTo(&menu, LOCALE_ASSISTANT_SETUP_MCP_TOKEN, LOCALE_MENU_HINT_ASSISTANT_BOX_SERVER_TOKEN);
+	notifier.setTokenItem(token.forwarder());
 
 	return menu.exec(NULL, "");
 }

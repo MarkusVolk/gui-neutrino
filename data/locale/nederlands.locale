@@ -167,6 +167,8 @@ assistant.transcribing Bezig met uitschrijven
 assistant_setup.backend Taalmodel
 assistant_setup.backend_claude Claude
 assistant_setup.backend_openai OpenAI-compatibele server
+assistant_setup.box_server Deze box als MCP-server
+assistant_setup.box_server_enabled MCP-server
 assistant_setup.effort Inspanning
 assistant_setup.effort_default Standaard van het model
 assistant_setup.effort_high hoog
@@ -1356,6 +1358,10 @@ menu.hint_aplay Audiospeler
 menu.hint_aplay_setup Titelweergave, startmap, schermbeveiliging enz. wijzigen
 menu.hint_assistant Vraag het een taalmodel: het antwoordt en bedient de ontvanger
 menu.hint_assistant_backend Welk taalmodel antwoordt: Claude, of een server in uw netwerk die het OpenAI-protocol spreekt
+menu.hint_assistant_box_server Claude Desktop, Home Assistant en andere MCP-clients in het netwerk gebruiken de hulpmiddelen van de assistent
+menu.hint_assistant_box_server_enabled MCP-clients op het adres hieronder antwoorden. Bij het inschakelen ontstaat een toegangstoken.
+menu.hint_assistant_box_server_token Clients sturen het als bearer-token. Leeg: de server blijft uit.
+menu.hint_assistant_box_server_url Dit adres in de MCP-client invullen
 menu.hint_assistant_claude_key De sleutel van uw Anthropic-account. Hij wordt op de ontvanger als platte tekst opgeslagen.
 menu.hint_assistant_effort Hoe grondig Claude nadenkt voor het antwoordt. Laag antwoordt het snelst.
 menu.hint_assistant_enabled De assistent in het multimediamenu aanbieden: een taalmodel dat antwoordt en de ontvanger bedient, of zijn ingebouwde opdrachten

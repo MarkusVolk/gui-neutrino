@@ -167,6 +167,8 @@ assistant.transcribing Prepisujem
 assistant_setup.backend Jazykový model
 assistant_setup.backend_claude Claude
 assistant_setup.backend_openai Server kompatibilný s OpenAI
+assistant_setup.box_server Tento prijímač ako MCP server
+assistant_setup.box_server_enabled MCP server
 assistant_setup.effort Úsilie
 assistant_setup.effort_default Predvolené modelom
 assistant_setup.effort_high vysoké
@@ -1356,6 +1358,10 @@ menu.hint_aplay Prehrávanie zvukových súborov
 menu.hint_aplay_setup Zmena zobrazenia titulu, predvolený priečinok, šetrič obrazovky a ďaľšie
 menu.hint_assistant Opýtajte sa jazykového modelu: odpovedá a ovláda prijímač
 menu.hint_assistant_backend Ktorý jazykový model odpovedá: Claude, alebo server vo vašej sieti s protokolom OpenAI
+menu.hint_assistant_box_server Claude Desktop, Home Assistant a ďalší MCP klienti v sieti používajú nástroje asistenta
+menu.hint_assistant_box_server_enabled Odpovedať MCP klientom na adrese nižšie. Pri zapnutí sa vytvorí prístupový token.
+menu.hint_assistant_box_server_token Klienti ho posielajú ako bearer token. Prázdny: server zostane vypnutý.
+menu.hint_assistant_box_server_url Túto adresu zadajte v MCP klientovi
 menu.hint_assistant_claude_key Kľúč vášho účtu Anthropic. Na prijímači je uložený ako čistý text.
 menu.hint_assistant_effort Ako dôkladne Claude premýšľa pred odpoveďou. Nízke odpovedá najrýchlejšie.
 menu.hint_assistant_enabled Ponúknuť asistenta v menu Multimédiá: jazykový model, ktorý odpovedá a ovláda prijímač, alebo jeho vstavané príkazy

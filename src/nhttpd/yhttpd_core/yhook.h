@@ -146,6 +146,7 @@ public:
 	CStringList 	ParamList;		// local copy of ParamList (Request)
 	CStringList 	UrlData;		// local copy of UrlData (Request)
 	CStringList 	HeaderList;		// local copy of HeaderList (Request)
+	std::string	Body;			// message body of a POST with JSON (Request)
 	CStringList 	WebserverConfigList;	// Reference (writable) to ConfigList
 	CStringList 	HookVarList;		// Variables in Hook-Handling passing to other Hooks
 	THttp_Method 	Method;			// HTTP Method (requested)
@@ -158,7 +159,8 @@ public:
 
 	// session handling
 	void 		session_init(CStringList _ParamList, CStringList _UrlData, CStringList _HeaderList,
-					CStringList& _ConfigList, THttp_Method _Method, bool _keep_alive);
+					CStringList& _ConfigList, THttp_Method _Method, bool _keep_alive,
+					const std::string &_Body = "");
 
 	// Cyhttpd based hooks
 	static THandleStatus	Hooks_ReadConfig(CConfigFile *Config, CStringList &ConfigList);

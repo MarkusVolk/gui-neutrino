@@ -192,8 +192,9 @@ THandleStatus CyhookHandler::Hooks_UploadReady(const std::string& Filename) {
 //=============================================================================
 void CyhookHandler::session_init(CStringList _ParamList, CStringList _UrlData,
 		CStringList _HeaderList, CStringList& _ConfigList,
-		THttp_Method _Method, bool _keep_alive) {
+		THttp_Method _Method, bool _keep_alive, const std::string &_Body) {
 	ParamList = _ParamList;
+	Body = _Body;
 	UrlData = _UrlData;
 	HeaderList = _HeaderList;
 	WebserverConfigList = _ConfigList;
@@ -280,8 +281,13 @@ std::string CyhookHandler::BuildHeader(bool cache) {
 
 	switch (httpStatus) {
 	case HTTP_UNAUTHORIZED:
-		result += "WWW-Authenticate: Basic realm=\"";
-		result += AUTH_NAME_MSG "\"\r\n";
+		/* a hook with its own scheme, such as a bearer token, names it */
+		if (!HookVarList["WWW-Authenticate"].empty())
+			result += "WWW-Authenticate: " + HookVarList["WWW-Authenticate"] + "\r\n";
+		else {
+			result += "WWW-Authenticate: Basic realm=\"";
+			result += AUTH_NAME_MSG "\"\r\n";
+		}
 		break;
 
 	case HTTP_MOVED_TEMPORARILY:

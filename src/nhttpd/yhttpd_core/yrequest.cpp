@@ -16,6 +16,7 @@
 //=============================================================================
 
 // c++
+#include <cctype>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -72,6 +73,7 @@ bool CWebserverRequest::HandleRequest(void) {
 	start_line = trim(start_line);
 	log_level_printf(1, "Request: %s\n", start_line.c_str());
 	UrlData["startline"] = start_line;
+	Body.clear();
 	if (!ParseStartLine(start_line))
 		return false;
 
@@ -188,6 +190,18 @@ bool CWebserverRequest::ParseParams(std::string param_string) {
 //		and consisting of either *TEXT or combinations
 //		of token, separators, and quoted-string>
 //-----------------------------------------------------------------------------
+// Header names are case-insensitive (RFC 9110); they are kept as
+// Content-Type, If-None-Match, ... whatever case a client sent them in
+static std::string canonical_header_name(const std::string &name) {
+	std::string out = name;
+	bool start = true;
+	for (size_t i = 0; i < out.size(); i++) {
+		out[i] = start ? toupper((unsigned char) out[i]) : tolower((unsigned char) out[i]);
+		start = out[i] == '-';
+	}
+	return out;
+}
+
 bool CWebserverRequest::ParseHeader(std::string header) {
 	bool ende = false;
 	std::string sheader = "", name = "", value = "";
@@ -198,7 +212,7 @@ bool CWebserverRequest::ParseHeader(std::string header) {
 		if (!ySplitStringExact(header, "\r\n", sheader, header))
 			ende = true;
 		if (ySplitStringExact(sheader, ":", name, value))
-			HeaderList[name] = trim(value);
+			HeaderList[canonical_header_name(name)] = trim(value);
 		log_level_printf(8, "ParseHeader: name: %s value: %s\n", name.c_str(), value.c_str());
 	}
 	return true;
@@ -303,29 +317,47 @@ bool CWebserverRequest::HandlePost() {
 		log_level_printf(6, "Handle POST application/x-www-form-urlencoded\n");
 
 		// get message-body
-		std::string post_header = Connection->sock->ReceiveBlock();
-		while (post_header.length() < content_len) {
-			std::string more = Connection->sock->ReceiveBlock();
-			if (more.empty()) {
-				// Nothing waiting: wait for the next byte instead of asking
-				// again at once. A caller that went away ends the body here,
-				// short of what it announced.
-				char next;
-				int got = Connection->sock->Read(&next, 1);
-				if (got < 0 && errno == EINTR)
-					continue;
-				if (got != 1) {
-					Connection->sock->isValid = false;
-					aprintf("POST form less data then expected\n");
-					Connection->Response.SendError(HTTP_INTERNAL_SERVER_ERROR);
-					return false;
-				}
-				more.assign(1, next);
-			}
-			post_header += more;
-		}
+		std::string post_header;
+		if (!ReadBody(content_len, post_header))
+			return false;
 		// parse the params in post_header (message-body) an add them to ParameterList
 		ParseParams(post_header);
+	} else if (HeaderList["Content-Type"].compare(0, 16, "application/json") == 0) {
+		// a JSON message such as a call of the MCP server, kept as it came
+		if (content_len > Y_CONFIG_MAX_JSON_BODY) {
+			Connection->Response.SendError(HTTP_REQUEST_ENTITY_TOO_LARGE);
+			return false;
+		}
+		if (!ReadBody(content_len, Body))
+			return false;
+	}
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Read a message body of content_len bytes
+//-----------------------------------------------------------------------------
+bool CWebserverRequest::ReadBody(unsigned int content_len, std::string &body) {
+	body = Connection->sock->ReceiveBlock();
+	while (body.length() < content_len) {
+		std::string more = Connection->sock->ReceiveBlock();
+		if (more.empty()) {
+			// Nothing waiting: wait for the next byte instead of asking
+			// again at once. A caller that went away ends the body here,
+			// short of what it announced.
+			char next;
+			int got = Connection->sock->Read(&next, 1);
+			if (got < 0 && errno == EINTR)
+				continue;
+			if (got != 1) {
+				Connection->sock->isValid = false;
+				aprintf("POST less data then expected\n");
+				Connection->Response.SendError(HTTP_INTERNAL_SERVER_ERROR);
+				return false;
+			}
+			more.assign(1, next);
+		}
+		body += more;
 	}
 	return true;
 }
