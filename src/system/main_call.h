@@ -35,6 +35,9 @@ namespace main_call
 	/* false when the main loop did not take it within timeout_ms; the
 	 * function may still run later, so it keeps its own state */
 	bool run(const std::function<void()> &fn, int timeout_ms);
+	/* hands the function over without waiting, for a dialog that takes
+	 * its time; false when the main loop's queue did not take it */
+	bool post(const std::function<void()> &fn);
 	/* for CNeutrinoApp::handleMsg on EVT_CALL_IN_MAIN */
 	void handle(neutrino_msg_data_t data);
 }

@@ -28,7 +28,9 @@ libnhttpd_tuxboxapi_a_SOURCES = \
 	neutrinoyparser.cpp
 
 if ENABLE_ASSISTANT
+AM_CPPFLAGS += @CRYPTO_CFLAGS@
 libnhttpd_tuxboxapi_a_SOURCES += \
-	mcpapi.cpp
+	mcpapi.cpp \
+	mcpoauth.cpp
 endif
 	

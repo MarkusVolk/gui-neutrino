@@ -578,6 +578,7 @@ if test "$enable_assistant_voice" = "yes" -a "$enable_assistant" != "yes"; then
 	AC_MSG_ERROR([--enable-assistant-voice needs --enable-assistant])
 fi
 if test "$enable_assistant" = "yes"; then
+	PKG_CHECK_MODULES([CRYPTO], [libcrypto])
 	AC_DEFINE(ENABLE_ASSISTANT, 1, [ask a language model that operates the box, with tools of MCP servers])
 fi
 if test "$enable_assistant_voice" = "yes"; then

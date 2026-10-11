@@ -954,6 +954,7 @@ struct SNeutrinoSettings
 	std::string assistant_stt_device;
 	int assistant_box_server;
 	std::string assistant_box_server_token;
+	std::string assistant_box_server_url;
 #endif
 
 	int flashupdate_createimage_add_env;

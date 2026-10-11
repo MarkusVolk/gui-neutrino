@@ -1122,6 +1122,7 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	setSettingsText(g_settings.assistant_stt_device, configfile.getString("assistant_stt_device", "default"));
 	g_settings.assistant_box_server = configfile.getInt32("assistant_box_server", 0);
 	loadSecret(configfile, "assistant_box_server_token", g_settings.assistant_box_server_token);
+	setSettingsText(g_settings.assistant_box_server_url, configfile.getString("assistant_box_server_url", ""));
 #endif
 
 	if (g_settings.softupdate_proxyserver.empty())
@@ -2087,6 +2088,7 @@ void CNeutrinoApp::saveSetup(const char *fname)
 	configfile.setString("assistant_stt_device", g_settings.assistant_stt_device);
 	configfile.setInt32("assistant_box_server", g_settings.assistant_box_server);
 	saveSecret(configfile, "assistant_box_server_token", g_settings.assistant_box_server_token);
+	configfile.setString("assistant_box_server_url", g_settings.assistant_box_server_url);
 #endif
 
 	configfile.setInt32("flashupdate_createimage_add_env", g_settings.flashupdate_createimage_add_env);

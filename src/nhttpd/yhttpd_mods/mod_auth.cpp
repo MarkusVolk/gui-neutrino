@@ -15,8 +15,11 @@ THandleStatus CmAuth::Hook_PrepareResponse(CyhookHandler *hh) {
 	THandleStatus status = HANDLED_CONTINUE;
 
 	// dont check local calls or calls from NoAuthClient
-	// the MCP server checks its own bearer token
-	if (authenticate && hh->UrlData["url"] != "/mcp") {
+	// the MCP server and its OAuth sign-in check tokens of their own
+	const std::string &url = hh->UrlData["url"];
+	bool mcp = url == "/mcp" || url.compare(0, 7, "/oauth/") == 0
+		   || url.compare(0, 18, "/.well-known/oauth") == 0;
+	if (authenticate && !mcp) {
 		if ((hh->UrlData["clientaddr"]).find(IADDR_LOCAL) > 0
 			&& (no_auth_client.empty() || (hh->UrlData["clientaddr"]).compare(no_auth_client) != 0))
 		{

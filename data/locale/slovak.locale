@@ -125,6 +125,9 @@ apidselector.head Výber jazyka
 assistant.ask Opýtať sa
 assistant.cancelled zrušené
 assistant.connecting Pripájam sa k
+assistant.consent Tento klient chce ovládať tento prijímač: programový sprievodca, časovače, prepínanie, hlasitosť a pohotovostný režim. Povoľte to len vtedy, ak ste o to práve sami požiadali.
+assistant.consent_busy Iné prihlásenie čaká na televízore na odpoveď. Skúste to o chvíľu znova.
+assistant.consent_wait Potvrďte prístup na televízore tlačidlom OK.
 assistant.enabled Asistent
 assistant.head Asistent
 assistant.help Bez jazykového modelu asistent rozumie príkazom ako:\n   prepni na Jednotku\n   čo ide\n   čo ide na Dvojke\n   čo ide dnes večer\n   nájdi Správy\n   nahraj toto\n   nahraj Správy\n   časovače\n   zmaž časovač 5\n   hlasnejšie, tichšie, stlmiť\n   standby\nNa všetko ostatné nastavte v nastaveniach jazykový model.
@@ -180,6 +183,8 @@ assistant_setup.mcp_name Názov
 assistant_setup.mcp_server Server
 assistant_setup.mcp_token Prístupový token
 assistant_setup.model Model
+assistant_setup.public_url Verejná adresa
+assistant_setup.revoke Odhlásiť všetkých klientov
 assistant_setup.stt_device Mikrofón
 assistant_setup.stt_language Jazyk
 assistant_setup.url Adresa
@@ -1370,6 +1375,8 @@ menu.hint_assistant_mcp_name Krátky názov, zobrazený pri použití nástroja 
 menu.hint_assistant_mcp_token Posiela sa ako bearer token, keď ho server vyžaduje
 menu.hint_assistant_mcp_url Adresa MCP koncového bodu servera (Streamable HTTP)
 menu.hint_assistant_openai_url Adresa servera po /v1, napríklad http://192.168.1.10:11434/v1
+menu.hint_assistant_public_url https adresa tunela alebo proxy pred prijímačom, pre MCP klientov z internetu ako claude.ai. Odpovedá tam len MCP a jeho prihlásenie.
+menu.hint_assistant_revoke Klienti prihlásení cez OAuth musia požiadať znova
 menu.hint_assistant_stt_device Zariadenie ALSA, z ktorého sa nahráva, napríklad default alebo plughw:1,0
 menu.hint_assistant_stt_language Hovorený jazyk ako kód, napríklad sk alebo en. Prázdne: server ho zistí sám.
 menu.hint_assistant_stt_url Server, ktorý prevádza reč na text (zvukový protokol OpenAI), po /v1

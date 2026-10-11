@@ -317,6 +317,7 @@ udev_dep = enable_udev ? dependency('libudev') : []
 libsecret_dep = enable_libsecret ? dependency('libsecret-1') : []
 lzma_dep = enable_xmltv_xz ? dependency('liblzma') : []
 alsa_dep = enable_assistant_voice ? dependency('alsa') : []
+crypto_dep = enable_assistant ? dependency('libcrypto') : []
 webp_dep = enable_webp ? dependency('libwebp') : []
 heif_dep = enable_heif ? dependency('libheif') : []
 jxl_dep = enable_jxl ? dependency('libjxl') : []
@@ -339,6 +340,7 @@ nt_deps = [
 	tsm_dep,
 	lzma_dep,
 	alsa_dep,
+	crypto_dep,
 	webp_dep,
 	heif_dep,
 	jxl_dep,

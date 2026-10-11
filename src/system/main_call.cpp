@@ -59,6 +59,19 @@ bool main_call::run(const std::function<void()> &fn, int timeout_ms)
 	return j->cond.wait_for(l, std::chrono::milliseconds(timeout_ms), [&] { return j->done; });
 }
 
+bool main_call::post(const std::function<void()> &fn)
+{
+	std::shared_ptr<job> j = std::make_shared<job>();
+	j->fn = fn;
+	std::shared_ptr<job> *ref = new std::shared_ptr<job>(j);
+	if (!g_RCInput->postMsg(NeutrinoMessages::EVT_CALL_IN_MAIN, (neutrino_msg_data_t) ref, false))
+	{
+		delete ref;
+		return false;
+	}
+	return true;
+}
+
 void main_call::handle(neutrino_msg_data_t data)
 {
 	std::shared_ptr<job> *ref = (std::shared_ptr<job> *) data;

@@ -253,13 +253,15 @@ void Cyhttpd::hooks_attach() {
 	CyhookHandler::attach(auth);
 #endif
 
+#if defined(CONFIG_SYSTEM_TUXBOX) && defined(ENABLE_ASSISTANT)
+	// MCP and its sign-in, ahead of the hooks a public address must not reach
+	CyhookHandler::attach(&mcpAPI);
+#endif
+
 #ifdef CONFIG_SYSTEM_TUXBOX
 	NeutrinoAPI = new CNeutrinoAPI();
 	CyhookHandler::attach(NeutrinoAPI->NeutrinoYParser);
 	CyhookHandler::attach(NeutrinoAPI->ControlAPI);
-#ifdef ENABLE_ASSISTANT
-	CyhookHandler::attach(&mcpAPI);
-#endif
 #else
 #ifdef Y_CONFIG_USE_YPARSER
 	CyhookHandler::attach(&yParser);

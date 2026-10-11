@@ -146,6 +146,10 @@ if ENABLE_XMLTV_XZ
 neutrino_LDADD += @LZMA_LIBS@
 endif
 
+if ENABLE_ASSISTANT
+neutrino_LDADD += @CRYPTO_LIBS@
+endif
+
 if ENABLE_ASSISTANT_VOICE
 neutrino_LDADD += @ALSA_LIBS@
 endif

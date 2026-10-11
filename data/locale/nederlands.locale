@@ -125,6 +125,9 @@ apidselector.head Selecteer taal
 assistant.ask Vragen
 assistant.cancelled geannuleerd
 assistant.connecting Verbinden met
+assistant.consent Deze client wil deze box bedienen: programmagids, timers, omschakelen, volume en stand-by. Alleen toestaan als u er zelf net om gevraagd hebt.
+assistant.consent_busy Een andere aanmelding wacht op de televisie op een antwoord. Probeer het zo meteen opnieuw.
+assistant.consent_wait Bevestig de toegang op de televisie met OK.
 assistant.enabled Assistent
 assistant.head Assistent
 assistant.help Zonder taalmodel begrijpt de assistent opdrachten als deze:\n   schakel naar NPO 1\n   wat is er op\n   wat is er op NPO 2\n   wat is er vanavond\n   zoek Journaal\n   neem dit op\n   neem Journaal op\n   timers\n   verwijder timer 5\n   harder, zachter, stil\n   stand-by\nStel voor al het andere een taalmodel in bij de instellingen.
@@ -180,6 +183,8 @@ assistant_setup.mcp_name Naam
 assistant_setup.mcp_server Server
 assistant_setup.mcp_token Toegangstoken
 assistant_setup.model Model
+assistant_setup.public_url Openbaar adres
+assistant_setup.revoke Alle clients afmelden
 assistant_setup.stt_device Microfoon
 assistant_setup.stt_language Taal
 assistant_setup.url Adres
@@ -1370,6 +1375,8 @@ menu.hint_assistant_mcp_name Een korte naam, getoond als een hulpmiddel van deze
 menu.hint_assistant_mcp_token Wordt als bearer-token meegestuurd als de server erom vraagt
 menu.hint_assistant_mcp_url Adres van het MCP-eindpunt van de server (Streamable HTTP)
 menu.hint_assistant_openai_url Adres van de server tot en met /v1, bijvoorbeeld http://192.168.1.10:11434/v1
+menu.hint_assistant_public_url https-adres van een tunnel of proxy voor de box, voor MCP-clients van het internet zoals claude.ai. Daar antwoorden alleen MCP en de aanmelding.
+menu.hint_assistant_revoke Via OAuth aangemelde clients moeten opnieuw vragen
 menu.hint_assistant_stt_device ALSA-apparaat om van op te nemen, bijvoorbeeld default of plughw:1,0
 menu.hint_assistant_stt_language Gesproken taal, als code zoals nl of en. Leeg: de server bepaalt het zelf.
 menu.hint_assistant_stt_url Server die spraak in tekst omzet (OpenAI-audioprotocol), tot en met /v1

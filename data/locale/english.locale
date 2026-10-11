@@ -125,6 +125,9 @@ apidselector.head Select language
 assistant.ask Ask
 assistant.cancelled cancelled
 assistant.connecting Connecting to
+assistant.consent This client wants to operate this box: programme guide, timers, switching channels, volume and standby. Only allow it if you asked for it yourself just now.
+assistant.consent_busy Another sign-in is waiting for an answer on the television. Try again in a moment.
+assistant.consent_wait Confirm the access on the television with OK.
 assistant.enabled Assistant
 assistant.head Assistant
 assistant.help Without a language model the assistant understands commands like these:\n   switch to BBC One\n   what's on\n   what's on BBC Two\n   what's on tonight\n   find Newsnight\n   record this\n   record Newsnight\n   timers\n   delete timer 5\n   louder, quieter, mute\n   standby\nFor anything else, set up a language model in the settings.
@@ -180,6 +183,8 @@ assistant_setup.mcp_name Name
 assistant_setup.mcp_server Server
 assistant_setup.mcp_token Access token
 assistant_setup.model Model
+assistant_setup.public_url Public address
+assistant_setup.revoke Sign out all clients
 assistant_setup.stt_device Microphone
 assistant_setup.stt_language Language
 assistant_setup.url Address
@@ -1370,6 +1375,8 @@ menu.hint_assistant_mcp_name A short name, shown when a tool of this server is u
 menu.hint_assistant_mcp_token Sent as bearer token when the server asks for one
 menu.hint_assistant_mcp_url Address of the server's MCP endpoint (Streamable HTTP)
 menu.hint_assistant_openai_url Address of the server up to /v1, for example http://192.168.1.10:11434/v1
+menu.hint_assistant_public_url https address of a tunnel or proxy in front of the box, for MCP clients from the internet such as claude.ai. Only MCP and its sign-in answer there.
+menu.hint_assistant_revoke Clients signed in through OAuth have to ask again
 menu.hint_assistant_stt_device ALSA device to record from, for example default or plughw:1,0
 menu.hint_assistant_stt_language Language that is spoken, as a code such as de or en. Empty: the server finds out.
 menu.hint_assistant_stt_url Server that turns speech into text (OpenAI audio protocol), up to /v1

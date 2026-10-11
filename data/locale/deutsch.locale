@@ -125,6 +125,9 @@ apidselector.head Sprachauswahl
 assistant.ask Fragen
 assistant.cancelled abgebrochen
 assistant.connecting Verbinde mit
+assistant.consent Dieser Client möchte diese Box bedienen: Programmführer, Timer, Umschalten, Lautstärke und Standby. Nur erlauben, wenn Sie das gerade selbst angefordert haben.
+assistant.consent_busy Eine andere Anmeldung wartet am Fernseher auf eine Antwort. Bitte gleich noch einmal versuchen.
+assistant.consent_wait Bitte den Zugriff am Fernseher mit OK bestätigen.
 assistant.enabled Assistent
 assistant.head Assistent
 assistant.help Ohne Sprachmodell versteht der Assistent Befehle wie diese:\n   schalte auf ZDF\n   was läuft\n   was läuft auf arte\n   was kommt heute abend\n   wann kommt Tatort\n   nimm das auf\n   nimm Tatort auf\n   timer\n   lösche timer 5\n   lauter, leiser, ton aus\n   standby\nFür alles andere in den Einstellungen ein Sprachmodell einrichten.
@@ -180,6 +183,8 @@ assistant_setup.mcp_name Name
 assistant_setup.mcp_server Server
 assistant_setup.mcp_token Zugangstoken
 assistant_setup.model Modell
+assistant_setup.public_url Öffentliche Adresse
+assistant_setup.revoke Alle Clients abmelden
 assistant_setup.stt_device Mikrofon
 assistant_setup.stt_language Sprache
 assistant_setup.url Adresse
@@ -1370,6 +1375,8 @@ menu.hint_assistant_mcp_name Ein kurzer Name; er wird angezeigt, wenn ein Werkze
 menu.hint_assistant_mcp_token Wird als Bearer-Token gesendet, wenn der Server eines verlangt
 menu.hint_assistant_mcp_url Adresse des MCP-Endpunkts des Servers (Streamable HTTP)
 menu.hint_assistant_openai_url Adresse des Servers bis einschließlich /v1, zum Beispiel http://192.168.1.10:11434/v1
+menu.hint_assistant_public_url https-Adresse eines Tunnels oder Proxys vor der Box, für MCP-Clients aus dem Internet wie claude.ai. Dort antworten nur MCP und seine Anmeldung.
+menu.hint_assistant_revoke Über OAuth angemeldete Clients müssen erneut fragen
 menu.hint_assistant_stt_device ALSA-Gerät für die Aufnahme, zum Beispiel default oder plughw:1,0
 menu.hint_assistant_stt_language Gesprochene Sprache als Kürzel wie de oder en. Leer: Der Server findet es heraus.
 menu.hint_assistant_stt_url Server, der Sprache in Text umsetzt (OpenAI-Audio-Protokoll), bis einschließlich /v1

@@ -28,6 +28,7 @@
 #endif
 
 #include "mcpapi.h"
+#include "mcpoauth.h"
 
 #include <global.h>
 #include <gui/assistant_tools.h>
@@ -53,15 +54,22 @@ enum
 
 THandleStatus CMcpAPI::Hook_PrepareResponse(CyhookHandler *hh)
 {
-	return hh->UrlData["url"] == "/mcp" ? HANDLED_READY : HANDLED_NONE;
+	const std::string &url = hh->UrlData["url"];
+	bool ours = url == "/mcp" || mcp_oauth::handles(url);
+	/* a tunnel or proxy in front of the box reaches MCP and its sign-in only,
+	 * never the web interface or the control API */
+	if (!ours && mcp_oauth::viaPublicAddress(hh))
+	{
+		hh->SetError(HTTP_FORBIDDEN);
+		return HANDLED_ERROR;
+	}
+	return ours ? HANDLED_READY : HANDLED_NONE;
 }
 
 bool CMcpAPI::enabled(std::string &token)
 {
-	if (!g_settings.assistant_box_server)
-		return false;
 	token = g_settings.assistant_box_server_token;
-	return !token.empty();
+	return g_settings.assistant_box_server;
 }
 
 /* the same time for every wrong token, whatever part of it matches */
@@ -78,7 +86,9 @@ bool CMcpAPI::authorized(CyhookHandler *hh, const std::string &token)
 	const std::string &given = hh->HeaderList["Authorization"];
 	if (given.compare(0, 7, "Bearer ") != 0)
 		return false;
-	return equal_secret(given.substr(7), token);
+	std::string bearer = given.substr(7);
+	/* the token of the settings, or one a client got by signing in */
+	return (!token.empty() && equal_secret(bearer, token)) || mcp_oauth::validAccessToken(bearer);
 }
 
 /* a page in a browser must not reach the box through a name that points to
@@ -193,13 +203,20 @@ Json::Value CMcpAPI::toolsCall(const Json::Value &params, int &code, std::string
 
 THandleStatus CMcpAPI::Hook_SendResponse(CyhookHandler *hh)
 {
-	if (hh->UrlData["url"] != "/mcp")
+	const std::string &url = hh->UrlData["url"];
+	bool oauth = mcp_oauth::handles(url);
+	if (url != "/mcp" && !oauth)
 		return HANDLED_NONE;
 
 	std::string token;
 	if (!enabled(token))
 	{
 		hh->SetError(HTTP_NOT_FOUND);
+		return HANDLED_READY;
+	}
+	if (oauth)
+	{
+		mcp_oauth::respond(hh);
 		return HANDLED_READY;
 	}
 	if (!sameOrigin(hh))
@@ -209,7 +226,8 @@ THandleStatus CMcpAPI::Hook_SendResponse(CyhookHandler *hh)
 	}
 	if (!authorized(hh, token))
 	{
-		hh->HookVarList["WWW-Authenticate"] = "Bearer";
+		hh->HookVarList["WWW-Authenticate"] = "Bearer resource_metadata=\"" + mcp_oauth::baseUrl(hh)
+						      + "/.well-known/oauth-protected-resource\"";
 		hh->SetError(HTTP_UNAUTHORIZED);
 		return HANDLED_READY;
 	}

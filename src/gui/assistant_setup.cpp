@@ -32,6 +32,7 @@
 #include <system/helpers.h>
 #include <system/llm_client.h>
 #include <nhttpd/yconfig.h>
+#include <nhttpd/tuxboxapi/mcpoauth.h>
 #include <libconfigfile/configfile.h>
 #include <libnet/libnet.h>
 
@@ -118,6 +119,11 @@ int CAssistantSetup::exec(CMenuTarget *parent, const std::string &actionKey)
 		return showVoice();
 	if (actionKey == "box_server")
 		return showBoxServer();
+	if (actionKey == "revoke")
+	{
+		mcp_oauth::revokeAll();
+		return menu_return::RETURN_REPAINT;
+	}
 	if (!actionKey.compare(0, 6, "server"))
 		return showServer(atoi(actionKey.c_str() + 6));
 	return showSetup();
@@ -243,6 +249,13 @@ int CAssistantSetup::showBoxServer()
 	CTextSetting token(LOCALE_ASSISTANT_SETUP_MCP_TOKEN, &g_settings.assistant_box_server_token);
 	token.addTo(&menu, LOCALE_ASSISTANT_SETUP_MCP_TOKEN, LOCALE_MENU_HINT_ASSISTANT_BOX_SERVER_TOKEN);
 	notifier.setTokenItem(token.forwarder());
+
+	menu.addItem(GenericMenuSeparatorLine);
+	CTextSetting public_url(LOCALE_ASSISTANT_SETUP_PUBLIC_URL, &g_settings.assistant_box_server_url, false, "https://neutrino.example.org");
+	public_url.addTo(&menu, LOCALE_ASSISTANT_SETUP_PUBLIC_URL, LOCALE_MENU_HINT_ASSISTANT_PUBLIC_URL);
+	CMenuForwarder *mf = new CMenuForwarder(LOCALE_ASSISTANT_SETUP_REVOKE, true, NULL, this, "revoke", CRCInput::RC_red);
+	mf->setHint("", LOCALE_MENU_HINT_ASSISTANT_REVOKE);
+	menu.addItem(mf);
 
 	return menu.exec(NULL, "");
 }

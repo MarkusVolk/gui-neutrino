@@ -4,7 +4,7 @@ libnhttpd_tuxboxapi_sources = [
 	'neutrinoyparser.cpp',
 ]
 if enable_assistant
-	libnhttpd_tuxboxapi_sources += 'mcpapi.cpp'
+	libnhttpd_tuxboxapi_sources += ['mcpapi.cpp', 'mcpoauth.cpp']
 endif
 
 libnhttpd_tuxboxapi = static_library('nhttpd_tuxboxapi',
