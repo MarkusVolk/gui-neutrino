@@ -297,25 +297,51 @@ static void page(CyhookHandler *hh, HttpResponseType status, const std::string &
 	hh->addResult(out);
 }
 
+/* headers a tunnel or reverse proxy adds and a browser in the home
+ * network never sends: Tailscale Funnel, cloudflared, nginx and the like */
+static const char *proxy_headers[] =
+{
+	"Tailscale-Funnel-Request",
+	"Forwarded",
+	"X-Forwarded-For",
+	"X-Forwarded-Host",
+	"X-Forwarded-Proto",
+	"X-Real-Ip",
+	"Cf-Connecting-Ip",
+	"Cf-Ray"
+};
+
 bool mcp_oauth::viaPublicAddress(CyhookHandler *hh)
 {
+	/* a request that came through a proxy counts as one from the internet,
+	 * whether or not the public address is set */
+	for (size_t i = 0; i < sizeof(proxy_headers) / sizeof(proxy_headers[0]); i++)
+	{
+		CStringList::iterator it = hh->HeaderList.find(proxy_headers[i]);
+		if (it != hh->HeaderList.end() && !it->second.empty())
+			return true;
+	}
 	const std::string &pub = g_settings.assistant_box_server_url;
-	if (pub.empty())
-		return false;
-	std::string host = host_of(pub);
-	return hh->HeaderList["Host"] == host || hh->HeaderList["X-Forwarded-Host"] == host;
+	return !pub.empty() && hh->HeaderList["Host"] == host_of(pub);
 }
 
 std::string mcp_oauth::baseUrl(CyhookHandler *hh)
 {
+	if (!viaPublicAddress(hh))
+		return "http://" + hh->HeaderList["Host"];
 	std::string pub = g_settings.assistant_box_server_url;
-	if (!pub.empty() && viaPublicAddress(hh))
+	if (!pub.empty())
 	{
 		while (!pub.empty() && pub[pub.size() - 1] == '/')
 			pub.erase(pub.size() - 1);
 		return pub;
 	}
-	return "http://" + hh->HeaderList["Host"];
+	/* without a public address, the one the proxy was asked for */
+	std::string host = hh->HeaderList["X-Forwarded-Host"];
+	if (host.empty())
+		host = hh->HeaderList["Host"];
+	std::string proto = hh->HeaderList["X-Forwarded-Proto"];
+	return (proto == "http" ? "http://" : "https://") + host;
 }
 
 /* exactly these paths, so that no other one rides along with them */

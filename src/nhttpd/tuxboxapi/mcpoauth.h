@@ -32,10 +32,12 @@ namespace mcp_oauth
 	void respond(CyhookHandler *hh);
 	/* an access token handed out to a signed-in client and not expired */
 	bool validAccessToken(const std::string &token);
-	/* where clients reach the box: the public address of the settings
-	 * when the request came that way, else the address that was asked */
+	/* where clients reach the box: for a request from the internet the
+	 * public address of the settings, or else the one the proxy was asked
+	 * for; for one from the home network the address that was asked */
 	std::string baseUrl(CyhookHandler *hh);
-	/* the request came through the public address of the settings */
+	/* the request came from the internet: through a tunnel or proxy, which
+	 * its headers show, or to the public address of the settings */
 	bool viaPublicAddress(CyhookHandler *hh);
 	/* signs every client out */
 	void revokeAll();
