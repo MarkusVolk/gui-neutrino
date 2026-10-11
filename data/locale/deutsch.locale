@@ -2281,6 +2281,7 @@ networkmenu.broadcast Broadcast
 networkmenu.dhcp DHCP
 networkmenu.error_hostname Ungültiger Hostname!\nErlaubt sind Buchstaben, Ziffern und Bindestriche.
 networkmenu.error_no_address Keine %s-Adresse angegeben!
+networkmenu.error_not_written Die Netzwerkeinstellungen konnten nicht gespeichert werden.
 networkmenu.gateway Standard Gateway
 networkmenu.hostname Hostname
 networkmenu.hostname_hint1 Geben sie den Hostnamen ein

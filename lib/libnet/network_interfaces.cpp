@@ -60,7 +60,9 @@ bool write_file(const std::string &filename, const std::list<std::string> &line)
 	for (std::list<std::string>::const_iterator it = line.begin(); it != line.end(); ++it)
 		out << (*it) << std::endl;
 
-	return true;
+	/* a full disk shows only now */
+	out.close();
+	return !out.fail();
 }
 
 std::list<std::string>::iterator add_attributes(const std::map<std::string, std::string> &attribute, std::list<std::string> &line, std::list<std::string>::iterator here)

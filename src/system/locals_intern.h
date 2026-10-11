@@ -2308,6 +2308,7 @@ const char * locale_real_names[] =
 	"networkmenu.dhcp",
 	"networkmenu.error_hostname",
 	"networkmenu.error_no_address",
+	"networkmenu.error_not_written",
 	"networkmenu.gateway",
 	"networkmenu.hostname",
 	"networkmenu.hostname_hint1",

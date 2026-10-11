@@ -187,12 +187,12 @@ bool CNetworkConfig::modified_from_orig(void)
 #endif
 }
 
-void CNetworkConfig::commitConfig(void)
+bool CNetworkConfig::commitConfig(void)
 {
 	if (!canConfigure())
 	{
 		printf("CNetworkConfig::commitConfig: %s is not configured here\n", ifname.c_str());
-		return;
+		return true;
 	}
 
 	bool modified = modified_from_orig();
@@ -209,10 +209,13 @@ void CNetworkConfig::commitConfig(void)
 		}
 	}
 
-	backendCommit(modified, nameserver_changed);
+	/* what was not written stays a change, the menu asks for it again */
+	if (!backendCommit(modified, nameserver_changed))
+		return false;
 
 	if (modified || nameserver_changed)
 		copy_to_orig();
+	return true;
 }
 
 bool CNetworkConfig::systemManaged(void)

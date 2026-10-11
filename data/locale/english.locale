@@ -2281,6 +2281,7 @@ networkmenu.broadcast Broadcast
 networkmenu.dhcp DHCP
 networkmenu.error_hostname Invalid hostname!\nLetters, digits and hyphens are allowed.
 networkmenu.error_no_address Missing %s-address!
+networkmenu.error_not_written The network settings could not be written.
 networkmenu.gateway Gateway
 networkmenu.hostname Hostname
 networkmenu.hostname_hint1 Enter hostname
