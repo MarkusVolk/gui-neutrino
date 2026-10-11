@@ -95,6 +95,7 @@ class CKeyboardInput : public CMenuTarget,  public sigc::trackable
 		bool masked;
 		fb_pixel_t *pixBuf;
 
+		std::string maskedString();
 		void keyDigiPressed(const neutrino_msg_t key);
 
 		void init();
@@ -129,7 +130,7 @@ class CKeyboardInput : public CMenuTarget,  public sigc::trackable
 		int exec( CMenuTarget* parent, const std::string & actionKey );
 
 		void forceSaveScreen(bool enable);
-		/* for secrets: every character but the one being edited shows as '*' */
+		/* for secrets: every character shows as '*', also on the displays of the box */
 		void setMasked(bool enable) { masked = enable; }
 		sigc::signal<void> OnAfterSave;
 };

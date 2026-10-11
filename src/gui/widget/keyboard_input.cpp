@@ -565,9 +565,11 @@ int CKeyboardInput::exec(CMenuTarget* parent, const std::string &)
 		if (changed)
 		{
 			changed = false;
-			CVFD::getInstance()->showMenuText(1, inputString->c_str() , selected+1);
+			/* the displays of the box get the stars as well */
+			std::string shown = masked ? maskedString() : std::string(inputString->c_str());
+			CVFD::getInstance()->showMenuText(1, shown.c_str(), selected+1);
 #ifdef ENABLE_GRAPHLCD
-			cGLCD::lockChannel(inputString->c_str(), "", 0);
+			cGLCD::lockChannel(shown.c_str(), "", 0);
 #endif
 		}
 		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd, true);
@@ -741,6 +743,15 @@ void CKeyboardInput::paintChar(int pos)
 		paintChar(pos, inputString->at(pos));
 }
 
+std::string CKeyboardInput::maskedString()
+{
+	/* one star for each character, a space stays a space */
+	std::string out;
+	for (size_t i = 0; i < inputString->length(); i++)
+		out += (inputString->at(i) == " " || inputString->at(i).empty()) ? ' ' : '*';
+	return out;
+}
+
 void CKeyboardInput::paintChar(int pos, std::string &c)
 {
 	int xpos = x + offset + (width-iwidth)/2 + pos* input_w;
@@ -755,7 +766,7 @@ void CKeyboardInput::paintChar(int pos, std::string &c)
 	frameBuffer->paintBoxFrame(xpos, ypos, input_w, input_h, 1, COL_MENUCONTENT_PLUS_2);
 
 	std::string star = "*";
-	std::string &shown = (masked && pos != selected && c != " " && !c.empty()) ? star : c;
+	std::string &shown = (masked && c != " " && !c.empty()) ? star : c;
 
 	int ch_w = g_Font[SNeutrinoSettings::FONT_TYPE_MENU]->getRenderWidth(shown);
 	int ch_x = xpos + std::max(input_w/2 - ch_w/2, 0);
