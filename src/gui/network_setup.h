@@ -46,6 +46,7 @@ class CNetworkSetup : public CMenuTarget, CChangeObserver
 						
 		int width;
 		int is_wizard;
+		bool settings_written;
 
 		int network_dhcp;
 		int network_automatic_start;

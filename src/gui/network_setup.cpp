@@ -81,6 +81,7 @@ CNetworkSetup::CNetworkSetup(int wizard_mode)
 	sectionsdConfigNotifier = NULL;
 
 	is_wizard = wizard_mode;
+	settings_written = true;
 
 	width = 40;
 
@@ -780,7 +781,7 @@ void CNetworkSetup::saveNetworkSettings()
 	dprintf(DEBUG_NORMAL, "[CNetworkSetup]\t[%s - %d], saving current network settings...\n", __func__, __LINE__);
 
 	prepareSettings();
-	networkConfig->commitConfig();
+	settings_written = networkConfig->commitConfig();
 }
 
 //saves settings and apply
@@ -797,6 +798,10 @@ void CNetworkSetup::applyNetworkSettings()
 
 	ShowHintS("Stopping network...", (sigc::mem_fun(networkConfig, &CNetworkConfig::stopNetwork)), 1, true, NEUTRINO_ICON_LOADER);
 	ShowHintS("Save network settings...", (sigc::mem_fun(*this, &CNetworkSetup::saveNetworkSettings)), 1, true, NEUTRINO_ICON_LOADER);
+	/* said before the network comes up again, which takes a while with DHCP;
+	 * it comes up with the settings it had, the stop above has taken them down */
+	if (!settings_written)
+		ShowMsg(LOCALE_MAINSETTINGS_NETWORK, LOCALE_NETWORKMENU_ERROR_NOT_WRITTEN, CMsgBox::mbrOk, CMsgBox::mbOk, NEUTRINO_ICON_ERROR, width);
 	ShowHintS("Starting network...", (sigc::mem_fun(networkConfig, &CNetworkConfig::startNetwork)), 0, true, NEUTRINO_ICON_LOADER);
 }
 

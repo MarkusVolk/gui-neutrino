@@ -34,7 +34,7 @@
 #ifndef ENABLE_IWD
 /* the networks are wpa_supplicant's, chosen in the wireless menu; its config
  * needs the control socket for that menu and has to let it store networks */
-static void prepareWpaConfig()
+static bool prepareWpaConfig()
 {
 	std::string s, conf;
 	bool ctrl = false, update = false;
@@ -61,12 +61,17 @@ static void prepareWpaConfig()
 	if (!f)
 	{
 		perror(WPA_CONFIG " write error");
-		return;
+		return false;
 	}
-	fchmod(fileno(f), 0600);
-	fputs(conf.c_str(), f);
-	if (fclose(f) == 0)
-		rename(tmp.c_str(), WPA_CONFIG);
+	bool ok = fchmod(fileno(f), 0600) == 0 && fputs(conf.c_str(), f) >= 0;
+	ok = fclose(f) == 0 && ok;
+	if (!ok || rename(tmp.c_str(), WPA_CONFIG) < 0)
+	{
+		perror(WPA_CONFIG " write error");
+		unlink(tmp.c_str());
+		return false;
+	}
+	return true;
 }
 #endif
 
@@ -90,28 +95,35 @@ void CNetworkConfig::backendRead(void)
 	inet_static = getInetAttributes(ifname, automatic_start, address, netmask, broadcast, gateway);
 }
 
-void CNetworkConfig::backendCommit(bool modified, bool nameserver_changed)
+bool CNetworkConfig::backendCommit(bool modified, bool nameserver_changed)
 {
+	bool ok = true;
 	if (modified)
 	{
-		addLoopbackDevice("lo", true);
+		ok = addLoopbackDevice("lo", true);
 		if (inet_static)
 		{
 			if (validAddress(address) && validAddress(netmask) && (gateway.empty() || validAddress(gateway)))
-				setStaticAttributes(ifname, automatic_start, address, netmask, broadcast, gateway, wireless);
+				ok = setStaticAttributes(ifname, automatic_start, address, netmask, broadcast, gateway, wireless) && ok;
 			else
+			{
 				printf("CNetworkConfig::commitConfig: invalid address, %s not written\n", ifname.c_str());
+				ok = false;
+			}
 		}
 		else
-			setDhcpAttributes(ifname, automatic_start, wireless);
+			ok = setDhcpAttributes(ifname, automatic_start, wireless) && ok;
+		if (!ok)
+			printf("CNetworkConfig::commitConfig: /etc/network/interfaces not written\n");
 
 #ifndef ENABLE_IWD
 		if (wireless)
-			prepareWpaConfig();
+			ok = prepareWpaConfig() && ok;
 #endif
 	}
 	if (nameserver_changed && (nameserver.empty() || validAddress(nameserver)))
 		netSetNameserver(nameserver);
+	return ok;
 }
 
 void CNetworkConfig::startNetwork(void)

@@ -2369,6 +2369,7 @@ networkmenu.broadcast Vysielanie / Broadcast
 networkmenu.dhcp Načítanie IP adresy z DHCP
 networkmenu.error_hostname Neplatný názov hostiteľa!\nPovolené sú písmená, číslice a pomlčky.
 networkmenu.error_no_address Chýbajúce %s adresy!
+networkmenu.error_not_written Nastavenia siete sa nepodarilo uložiť.
 networkmenu.gateway Predvolená brána
 networkmenu.hostname Názov hostiteľa
 networkmenu.hostname_hint1 Vložiť hostiteľa,

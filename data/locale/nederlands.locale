@@ -2369,6 +2369,7 @@ networkmenu.broadcast broadcast adres
 networkmenu.dhcp DHCP
 networkmenu.error_hostname Ongeldige hostnaam!\nLetters, cijfers en koppeltekens zijn toegestaan.
 networkmenu.error_no_address Adres ontbreekt
+networkmenu.error_not_written De netwerkinstellingen konden niet worden opgeslagen.
 networkmenu.gateway Standaard gateway
 networkmenu.hostname Hostnaam
 networkmenu.hostname_hint1 Hostnaam invoeren

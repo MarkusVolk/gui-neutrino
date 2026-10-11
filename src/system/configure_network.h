@@ -42,7 +42,7 @@ class CNetworkConfig
 
 	/* implemented once per backend, see configure_network_*.cpp */
 	void backendRead(void);
-	void backendCommit(bool modified, bool nameserver_changed);
+	bool backendCommit(bool modified, bool nameserver_changed);
 	void waitForAddress(void);
 
  public:
@@ -65,7 +65,8 @@ class CNetworkConfig
 	bool modified_from_orig(void);
 
 	void readConfig(std::string iname);
-	void commitConfig(void);
+	/* false when the settings could not be written */
+	bool commitConfig(void);
 
 	void startNetwork(void);
 	void stopNetwork(void);
