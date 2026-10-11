@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
+#include <net/if.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include "configure_network.h"
@@ -180,6 +181,37 @@ static bool write_file(const std::string &file, const std::string &content, mode
 	return true;
 }
 
+/* the file networkd configures the interface with, empty when it has none */
+static std::string active_file(const std::string &ifname)
+{
+	unsigned int index = if_nametoindex(ifname.c_str());
+	if (!index)
+		return "";
+
+	char state[64];
+	snprintf(state, sizeof(state), NETWORKD_RUNTIME_DIR "/links/%u", index);
+	std::ifstream in(state);
+	std::string line;
+	while (getline(in, line))
+		if (line.compare(0, 13, "NETWORK_FILE=") == 0)
+			return line.substr(13);
+	return "";
+}
+
+static std::string base_name(const std::string &path)
+{
+	std::string::size_type slash = path.rfind('/');
+	return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+/* networkd takes the first matching file by name, whatever its directory */
+static bool other_file_wins(const std::string &ifname)
+{
+	std::string active = active_file(ifname);
+	return !active.empty() && active != config_file(ifname) &&
+	       base_name(active) < base_name(config_file(ifname));
+}
+
 bool CNetworkConfig::canConfigure(void)
 {
 	if (systemManaged())
@@ -188,7 +220,8 @@ bool CNetworkConfig::canConfigure(void)
 		return false;
 	if (is_wireless(ifname) && iwd_configures_network())
 		return !iwd_profile(ifname).empty();
-	return true;
+	/* a file of the system that comes first would keep ours from being used */
+	return !other_file_wins(ifname);
 }
 
 bool CNetworkConfig::hasAutomaticStart(void)
@@ -305,7 +338,12 @@ void CNetworkConfig::backendRead(void)
 		return;
 	}
 
-	std::ifstream in(config_file(ifname).c_str());
+	/* the menu shows what networkd uses, which need not be our file,
+	 * so saving it does not turn a static setup into DHCP */
+	std::string file = active_file(ifname);
+	if (file.empty())
+		file = config_file(ifname);
+	std::ifstream in(file.c_str());
 	if (!in.is_open())
 		return;
 
