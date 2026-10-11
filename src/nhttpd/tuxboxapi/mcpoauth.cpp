@@ -311,6 +311,20 @@ static const char *proxy_headers[] =
 	"Cf-Ray"
 };
 
+/* the public address as set, with https:// when it was typed without a
+ * scheme and without a slash at the end */
+static std::string public_url()
+{
+	std::string pub = g_settings.assistant_box_server_url;
+	size_t b = pub.find_first_not_of(" \t");
+	pub = b == std::string::npos ? "" : pub.substr(b, pub.find_last_not_of(" \t") - b + 1);
+	while (!pub.empty() && pub[pub.size() - 1] == '/')
+		pub.erase(pub.size() - 1);
+	if (!pub.empty() && pub.find("://") == std::string::npos)
+		pub = "https://" + pub;
+	return pub;
+}
+
 bool mcp_oauth::viaPublicAddress(CyhookHandler *hh)
 {
 	/* a request that came through a proxy counts as one from the internet,
@@ -321,7 +335,7 @@ bool mcp_oauth::viaPublicAddress(CyhookHandler *hh)
 		if (it != hh->HeaderList.end() && !it->second.empty())
 			return true;
 	}
-	const std::string &pub = g_settings.assistant_box_server_url;
+	std::string pub = public_url();
 	return !pub.empty() && hh->HeaderList["Host"] == host_of(pub);
 }
 
@@ -329,13 +343,9 @@ std::string mcp_oauth::baseUrl(CyhookHandler *hh)
 {
 	if (!viaPublicAddress(hh))
 		return "http://" + hh->HeaderList["Host"];
-	std::string pub = g_settings.assistant_box_server_url;
+	std::string pub = public_url();
 	if (!pub.empty())
-	{
-		while (!pub.empty() && pub[pub.size() - 1] == '/')
-			pub.erase(pub.size() - 1);
 		return pub;
-	}
 	/* without a public address, the one the proxy was asked for */
 	std::string host = hh->HeaderList["X-Forwarded-Host"];
 	if (host.empty())
