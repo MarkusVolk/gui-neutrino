@@ -247,6 +247,8 @@ static std::vector<CMenuOptionChooser::keyval> videoFormatOptions()
 	v.push_back({ DISPLAY_AR_4_3, LOCALE_VIDEOMENU_VIDEOFORMAT_43 });
 	v.push_back({ DISPLAY_AR_16_9, LOCALE_VIDEOMENU_VIDEOFORMAT_169 });
 #if !HAVE_CST_HARDWARE
+	if (g_info.hw_caps->can_ar_16_10)
+		v.push_back({ DISPLAY_AR_16_10, LOCALE_VIDEOMENU_VIDEOFORMAT_1610 });
 	if (g_info.hw_caps->can_ar_21_9)
 		v.push_back({ DISPLAY_AR_21_9, LOCALE_VIDEOMENU_VIDEOFORMAT_219 });
 #endif
@@ -614,6 +616,7 @@ bool CVideoSettings::changeNotify(const neutrino_locale_t OptionName, void * /* 
 		if (g_settings.video_Format != 1 && g_settings.video_Format != 3 && g_settings.video_Format != 2
 #if !HAVE_CST_HARDWARE
 		    && !(g_info.hw_caps->can_ar_21_9 && g_settings.video_Format == DISPLAY_AR_21_9)
+		    && !(g_info.hw_caps->can_ar_16_10 && g_settings.video_Format == DISPLAY_AR_16_10)
 #endif
 		   )
 			g_settings.video_Format = 3;
