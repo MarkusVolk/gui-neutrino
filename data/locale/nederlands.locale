@@ -185,6 +185,7 @@ assistant_setup.mcp_token Toegangstoken
 assistant_setup.model Model
 assistant_setup.public_url Openbaar adres
 assistant_setup.revoke Alle clients afmelden
+assistant_setup.revoked Alle clients zijn afgemeld.
 assistant_setup.stt_device Microfoon
 assistant_setup.stt_language Taal
 assistant_setup.url Adres

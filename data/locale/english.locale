@@ -185,6 +185,7 @@ assistant_setup.mcp_token Access token
 assistant_setup.model Model
 assistant_setup.public_url Public address
 assistant_setup.revoke Sign out all clients
+assistant_setup.revoked All clients are signed out.
 assistant_setup.stt_device Microphone
 assistant_setup.stt_language Language
 assistant_setup.url Address

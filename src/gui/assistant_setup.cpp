@@ -27,6 +27,7 @@
 #include <neutrino.h>
 #include <driver/rcinput.h>
 #include <gui/components/cc_input_dialog.h>
+#include <gui/widget/hintbox.h>
 #include <gui/widget/icons.h>
 #include <gui/widget/menue_options.h>
 #include <system/helpers.h>
@@ -122,6 +123,7 @@ int CAssistantSetup::exec(CMenuTarget *parent, const std::string &actionKey)
 	if (actionKey == "revoke")
 	{
 		mcp_oauth::revokeAll();
+		ShowHint(LOCALE_MESSAGEBOX_INFO, LOCALE_ASSISTANT_SETUP_REVOKED, HINTBOX_MIN_WIDTH, 2);
 		return menu_return::RETURN_REPAINT;
 	}
 	if (!actionKey.compare(0, 6, "server"))

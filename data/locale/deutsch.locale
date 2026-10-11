@@ -185,6 +185,7 @@ assistant_setup.mcp_token Zugangstoken
 assistant_setup.model Modell
 assistant_setup.public_url Öffentliche Adresse
 assistant_setup.revoke Alle Clients abmelden
+assistant_setup.revoked Alle Clients sind abgemeldet.
 assistant_setup.stt_device Mikrofon
 assistant_setup.stt_language Sprache
 assistant_setup.url Adresse

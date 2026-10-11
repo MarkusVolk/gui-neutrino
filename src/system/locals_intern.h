@@ -212,6 +212,7 @@ const char * locale_real_names[] =
 	"assistant_setup.model",
 	"assistant_setup.public_url",
 	"assistant_setup.revoke",
+	"assistant_setup.revoked",
 	"assistant_setup.stt_device",
 	"assistant_setup.stt_language",
 	"assistant_setup.url",

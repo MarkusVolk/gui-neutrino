@@ -185,6 +185,7 @@ assistant_setup.mcp_token Prístupový token
 assistant_setup.model Model
 assistant_setup.public_url Verejná adresa
 assistant_setup.revoke Odhlásiť všetkých klientov
+assistant_setup.revoked Všetci klienti sú odhlásení.
 assistant_setup.stt_device Mikrofón
 assistant_setup.stt_language Jazyk
 assistant_setup.url Adresa
