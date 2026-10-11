@@ -1,6 +1,6 @@
 /*
 	What the assistant can do with the box: channels, programme guide,
-	timers, volume and standby as tools for a language model
+	timers, volume, standby and plugins as tools for a language model
 
 	License: GPL
 
@@ -30,6 +30,7 @@
 #include <eitd/sectionsd.h>
 #include <gui/channellist.h>
 #include <gui/movieplayer.h>
+#include <gui/plugins.h>
 #include <system/helpers.h>
 #include <timerdclient/timerdclient.h>
 #include <zapit/getservices.h>
@@ -123,6 +124,18 @@ static const struct
 		"tv_standby",
 		"Put the box into standby.",
 		"{\"type\":\"object\",\"properties\":{}}"
+	},
+	{
+		"tv_plugins",
+		"List the plugins of the box: games, tools and scripts, with their description.",
+		"{\"type\":\"object\",\"properties\":{}}"
+	},
+	{
+		"tv_plugin_start",
+		"Start a plugin by its name from tv_plugins. A game takes the screen until it is left.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"name\":{\"type\":\"string\",\"description\":\"name of the plugin\"}},"
+		"\"required\":[\"name\"]}"
 	}
 };
 
@@ -716,6 +729,90 @@ static bool volume(const Json::Value &input, std::string &result)
 	return true;
 }
 
+static const char *plugin_kind(int type)
+{
+	switch (type)
+	{
+		case CPlugins::P_TYPE_GAME:	return "game";
+		case CPlugins::P_TYPE_TOOL:	return "tool";
+		case CPlugins::P_TYPE_SCRIPT:	return "script";
+		case CPlugins::P_TYPE_LUA:	return "lua";
+		default:			return "plugin";
+	}
+}
+
+static bool plugin_usable(int number)
+{
+	return !g_Plugins->isHidden(number) && !(g_Plugins->getType(number) & CPlugins::P_TYPE_DISABLED);
+}
+
+static bool plugins(std::string &result)
+{
+	CPlugins::PluginGuard guard(g_Plugins);
+	for (int i = 0; i < g_Plugins->getNumberOfPlugins(); i++)
+	{
+		if (!plugin_usable(i))
+			continue;
+		result += std::string(g_Plugins->getName(i)) + "  (" + plugin_kind(g_Plugins->getType(i)) + ")";
+		if (!g_Plugins->getDescription(i).empty())
+			result += "  " + g_Plugins->getDescription(i);
+		result += "\n";
+	}
+	if (result.empty())
+		result = tr(LOCALE_ASSISTANT_TOOL_NO_PLUGINS);
+	return true;
+}
+
+/* a plugin by name or file name; a part of the name when no plugin has it as a whole */
+static bool plugin_start(const Json::Value &input, std::string &result)
+{
+	std::string want = lower(input["name"].asString());
+	std::string file, name;
+	{
+		CPlugins::PluginGuard guard(g_Plugins);
+		size_t closest = 0;
+		for (int i = 0; i < g_Plugins->getNumberOfPlugins() && !want.empty(); i++)
+		{
+			if (!plugin_usable(i))
+				continue;
+			std::string have = lower(g_Plugins->getName(i));
+			if (have == want || lower(g_Plugins->getFileName(i)) == want)
+			{
+				file = g_Plugins->getFileName(i);
+				name = g_Plugins->getName(i);
+				break;
+			}
+			if (have.find(want) != std::string::npos && (file.empty() || have.size() < closest))
+			{
+				file = g_Plugins->getFileName(i);
+				name = g_Plugins->getName(i);
+				closest = have.size();
+			}
+		}
+	}
+	if (file.empty())
+	{
+		result = std::string(tr(LOCALE_ASSISTANT_TOOL_NO_PLUGIN)) + " \"" + input["name"].asString() + "\"";
+		return false;
+	}
+	if (CNeutrinoApp::getInstance()->getMode() == NeutrinoModes::mode_standby)
+	{
+		result = tr(LOCALE_ASSISTANT_TOOL_IN_STANDBY);
+		return false;
+	}
+	/* started from the main loop, so the answer does not wait until the plugin is left */
+	char *data = new char[file.size() + 1];
+	strcpy(data, file.c_str());
+	if (!g_RCInput->postMsg(NeutrinoMessages::EVT_START_PLUGIN, (neutrino_msg_data_t)data, false))
+	{
+		delete[] data;
+		result = "the box is busy";
+		return false;
+	}
+	result = std::string(tr(LOCALE_ASSISTANT_TOOL_PLUGIN_STARTED)) + " " + name;
+	return true;
+}
+
 bool CAssistantTools::call(const std::string &name, const Json::Value &input, std::string &result)
 {
 	result.clear();
@@ -746,6 +843,10 @@ bool CAssistantTools::call(const std::string &name, const Json::Value &input, st
 		result = tr(LOCALE_ASSISTANT_TOOL_STANDBY);
 		return true;
 	}
+	if (name == "tv_plugins")
+		return plugins(result);
+	if (name == "tv_plugin_start")
+		return plugin_start(input, result);
 	result = "unknown tool";
 	return false;
 }

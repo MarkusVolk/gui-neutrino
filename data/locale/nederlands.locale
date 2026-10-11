@@ -154,11 +154,14 @@ assistant.tool_no_channel Er is geen zender
 assistant.tool_no_channel_on Er staat geen zender aan.
 assistant.tool_no_channels Geen zenders gevonden.
 assistant.tool_no_epg Geen programma-informatie.
+assistant.tool_no_plugin Er is geen plugin
+assistant.tool_no_plugins Geen plugins geïnstalleerd.
 assistant.tool_no_timer Er is geen timer
 assistant.tool_no_timers Geen timers.
 assistant.tool_not_muted geluid aan
 assistant.tool_nothing_found Niets gevonden.
 assistant.tool_now Nu
+assistant.tool_plugin_started Gestart:
 assistant.tool_record_times Een opname heeft een einde nodig dat na het begin ligt en nog niet voorbij is.
 assistant.tool_removed verwijderd
 assistant.tool_standby Ga naar stand-by.

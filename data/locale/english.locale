@@ -154,11 +154,14 @@ assistant.tool_no_channel There is no channel
 assistant.tool_no_channel_on No channel is on.
 assistant.tool_no_channels No channels found.
 assistant.tool_no_epg No programme information.
+assistant.tool_no_plugin There is no plugin
+assistant.tool_no_plugins No plugins installed.
 assistant.tool_no_timer There is no timer
 assistant.tool_no_timers No timers.
 assistant.tool_not_muted sound on
 assistant.tool_nothing_found Nothing found.
 assistant.tool_now Now
+assistant.tool_plugin_started Started
 assistant.tool_record_times A recording needs an end that is after its start and not over yet.
 assistant.tool_removed removed
 assistant.tool_standby Going into standby.

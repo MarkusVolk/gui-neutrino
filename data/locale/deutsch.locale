@@ -154,11 +154,14 @@ assistant.tool_no_channel Es gibt keinen Sender
 assistant.tool_no_channel_on Es läuft kein Sender.
 assistant.tool_no_channels Keine Sender gefunden.
 assistant.tool_no_epg Keine Programminformationen.
+assistant.tool_no_plugin Es gibt kein Plugin
+assistant.tool_no_plugins Keine Plugins installiert.
 assistant.tool_no_timer Es gibt keinen Timer
 assistant.tool_no_timers Keine Timer.
 assistant.tool_not_muted Ton an
 assistant.tool_nothing_found Nichts gefunden.
 assistant.tool_now Jetzt
+assistant.tool_plugin_started Gestartet:
 assistant.tool_record_times Eine Aufnahme braucht ein Ende, das nach ihrem Anfang liegt und noch nicht vorbei ist.
 assistant.tool_removed gelöscht
 assistant.tool_standby Gehe in den Standby.

@@ -154,11 +154,14 @@ assistant.tool_no_channel Neexistuje kanál
 assistant.tool_no_channel_on Nie je zapnutý žiadny kanál.
 assistant.tool_no_channels Nenašli sa žiadne kanály.
 assistant.tool_no_epg Žiadne informácie o programe.
+assistant.tool_no_plugin Neexistuje plugin
+assistant.tool_no_plugins Nie sú nainštalované žiadne pluginy.
 assistant.tool_no_timer Neexistuje časovač
 assistant.tool_no_timers Žiadne časovače.
 assistant.tool_not_muted zvuk zapnutý
 assistant.tool_nothing_found Nič sa nenašlo.
 assistant.tool_now Teraz
+assistant.tool_plugin_started Spustené:
 assistant.tool_record_times Nahrávanie potrebuje koniec, ktorý je po začiatku a ešte neuplynul.
 assistant.tool_removed odstránené
 assistant.tool_standby Prechádzam do pohotovostného režimu.
