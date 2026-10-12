@@ -74,7 +74,9 @@ static const file_ext_s file_ext[] =
 	{ "mpg",	CFile::FILE_MPG		},
 	{ "ogg",	CFile::FILE_OGG		},
 	{ "opk",	CFile::FILE_PKG_PACKAGE	},
+#ifdef ENABLE_FFMPEGDEC
 	{ "opus",	CFile::FILE_OGG		},
+#endif
 	{ "pls",	CFile::FILE_PLAYLIST	},
 	{ "png",	CFile::FILE_PICTURE	},
 	{ "sh", 	CFile::FILE_TEXT	},
