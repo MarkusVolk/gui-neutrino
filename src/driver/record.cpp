@@ -1896,8 +1896,10 @@ bool CRecordManager::ShowMenu(void)
 			mutex.unlock();
 			return false;
 		}
+		/* choosing it in the menu is the confirmation */
+		StopInstance(inst);
 		mutex.unlock();
-		return AskToStop(channel_ids[select], recording_ids[select]);
+		return true;
 	}
 	return false;
 }
