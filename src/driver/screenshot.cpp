@@ -390,7 +390,7 @@ bool CScreenShot::SavePng()
 	}
 
 	png_set_IHDR(png_ptr, info_ptr, xres, yres, 8, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
-	//png_set_filter (png_ptr, 0, PNG_FILTER_NONE);
+	png_set_filter(png_ptr, 0, PNG_FILTER_NONE);
 
 	png_set_compression_level(png_ptr, Z_BEST_SPEED);
 
