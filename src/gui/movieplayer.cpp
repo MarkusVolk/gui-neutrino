@@ -2316,9 +2316,9 @@ bool CMoviePlayerGui::luaGetUrl(const std::string &script, const std::string &fi
 		}
 	}
 	if (root.isObject()) {
+		info.url=""; info.url2=""; info.name=""; info.header=""; info.bandwidth = 1; info.resolution=""; info.res1 = 1;
+		tmp = "0";
 		for (Json::Value::iterator it = root.begin(); it != root.end(); ++it) {
-			info.url=""; info.url2=""; info.name=""; info.header=""; info.bandwidth = 1; info.resolution=""; info.res1 = 1;
-			tmp = "0";
 			std::string name = it.name();
 			if (name=="url") {
 				info.url = (*it).asString();
