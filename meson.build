@@ -321,6 +321,7 @@ crypto_dep = enable_assistant ? dependency('libcrypto') : []
 webp_dep = enable_webp ? dependency('libwebp') : []
 heif_dep = enable_heif ? dependency('libheif') : []
 jxl_dep = enable_jxl ? dependency('libjxl') : []
+mhd_dep = dependency('libmicrohttpd', version : '>= 1.0.0')
 
 nt_deps = [
 	threads_dep,
@@ -344,6 +345,7 @@ nt_deps = [
 	webp_dep,
 	heif_dep,
 	jxl_dep,
+	mhd_dep,
 ]
 
 subdir('lib')

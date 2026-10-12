@@ -12,7 +12,6 @@
 #include <yconfig.h>
 #include "ytypes_globals.h"
 #include "ylogging.h"
-#include "yconnection.h"
 //=============================================================================
 // Instance Handling - like Singelton Pattern
 //=============================================================================

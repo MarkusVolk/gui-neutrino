@@ -103,6 +103,7 @@ neutrino_LDADD = \
 	nhttpd/tuxboxapi/libnhttpd_tuxboxapi.a \
 	nhttpd/yhttpd_mods/libyhttpdmods.a \
 	nhttpd/yhttpd_core/libyhttpd.a \
+	nhttpd/api/libyapi.a \
 	system/libneutrino_system.a \
 	$(top_builddir)/lib/sectionsdclient/libsectionsdclient.a \
 	$(top_builddir)/lib/timerdclient/libtimerdclient.a \
@@ -118,6 +119,7 @@ neutrino_LDADD = \
 	$(top_builddir)/lib/libdvbsub/libdvbsub.a \
 	$(top_builddir)/src/gui/widget/yaft/libneutrino_gui_terminal.a \
 	@CURL_LIBS@ \
+	@MHD_LIBS@ \
 	@FREETYPE_LIBS@ \
 	@PNG_LIBS@ \
 	@BLURAY_LIBS@ \

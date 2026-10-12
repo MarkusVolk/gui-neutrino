@@ -1,4 +1,4 @@
-SUBDIRS = yhttpd_core yhttpd_mods tuxboxapi
+SUBDIRS = yhttpd_core yhttpd_mods tuxboxapi api
 
 AM_CPPFLAGS = -fno-rtti -fno-exceptions -D_FILE_OFFSET_BITS=64
 

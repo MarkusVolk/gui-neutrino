@@ -18,7 +18,6 @@
 #include <yconfig.h>
 #include <yhttpd.h>
 #include "ylanguage.h"
-#include "yconnection.h"
 
 #include <global.h>
 

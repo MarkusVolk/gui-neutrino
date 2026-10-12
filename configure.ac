@@ -141,6 +141,8 @@ PKG_CHECK_MODULES([FREETYPE], [freetype2 >= 16.2.10], [
 	#AC_MSG_ERROR([freetype2 >= 2.5.0 not found])
 ])
 
+PKG_CHECK_MODULES([MHD], [libmicrohttpd >= 1.0.0])
+
 # fallback to curl-config (which is ugly for cross-compilation)
 if test -z "$CURL_LIBS" -a -z "$CURL_CFLAGS"; then
 	TUXBOX_APPS_LIB_CONFIG(CURL,curl-config)
@@ -1039,6 +1041,7 @@ src/gui/moviebrowser/Makefile
 src/gui/widget/Makefile
 src/gui/widget/yaft/Makefile
 src/nhttpd/Makefile
+src/nhttpd/api/Makefile
 src/nhttpd/tuxboxapi/Makefile
 src/nhttpd/yhttpd_core/Makefile
 src/nhttpd/yhttpd_mods/Makefile

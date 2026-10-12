@@ -1,21 +1,26 @@
 //=============================================================================
 // YHTTPD
 // Webserver Class : Until now: exact one instance
+// libmicrohttpd accepts and parses; each request runs through the hook chain
+// the way the old socket server ran it, /api/ goes to the REST API
 //=============================================================================
 // c++
 #include <cerrno>
-#include <csignal>
+#include <cstring>
 #include <string>
+#include <vector>
 
 // system
 #include <stdio.h>
 #include <arpa/inet.h>
-#include <netinet/tcp.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
 #include <fcntl.h>
+#include <microhttpd.h>
 // tuxbox
 #include <configfile.h>
 
@@ -24,525 +29,562 @@
 #include "ywebserver.h"
 #include "ylogging.h"
 #include "helper.h"
-#include "yconnection.h"
-#include "yrequest.h"
+#include "yhook.h"
+#include <api/apiserver.h>
 #include <system/set_threadname.h>
 
-//=============================================================================
-// Initialization of static variables
-//=============================================================================
 bool CWebserver::is_threading = true;
-pthread_mutex_t CWebserver::mutex = PTHREAD_MUTEX_INITIALIZER;
-;
+
+namespace {
+
+struct TRequest
+{
+	std::string	raw_uri;
+	bool		started;
+	THttp_Method	method;
+	CStringList	ParameterList;
+	CStringList	UrlData;
+	CStringList	HeaderList;
+	std::string	Body;
+	std::string	content_type;
+	bool		too_large;
+	bool		is_api;
+	MHD_PostProcessor *pp;
+	int		upload_fd;
+	std::string	upload_var;
+	bool		upload_seen;
+	std::string	field_name;
+	std::string	field_value;
+	CyhookHandler	*hh;
+
+	TRequest() : started(false), method(M_UNKNOWN), too_large(false), is_api(false),
+		pp(NULL), upload_fd(-1), upload_seen(false), hh(NULL) {}
+	~TRequest()
+	{
+		if (pp)
+			MHD_destroy_post_processor(pp);
+		if (upload_fd >= 0)
+			close(upload_fd);
+		delete hh;
+	}
+};
+
+// Header names are case-insensitive (RFC 9110); they are kept as
+// Content-Type, If-None-Match, ... whatever case a client sent them in
+std::string canonical_header_name(const std::string &name)
+{
+	std::string out = name;
+	bool start = true;
+	for (size_t i = 0; i < out.size(); i++) {
+		out[i] = start ? toupper((unsigned char) out[i]) : tolower((unsigned char) out[i]);
+		start = out[i] == '-';
+	}
+	return out;
+}
+
+// parameter = attribute "=" value; an attribute given more than once
+// collects its values as <value1>,<value2>,..; every parameter is also
+// stored under its position, so /control/rcem?KEY_OK finds KEY_OK as "1"
+void parse_params(std::string param_string, CStringList &ParameterList)
+{
+	bool ende = false;
+	std::string param, name, value, number;
+
+	while (!ende) {
+		if (!ySplitStringExact(param_string, "&", param, param_string))
+			ende = true;
+		if (ySplitStringExact(param, "=", name, value)) {
+			name = decodeString(name);
+			value = trim(decodeString(value));
+			if (ParameterList[name].empty())
+				ParameterList[name] = value;
+			else {
+				ParameterList[name] += ",";
+				ParameterList[name] += value;
+			}
+		}
+		else
+			name = trim(decodeString(name));
+		number = string_printf("%d", ParameterList.size() + 1);
+		ParameterList[number] = name;
+	}
+}
+
+// Split an URL into path, filename and fileext in UrlData, the query into
+// ParameterList
+void analyze_url(const std::string &url, CStringList &UrlData, CStringList &ParameterList)
+{
+	ParameterList.clear();
+	std::string fullurl = trim(decodeString(url), "\r\n");
+	UrlData["fullurl"] = fullurl;
+
+	if (ySplitString(url, "?", UrlData["url"], UrlData["paramstring"])) {
+		UrlData["url"] = decodeString(UrlData["url"]);
+		parse_params(UrlData["paramstring"], ParameterList);
+	} else {
+		UrlData["url"] = fullurl;
+		UrlData["paramstring"] = "";
+	}
+
+	if (!ySplitStringLast(UrlData["url"], "/", UrlData["path"], UrlData["filename"]))
+		UrlData["path"] = "/";
+	else
+		UrlData["path"] += "/";
+	if (UrlData["url"].length() == 1 || UrlData["url"][UrlData["url"].length() - 1] == '/') {
+		UrlData["path"] = UrlData["url"];
+		UrlData["filename"] = "index.html";
+	}
+	UrlData["filenamepure"] = "";
+	UrlData["fileext"] = "";
+	ySplitStringLast(UrlData["filename"], ".", UrlData["filenamepure"], UrlData["fileext"]);
+}
+
+THttp_Method method_of(const char *method)
+{
+	if (!strcmp(method, MHD_HTTP_METHOD_POST))	return M_POST;
+	if (!strcmp(method, MHD_HTTP_METHOD_GET))	return M_GET;
+	if (!strcmp(method, MHD_HTTP_METHOD_HEAD))	return M_HEAD;
+	if (!strcmp(method, MHD_HTTP_METHOD_PUT))	return M_PUT;
+	if (!strcmp(method, MHD_HTTP_METHOD_DELETE))	return M_DELETE;
+	if (!strcmp(method, MHD_HTTP_METHOD_TRACE))	return M_TRACE;
+	return M_UNKNOWN;
+}
+
+std::string client_address(struct MHD_Connection *connection)
+{
+	const union MHD_ConnectionInfo *ci =
+		MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
+	if (!ci || !ci->client_addr)
+		return "";
+	char buf[INET6_ADDRSTRLEN] = "";
+	const struct sockaddr *sa = ci->client_addr;
+	if (sa->sa_family == AF_INET)
+		inet_ntop(AF_INET, &((const struct sockaddr_in *) sa)->sin_addr, buf, sizeof(buf));
+	else if (sa->sa_family == AF_INET6) {
+		const struct in6_addr *a = &((const struct sockaddr_in6 *) sa)->sin6_addr;
+		// the hooks compare IPv4 addresses as the old server gave them
+		if (IN6_IS_ADDR_V4MAPPED(a))
+			inet_ntop(AF_INET, &a->s6_addr[12], buf, sizeof(buf));
+		else
+			inet_ntop(AF_INET6, a, buf, sizeof(buf));
+	}
+	return buf;
+}
+
+MHD_Result collect_header(void *cls, enum MHD_ValueKind, const char *key, const char *value)
+{
+	CStringList *headers = (CStringList *) cls;
+	(*headers)[canonical_header_name(key)] = trim(value ? value : "");
+	return MHD_YES;
+}
+
+void *uri_logger(void *, const char *uri, struct MHD_Connection *)
+{
+	TRequest *req = new TRequest;
+	req->raw_uri = uri ? uri : "/";
+	return req;
+}
+
+void request_completed(void *, struct MHD_Connection *, void **con_cls, enum MHD_RequestTerminationCode)
+{
+	TRequest *req = (TRequest *) *con_cls;
+	if (req && req->hh)
+		req->hh->Hooks_EndConnection();
+	delete req;
+	*con_cls = NULL;
+}
+
+// A multipart POST: the one file goes to UPLOAD_TMP_FILE, the fields to
+// the parameters, both under the names the old server gave them
+void finish_field(TRequest *req)
+{
+	if (!req->field_name.empty())
+		req->ParameterList[req->field_name] = trim(decodeString(req->field_value));
+	req->field_name.clear();
+	req->field_value.clear();
+}
+
+MHD_Result post_iterator(void *cls, enum MHD_ValueKind, const char *key, const char *filename,
+		const char *content_type, const char *, const char *data, uint64_t off, size_t size)
+{
+	TRequest *req = (TRequest *) cls;
+	std::string name = key ? key : "";
+	if (filename) {
+#ifdef Y_CONFIG_FEATURE_UPLOAD
+		finish_field(req);
+		if (off == 0 && req->upload_var != name) {
+			if (req->upload_fd >= 0) {
+				close(req->upload_fd);
+				req->upload_fd = -1;
+			}
+			req->upload_var = name;
+			req->ParameterList[name] = trim(filename);
+			req->ParameterList[name + "_mime"] = content_type ? trim(content_type) : "";
+			req->ParameterList[name + "_upload_filename"] = UPLOAD_TMP_FILE;
+			req->upload_fd = open(UPLOAD_TMP_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+			if (req->upload_fd < 0) {
+				aprintf("cannot open file %s: %s\n", UPLOAD_TMP_FILE, strerror(errno));
+				return MHD_NO;
+			}
+			req->upload_seen = true;
+		}
+		while (size > 0 && req->upload_fd >= 0) {
+			ssize_t w = write(req->upload_fd, data, size);
+			if (w <= 0) {
+				perror("write file failed");
+				return MHD_NO;
+			}
+			data += w;
+			size -= w;
+		}
+#endif
+		return MHD_YES;
+	}
+	if (name != req->field_name)
+		finish_field(req);
+	req->field_name = name;
+	if (size)
+		req->field_value.append(data, size);
+	return MHD_YES;
+}
+
+// The header block BuildHeader() writes, as headers of the response;
+// what follows the block (the body of a redirect) is returned
+std::string add_headers(struct MHD_Response *response, const std::string &header_block)
+{
+	std::string head, tail;
+	ySplitStringExact(header_block, "\r\n\r\n", head, tail);
+	std::string::size_type pos = head.find("\r\n");
+	// the first line is the status line
+	while (pos != std::string::npos) {
+		std::string::size_type next = head.find("\r\n", pos + 2);
+		std::string line = head.substr(pos + 2, next == std::string::npos ? std::string::npos : next - pos - 2);
+		pos = next;
+		std::string name, value;
+		if (!ySplitStringExact(line, ":", name, value))
+			continue;
+		name = trim(name);
+		value = trim(value);
+		// libmicrohttpd writes these itself
+		if (!strcasecmp(name.c_str(), MHD_HTTP_HEADER_CONTENT_LENGTH)
+				|| !strcasecmp(name.c_str(), MHD_HTTP_HEADER_CONNECTION)
+				|| !strcasecmp(name.c_str(), MHD_HTTP_HEADER_DATE)
+				|| !strcasecmp(name.c_str(), MHD_HTTP_HEADER_TRANSFER_ENCODING))
+			continue;
+		MHD_add_response_header(response, name.c_str(), value.c_str());
+	}
+	return tail;
+}
+
+MHD_Result queue_buffer(struct MHD_Connection *connection, int status, const std::string &header_block,
+		const std::string &body)
+{
+	std::string head, tail;
+	ySplitStringExact(header_block, "\r\n\r\n", head, tail);
+	const std::string content = tail + body;
+	struct MHD_Response *response =
+		MHD_create_response_from_buffer_copy(content.size(), content.data());
+	if (!response)
+		return MHD_NO;
+	add_headers(response, header_block);
+	MHD_Result ret = MHD_queue_response(connection, status, response);
+	MHD_destroy_response(response);
+	return ret;
+}
+
+MHD_Result queue_error(struct MHD_Connection *connection, CyhookHandler &hh, HttpResponseType status)
+{
+	hh.SetError(status);
+	hh.yresult.clear();
+	return queue_buffer(connection, status, hh.BuildHeader(), "");
+}
+
+MHD_Result queue_file(struct MHD_Connection *connection, CyhookHandler &hh)
+{
+	const std::string &filename = hh.UrlData["url"];
+	int fd = open(filename.c_str(), O_RDONLY);
+	struct stat st;
+	if (fd < 0 || fstat(fd, &st) != 0) {
+		if (fd >= 0)
+			close(fd);
+		return queue_error(connection, hh, HTTP_NOT_FOUND);
+	}
+	off_t start = hh.RangeStart;
+	off_t len = (hh.RangeStart == 0 && hh.RangeEnd == -1) ? st.st_size - start : hh.RangeEnd - hh.RangeStart + 1;
+	if (start > st.st_size)
+		start = st.st_size;
+	if (len < 0 || start + len > st.st_size)
+		len = st.st_size - start;
+	struct MHD_Response *response = MHD_create_response_from_fd_at_offset64(len, fd, start);
+	if (!response) {
+		close(fd);
+		return MHD_NO;
+	}
+	add_headers(response, hh.BuildHeader(!hh.cached));
+	MHD_Result ret = MHD_queue_response(connection, hh.httpStatus, response);
+	MHD_destroy_response(response);
+	return ret;
+}
+
+// The order the old server ran the hooks in: prepare (auth, cache,
+// static files, rewrites), then produce, then a file if one was named
+MHD_Result run_hooks(struct MHD_Connection *connection, TRequest *req)
+{
+	req->hh = new CyhookHandler;
+	CyhookHandler &hh = *req->hh;
+	hh.session_init(req->ParameterList, req->UrlData, req->HeaderList, Cyhttpd::ConfigList,
+			req->method, true, req->Body);
+
+	CStringList discarded;
+	do {
+		hh.Hooks_PrepareResponse();
+		if (hh.status == HANDLED_ERROR || hh.status == HANDLED_ABORT)
+			return queue_buffer(connection, hh.httpStatus, hh.BuildHeader(), hh.yresult);
+		if (hh.status == HANDLED_SENDFILE || hh.status == HANDLED_REWRITE)
+			analyze_url(hh.NewURL, hh.UrlData, discarded);
+		if (hh.status == HANDLED_REDIRECTION)
+			return queue_buffer(connection, hh.httpStatus, hh.BuildHeader(), "");
+	} while (hh.status == HANDLED_REWRITE);
+
+	if (hh.httpStatus == HTTP_NOT_MODIFIED)
+		return queue_buffer(connection, hh.httpStatus, hh.BuildHeader(), "");
+
+	if (hh.status != HANDLED_SENDFILE)
+		do {
+			hh.Hooks_SendResponse();
+			if (hh.status == HANDLED_READY || hh.status == HANDLED_CONTINUE || hh.status == HANDLED_ERROR)
+				return queue_buffer(connection, hh.httpStatus, hh.BuildHeader(), hh.yresult);
+			if (hh.status == HANDLED_ABORT)
+				return MHD_NO;
+			if (hh.status == HANDLED_SENDFILE || hh.status == HANDLED_REWRITE)
+				analyze_url(hh.NewURL, hh.UrlData, discarded);
+			if (hh.status == HANDLED_REDIRECTION)
+				return queue_buffer(connection, hh.httpStatus, hh.BuildHeader(), "");
+		} while (hh.status == HANDLED_REWRITE);
+
+	if (hh.status == HANDLED_SENDFILE && hh.httpStatus == HTTP_REQUEST_RANGE_NOT_SATISFIABLE)
+		return queue_error(connection, hh, hh.httpStatus);
+	if (hh.status == HANDLED_SENDFILE)
+		return queue_file(connection, hh);
+
+	return queue_error(connection, hh, HTTP_NOT_FOUND);
+}
+
+MHD_Result run_api(struct MHD_Connection *connection, const char *method, TRequest *req)
+{
+	yapi::Request in;
+	in.method = method;
+	in.path = req->UrlData["url"];
+	in.query = req->UrlData["paramstring"];
+	in.body = req->Body;
+	in.client = req->UrlData["clientaddr"];
+	in.headers = req->HeaderList;
+	in.too_large = req->too_large;
+
+	yapi::Response out;
+	yapi::dispatch(in, out);
+
+	struct MHD_Response *response;
+	if (out.fd >= 0)
+		response = MHD_create_response_from_fd_at_offset64(out.length, out.fd, out.offset);
+	else
+		response = MHD_create_response_from_buffer_copy(out.body.size(), out.body.data());
+	if (!response)
+		return MHD_NO;
+	if (!out.content_type.empty())
+		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, out.content_type.c_str());
+	MHD_add_response_header(response, MHD_HTTP_HEADER_SERVER, WEBSERVERNAME);
+	for (size_t i = 0; i < out.headers.size(); i++)
+		MHD_add_response_header(response, out.headers[i].first.c_str(), out.headers[i].second.c_str());
+	MHD_Result ret = MHD_queue_response(connection, out.status, response);
+	MHD_destroy_response(response);
+	return ret;
+}
+
+MHD_Result access_handler(void *, struct MHD_Connection *connection, const char *, const char *method,
+		const char *, const char *upload_data, size_t *upload_data_size, void **con_cls)
+{
+	TRequest *req = (TRequest *) *con_cls;
+	if (!req) {
+		req = new TRequest;
+		*con_cls = req;
+	}
+
+	if (!req->started) {
+		req->started = true;
+		req->method = method_of(method);
+		MHD_get_connection_values(connection, MHD_HEADER_KIND, collect_header, &req->HeaderList);
+		analyze_url(req->raw_uri, req->UrlData, req->ParameterList);
+		req->UrlData["startline"] = std::string(method) + " " + req->raw_uri + " HTTP/1.1";
+		req->UrlData["httprotocol"] = "HTTP/1.1";
+		req->UrlData["clientaddr"] = client_address(connection);
+		req->is_api = yapi::handles(req->UrlData["url"]);
+		req->content_type = req->HeaderList["Content-Type"];
+		if (!req->is_api && req->method == M_POST
+				&& req->content_type.compare(0, 19, "multipart/form-data") == 0)
+			req->pp = MHD_create_post_processor(connection, 64 * 1024, post_iterator, req);
+		if (!req->is_api && req->method == M_UNKNOWN) {
+			CyhookHandler hh;
+			hh.Method = M_UNKNOWN;
+			return queue_error(connection, hh, HTTP_NOT_IMPLEMENTED);
+		}
+		return MHD_YES;
+	}
+
+	if (*upload_data_size) {
+		if (req->pp) {
+			if (MHD_post_process(req->pp, upload_data, *upload_data_size) != MHD_YES) {
+				*upload_data_size = 0;
+				return MHD_NO;
+			}
+		} else if (req->Body.size() + *upload_data_size > Y_CONFIG_MAX_JSON_BODY)
+			req->too_large = true;
+		else
+			req->Body.append(upload_data, *upload_data_size);
+		*upload_data_size = 0;
+		return MHD_YES;
+	}
+
+	if (req->is_api)
+		return run_api(connection, method, req);
+
+	if (req->pp) {
+		MHD_destroy_post_processor(req->pp);
+		req->pp = NULL;
+		finish_field(req);
+		if (req->upload_fd >= 0) {
+			close(req->upload_fd);
+			req->upload_fd = -1;
+		}
+		if (req->upload_seen) {
+			CyhookHandler hh;
+			hh.Hooks_UploadReady(UPLOAD_TMP_FILE);
+		}
+	} else if (req->method == M_POST) {
+		if (req->content_type == "application/x-www-form-urlencoded") {
+			parse_params(req->Body, req->ParameterList);
+			req->Body.clear();
+		} else if (req->content_type.compare(0, 16, "application/json") == 0) {
+			if (req->too_large) {
+				CyhookHandler hh;
+				hh.Method = req->method;
+				return queue_error(connection, hh, HTTP_REQUEST_ENTITY_TOO_LARGE);
+			}
+		} else
+			req->Body.clear();
+	}
+
+	return run_hooks(connection, req);
+}
+
+bool resolve_bind_address(const std::string &host, struct sockaddr_in &sai)
+{
+	if (host.empty() || host == "0.0.0.0" || host == "*")
+		return false;
+	if (inet_pton(AF_INET, host.c_str(), &sai.sin_addr) == 1)
+		return true;
+	struct hostent *he = gethostbyname(host.c_str());
+	if (he && he->h_addrtype == AF_INET && he->h_length == sizeof(sai.sin_addr)) {
+		memcpy(&sai.sin_addr, he->h_addr_list[0], sizeof(sai.sin_addr));
+		return true;
+	}
+	aprintf("bind address %s not usable, listening on all interfaces\n", host.c_str());
+	return false;
+}
+
+} // namespace
 
 //=============================================================================
 // Constructor & Destructor & Initialization
 //=============================================================================
 CWebserver::CWebserver() {
 	terminate = false;
-	for (int i = 0; i < HTTPD_MAX_CONNECTIONS; i++) {
-		Connection_Thread_List[i] = (pthread_t) NULL;
-		SocketList[i] = NULL;
-	}
-	FD_ZERO(&master); // initialize FD_SETs
-	FD_ZERO(&read_fds);
-	fdmax = 0;
-	open_connections = 0;
-#ifdef Y_CONFIG_FEATURE_THREADING
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-#endif
+	daemon = NULL;
 	port = HTTPD_STANDARD_PORT;
-
+	pthread_mutex_init(&run_mutex, NULL);
+	pthread_cond_init(&run_cond, NULL);
 }
 //-----------------------------------------------------------------------------
 CWebserver::~CWebserver() {
-	listenSocket.close();
+	if (daemon)
+		MHD_stop_daemon(daemon);
+	pthread_cond_destroy(&run_cond);
+	pthread_mutex_destroy(&run_mutex);
 }
-//=============================================================================
-// Start Webserver. Main-Loop.
 //-----------------------------------------------------------------------------
-// Wait for Connection and schedule ist to handle_connection()
-// HTTP/1.1 should can handle "keep-alive" connections to reduce socket
-// creation and handling. This is handled using FD_SET and select Socket
-// mechanism.
-// select wait for socket-activity. Cases:
-//	1) get a new connection
-//	2) re-use a socket
-//	3) timeout: close unused sockets
+bool CWebserver::start(unsigned int _port) {
+	unsigned int flags = MHD_USE_ERROR_LOG;
+	if (is_threading)
+		flags |= MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD;
+	else
+		flags |= MHD_USE_INTERNAL_POLLING_THREAD;
+
+	struct sockaddr_in sai;
+	memset(&sai, 0, sizeof(sai));
+	sai.sin_family = AF_INET;
+	sai.sin_port = htons(_port);
+	const bool bound = resolve_bind_address(bindAddress, sai);
+	if (!bound)
+		flags |= MHD_USE_DUAL_STACK;
+
+	struct MHD_OptionItem ops[] = {
+		{ MHD_OPTION_URI_LOG_CALLBACK, (intptr_t) uri_logger, NULL },
+		{ MHD_OPTION_NOTIFY_COMPLETED, (intptr_t) request_completed, NULL },
+		{ MHD_OPTION_CONNECTION_LIMIT, HTTPD_MAX_CONNECTIONS, NULL },
+		{ MHD_OPTION_CONNECTION_TIMEOUT, 60, NULL },
+		{ bound ? MHD_OPTION_SOCK_ADDR : MHD_OPTION_END, 0, bound ? &sai : NULL },
+		{ MHD_OPTION_END, 0, NULL }
+	};
+	daemon = MHD_start_daemon(flags, (uint16_t) _port, NULL, NULL, access_handler, NULL,
+			MHD_OPTION_ARRAY, ops, MHD_OPTION_END);
+	if (!daemon && !bound) {
+		// a kernel without IPv6
+		flags &= ~MHD_USE_DUAL_STACK;
+		daemon = MHD_start_daemon(flags, (uint16_t) _port, NULL, NULL, access_handler, NULL,
+				MHD_OPTION_ARRAY, ops, MHD_OPTION_END);
+	}
+	if (daemon)
+		port = _port;
+	return daemon != NULL;
+}
 //-----------------------------------------------------------------------------
-//	from RFC 2616:
-//	8 Connections
-//	8.1 Persistent Connections
-//	8.1.1 Purpose
-//
-//	   Prior to persistent connections, a separate TCP connection was
-//	   established to fetch each URL, increasing the load on HTTP servers
-//	   and causing congestion on the Internet. The use of inline images and
-//	   other associated data often require a client to make multiple
-//	   requests of the same server in a short amount of time. Analysis of
-//	   these performance problems and results from a prototype
-//	   implementation are available [26] [30]. Implementation experience and
-//	   measurements of actual HTTP/1.1 (RFC 2068) implementations show good
-//	   results [39]. Alternatives have also been explored, for example,
-//	   T/TCP [27].
-//
-//	   Persistent HTTP connections have a number of advantages:
-//
-//	      - By opening and closing fewer TCP connections, CPU time is saved
-//	        in routers and hosts (clients, servers, proxies, gateways,
-//	        tunnels, or caches), and memory used for TCP protocol control
-//	        blocks can be saved in hosts.
-//
-//	      - HTTP requests and responses can be pipelined on a connection.
-//	        Pipelining allows a client to make multiple requests without
-//	        waiting for each response, allowing a single TCP connection to
-//	        be used much more efficiently, with much lower elapsed time.
-//
-//	      - Network congestion is reduced by reducing the number of packets
-//	        caused by TCP opens, and by allowing TCP sufficient time to
-//	        determine the congestion state of the network.
-//
-//	      - Latency on subsequent requests is reduced since there is no time
-//	        spent in TCP's connection opening handshake.
-//
-//	      - HTTP can evolve more gracefully, since errors can be reported
-//	        without the penalty of closing the TCP connection. Clients using
-//	        future versions of HTTP might optimistically try a new feature,
-//	        but if communicating with an older server, retry with old
-//	        semantics after an error is reported.
-//
-//	   HTTP implementations SHOULD implement persistent connections.
-//=============================================================================
-#define MAX_TIMEOUTS_TO_CLOSE 10
-#define MAX_TIMEOUTS_TO_TEST 100
 bool CWebserver::run(void) {
 	set_threadname("ywebsrv::run");
-	if (!listenSocket.listen(port, HTTPD_MAX_CONNECTIONS, bindAddress)) {
+	if (!start(port)) {
 		if (port != HTTPD_STANDARD_PORT) {
 			// WebsiteMain.port in nhttpd.conf is changed by user
-			fprintf(stderr, "[yhttpd] Socket cannot bind and listen on port %d. Abort.\n", port);
+			fprintf(stderr, "[yhttpd] cannot listen on port %d. Abort.\n", port);
 			return false;
 		}
-		fprintf(stderr, "[yhttpd] Socket cannot bind and listen on port %d. Retrying port %d.\n", HTTPD_STANDARD_PORT, HTTPD_FALLBACK_PORT);
-		port = HTTPD_FALLBACK_PORT;
-		if (!listenSocket.listen(port, HTTPD_MAX_CONNECTIONS, bindAddress)) {
-			fprintf(stderr, "[yhttpd] Socket cannot bind and listen on port %d. Abort.\n", HTTPD_FALLBACK_PORT);
+		fprintf(stderr, "[yhttpd] cannot listen on port %d. Retrying port %d.\n", HTTPD_STANDARD_PORT, HTTPD_FALLBACK_PORT);
+		if (!start(HTTPD_FALLBACK_PORT)) {
+			fprintf(stderr, "[yhttpd] cannot listen on port %d. Abort.\n", HTTPD_FALLBACK_PORT);
 			return false;
 		}
 	}
-#ifdef Y_CONFIG_FEATURE_KEEP_ALIVE
+	aprintf("listening on port %d\n", port);
 
-	// initialize values for select
-	int listener = listenSocket.get_socket();// Open Listener
-	struct timeval tv; // timeout struct
-	FD_SET(listener, &master); // add the listener to the master set
-	fdmax = listener; // init max fd
-	fcntl(listener, F_SETFD , O_NONBLOCK); // listener master socket non-blocking
-	int timeout_counter = 0; // Counter for Connection Timeout checking
-	int test_counter = 0; // Counter for Testing long running Connections
+	pthread_mutex_lock(&run_mutex);
+	while (!terminate)
+		pthread_cond_wait(&run_cond, &run_mutex);
+	pthread_mutex_unlock(&run_mutex);
 
-	// main Webserver Loop
-	while(!terminate)
-	{
-		// select : init vars
-		read_fds = master; // copy it
-		tv.tv_usec = 10000; // microsec: Timeout for select ! for re-use / keep-alive socket
-		tv.tv_sec = 0; // seconds
-		int fd = -1;
-
-		// select : wait for socket activity
-		if(open_connections <= 0) // No open Connection. Wait in select.
-		fd = select(fdmax+1,&read_fds, NULL, NULL, NULL);// wait for socket activity
-		else
-		fd = select(fdmax+1,&read_fds, NULL, NULL, &tv);// wait for socket activity or timeout
-
-		// too much to do : sleep
-		if(open_connections >= HTTPD_MAX_CONNECTIONS-1)
-		sleep(1);
-
-		// Socket Error?
-		if(fd == -1 && errno != EINTR)
-		{
-			perror("select");
-			return false;
-		}
-
-		// Socket Timeout?
-		if(fd == 0)
-		{
-			// Testoutput for long living threads
-			if(++test_counter >= MAX_TIMEOUTS_TO_TEST)
-			{
-				for(int j=0;j < HTTPD_MAX_CONNECTIONS;j++)
-				if(SocketList[j] != NULL) // here is a socket
-				log_level_printf(2,"FD-TEST sock:%d handle:%d open:%d\n",SocketList[j]->get_socket(),
-						SocketList[j]->handling,SocketList[j]->isOpened);
-				test_counter=0;
-			}
-			// some connection closing previous missed?
-			if(++timeout_counter >= MAX_TIMEOUTS_TO_CLOSE)
-			{
-				CloseConnectionSocketsByTimeout();
-				timeout_counter=0;
-			}
-			continue; // main loop again
-		}
-		//----------------------------------------------------------------------------------------
-		// Check all observed descriptors & check new or re-use Connections
-		//----------------------------------------------------------------------------------------
-		for(int i = listener; i <= fdmax; i++)
-		{
-			int slot = -1;
-			if(FD_ISSET(i, &read_fds)) // Socket observed?
-			{ // we got one!!
-				if (i == listener) // handle new connections
-				slot = AcceptNewConnectionSocket();
-				else // Connection on an existing open Socket = reuse (keep-alive)
-				{
-					slot = SL_GetExistingSocket(i);
-					if(slot>=0)
-					log_level_printf(2,"FD: reuse con fd:%d\n",SocketList[slot]->get_socket());
-				}
-				// prepare Connection handling
-				if(slot>=0)
-				if(SocketList[slot] != NULL && !SocketList[slot]->handling && SocketList[slot]->isValid)
-				{
-					log_level_printf(2,"FD: START CON HANDLING con fd:%d\n",SocketList[slot]->get_socket());
-					FD_CLR(SocketList[slot]->get_socket(), &master); // remove from master set
-					SocketList[slot]->handling = true; // prepares for thread-handling
-					if(!handle_connection(SocketList[slot]))// handle this activity
-					{
-						/* handle_connection owns the socket on failure now:
-						   it has answered 503, closed and deleted it. What is
-						   left here is this list's own bookkeeping - touching
-						   the object again would be a use after free. (This
-						   branch is compiled out, see Y_CONFIG_FEATURE_KEEP_ALIVE
-						   in yconfig.h; kept consistent for the day it is not.) */
-						SocketList[slot] = NULL;
-						open_connections--;
-					}
-				}
-			}
-		}// for
-		CloseConnectionSocketsByTimeout(); // Check connections to close
-
-	}//while
-#else
-	while (!terminate) {
-		CySocket *newConnectionSock;
-		if (!(newConnectionSock = listenSocket.accept())) //Now: Blocking wait
-		{
-			pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-			pthread_testcancel();
-			dperror("Socket accept error. Continue.\n");
-			continue;
-		}
-		log_level_printf(3, "Socket connect from %s\n",
-				(listenSocket.get_client_ip()).c_str());
-#ifdef Y_CONFIG_USE_OPEN_SSL
-		if(Cyhttpd::ConfigList["SSL"]=="true")
-		newConnectionSock->initAsSSL(); // make it a SSL-socket
-#endif
-		handle_connection(newConnectionSock);
-	}
-#endif
+	MHD_stop_daemon(daemon);
+	daemon = NULL;
 	return true;
 }
-//=============================================================================
-// SocketList Handler
-//=============================================================================
 //-----------------------------------------------------------------------------
-// Accept new Connection
-//-----------------------------------------------------------------------------
-int CWebserver::AcceptNewConnectionSocket() {
-	int slot = -1;
-	CySocket *connectionSock = NULL;
-
-	if (!(connectionSock = listenSocket.accept())) // Blocking wait
-	{
-		dperror("Socket accept error. Continue.\n");
-		delete connectionSock;
-		return -1;
-	}
-#ifdef Y_CONFIG_USE_OPEN_SSL
-	if(Cyhttpd::ConfigList["SSL"]=="true")
-	connectionSock->initAsSSL(); // make it a SSL-socket
-#endif
-	log_level_printf(2, "FD: new con fd:%d on port:%d\n",
-			connectionSock->get_socket(), connectionSock->get_accept_port());
-
-	// Add Socket to List
-	slot = SL_GetFreeSlot();
-	if (slot < 0) {
-		connectionSock->close();
-		aprintf("No free Slot in SocketList found. Open:%d\n", open_connections);
-	} else {
-		SocketList[slot] = connectionSock; // put it to list
-		fcntl(connectionSock->get_socket(), F_SETFD, O_NONBLOCK); // set non-blocking
-		open_connections++; // count open connectins
-		int newfd = connectionSock->get_socket();
-		if (newfd > fdmax) // keep track of the maximum fd
-			fdmax = newfd;
-	}
-	return slot;
+void CWebserver::stop(void) {
+	pthread_mutex_lock(&run_mutex);
+	terminate = true;
+	pthread_cond_broadcast(&run_cond);
+	pthread_mutex_unlock(&run_mutex);
 }
-
-//-----------------------------------------------------------------------------
-// Get Index for Socket from SocketList
-//-----------------------------------------------------------------------------
-int CWebserver::SL_GetExistingSocket(SOCKET sock) {
-	int slot = -1;
-	for (int j = 0; j < HTTPD_MAX_CONNECTIONS; j++)
-		if (SocketList[j] != NULL // here is a socket
-				&& SocketList[j]->get_socket() == sock) // we know that socket
-		{
-			slot = j;
-			break;
-		}
-	return slot;
-}
-//-----------------------------------------------------------------------------
-// Get Index for free Slot in SocketList
-//-----------------------------------------------------------------------------
-int CWebserver::SL_GetFreeSlot() {
-	int slot = -1;
-	for (int j = 0; j < HTTPD_MAX_CONNECTIONS; j++)
-		if (SocketList[j] == NULL) // here is a free slot
-		{
-			slot = j;
-			break;
-		}
-	return slot;
-}
-
-//-----------------------------------------------------------------------------
-// Look for Sockets to close
-//-----------------------------------------------------------------------------
-void CWebserver::CloseConnectionSocketsByTimeout() {
-	CySocket *connectionSock = NULL;
-	for (int j = 0; j < HTTPD_MAX_CONNECTIONS; j++)
-		if (SocketList[j] != NULL // here is a socket
-				&& !SocketList[j]->handling) // it is not handled
-		{
-			connectionSock = SocketList[j];
-			SOCKET thisSocket = connectionSock->get_socket();
-			bool shouldClose = true;
-
-			if (!connectionSock->isValid) // If not valid -> close
-				; // close
-			else if (connectionSock->tv_start_waiting.tv_sec != 0
-					|| SocketList[j]->tv_start_waiting.tv_usec != 0) { // calculate keep-alive timeout
-				struct timeval tv_now;
-				struct timezone tz_now;
-				gettimeofday(&tv_now, &tz_now);
-				int64_t tdiff = ((tv_now.tv_sec
-						- connectionSock->tv_start_waiting.tv_sec) * 1000000
-						+ (tv_now.tv_usec
-								- connectionSock->tv_start_waiting.tv_usec));
-				if (tdiff < HTTPD_KEEPALIVE_TIMEOUT || tdiff < 0)
-					shouldClose = false;
-			}
-			if (shouldClose) {
-				log_level_printf(2, "FD: close con Timeout fd:%d\n", thisSocket);
-				SL_CloseSocketBySlot(j);
-			}
-		}
-}
-//-----------------------------------------------------------------------------
-// Add Socket fd to FD_SET again (for select-handling)
-// Add start-time for waiting for connection re-use / keep-alive
-//-----------------------------------------------------------------------------
-void CWebserver::addSocketToMasterSet(SOCKET fd) {
-	int slot = SL_GetExistingSocket(fd); // get slot/index for fd
-	if (slot < 0)
-		return;
-	log_level_printf(2, "FD: add to master fd:%d\n", fd);
-	struct timeval tv_now;
-	struct timezone tz_now;
-	gettimeofday(&tv_now, &tz_now);
-	SocketList[slot]->tv_start_waiting = tv_now; // add keep-alive wait time
-	FD_SET(fd, &master); // add fd to select-master-set
-}
-
-//-----------------------------------------------------------------------------
-// Close (FD_SET handled) Socket
-// Clear it from SocketList
-//-----------------------------------------------------------------------------
-void CWebserver::SL_CloseSocketBySlot(int slot) {
-	open_connections--; // count open connections
-	if (SocketList[slot] == NULL)
-		return;
-	SocketList[slot]->handling = false; // no handling anymore
-	FD_CLR(SocketList[slot]->get_socket(), &master);// remove from master set
-	SocketList[slot]->close(); // close the socket
-	delete SocketList[slot]; // destroy ySocket
-	SocketList[slot] = NULL; // free in list
-}
-
-//=============================================================================
-// Thread Handling
-//=============================================================================
-//-----------------------------------------------------------------------------
-// Check if IP is allowed for keep-alive
 //-----------------------------------------------------------------------------
 bool CWebserver::CheckKeepAliveAllowedByIP(std::string client_ip) {
-	pthread_mutex_lock(&mutex);
-	bool do_keep_alive = true;
 	CStringVector::const_iterator it = conf_no_keep_alive_ips.begin();
-	while (it != conf_no_keep_alive_ips.end()) {
+	for (; it != conf_no_keep_alive_ips.end(); ++it)
 		if (trim(*it) == client_ip)
-			do_keep_alive = false;
-		++it;
-	}
-	pthread_mutex_unlock(&mutex);
-	return do_keep_alive;
-}
-//-----------------------------------------------------------------------------
-// Set Entry(number)to NULL in Threadlist
-//-----------------------------------------------------------------------------
-void CWebserver::clear_Thread_List_Number(int number) {
-	pthread_mutex_lock(&mutex);
-	if (number < HTTPD_MAX_CONNECTIONS)
-		Connection_Thread_List[number] = (pthread_t) NULL;
-	CloseConnectionSocketsByTimeout();
-	pthread_mutex_unlock(&mutex);
-}
-
-//-----------------------------------------------------------------------------
-// A new Connection is established to newSock. Create a (threaded) Connection
-// and handle the Request.
-//-----------------------------------------------------------------------------
-void CWebserver::refuse_connection(CySocket *sock) {
-	static const char refusal[] =
-		"HTTP/1.0 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
-	sock->Send(refusal, sizeof(refusal) - 1);
-	sock->close();
-	delete sock;
-}
-
-bool CWebserver::handle_connection(CySocket *newSock) {
-	void *WebThread(void *args); //forward declaration
-
-	// create arguments
-	TWebserverConnectionArgs *newConn = new TWebserverConnectionArgs;
-	if (!newConn) {
-		dperror("CWebserver TWebserverConnectionArgs error!\n");
-		refuse_connection(newSock);
-		return false;
-	}
-	newConn->ySock = newSock;
-	newConn->ySock->handling = true;
-	newConn->WebserverBackref = this;
-#ifdef Y_CONFIG_FEATURE_THREADING
-	newConn->is_treaded = is_threading;
-#else
-	newConn->is_treaded = false;
-#endif
-	int index = -1;
-#ifdef Y_CONFIG_FEATURE_THREADING
-	if(is_threading)
-	{
-		pthread_mutex_lock( &mutex );
-		// look for free Thread slot
-		for(int i=0;i<HTTPD_MAX_CONNECTIONS;i++)
-		if(Connection_Thread_List[i] == (pthread_t)NULL)
-		{
-			index = i;
-			break;
-		}
-		if(index == -1)
-		{
-			dperror("Maximum Connection-Threads reached\n");
-			pthread_mutex_unlock( &mutex );
-			// the caller gets nothing back to clean up: the socket and
-			// the arguments end here, and the client sees a 503, not a
-			// connection that hangs until its own timeout
-			delete newConn;
-			refuse_connection(newSock);
 			return false;
-		}
-		newConn->thread_number = index; //remember Index of Thread slot (for clean up)
-
-		// Create an orphan Thread. It is not joinable anymore.
-		// The id is written into the slot while the mutex is held: a worker
-		// that ends at once clears its slot under the same mutex, and a
-		// clear that came before pthread_create wrote the id would leave
-		// the slot taken for good.
-		if(pthread_create(&Connection_Thread_List[index], &attr, WebThread, (void *)newConn) != 0)
-		{
-			dperror("Could not create Connection-Thread\n");
-			Connection_Thread_List[index] = (pthread_t)NULL;
-			pthread_mutex_unlock( &mutex );
-			delete newConn;
-			refuse_connection(newSock);
-			return false;
-		}
-		pthread_mutex_unlock( &mutex );
-	}
-	else // non threaded
-#endif
-	WebThread((void *) newConn);
 	return true;
-}
-//-------------------------------------------------------------------------
-// Webserver-Thread for each connection
-//-------------------------------------------------------------------------
-void *WebThread(void *args) {
-	TWebserverConnectionArgs *newConn = (TWebserverConnectionArgs *) args;
-	if (!newConn) {
-		dperror("WebThread called without arguments!\n");
-		return NULL;
-	}
-
-	bool is_threaded = newConn->is_treaded;
-	if (is_threaded)
-		log_level_printf(1, "++ Thread 0x06%X gestartet\n", (int) pthread_self());
-
-	// (1) create & init Connection
-	CWebserver *ws = newConn->WebserverBackref;
-	if (!ws) {
-		dperror("WebThread CWebserver error!\n");
-		return NULL;
-	}
-
-	CWebserverConnection *con = new CWebserverConnection(ws);
-	if (!con) {
-		dperror("WebThread CWebserverConnection error!\n");
-		return NULL;
-	}
-
-	con->Request.UrlData["clientaddr"] = newConn->ySock->get_client_ip(); // TODO:here?
-	con->sock = newConn->ySock; // give socket reference
-	newConn->ySock->handling = true; // dont handle this socket now be webserver main loop
-
-	// (2) handle the connection
-	con->HandleConnection();
-
-	// (3) end connection handling
-#ifdef Y_CONFIG_FEATURE_KEEP_ALIVE
-	if(!con->keep_alive)
-		log_level_printf(2,"FD SHOULD CLOSE sock:%d!!!\n",con->sock->get_socket());
-	else
-		ws->addSocketToMasterSet(con->sock->get_socket()); // add to master set
-#endif
-	if (!con->keep_alive)
-		con->sock->isValid = false;
-	con->sock->handling = false; // socket can be handled by webserver main loop (select) again
-
-#ifndef Y_CONFIG_FEATURE_KEEP_ALIVE
-	delete newConn->ySock;
-	newConn->ySock = NULL;
-#endif
-
-	// (4) end thread
-	delete con;
-	int thread_number = newConn->thread_number;
-	delete newConn;
-	if (is_threaded) {
-		log_level_printf(1, "-- Thread 0x06%X beendet\n", (int) pthread_self());
-		ws->clear_Thread_List_Number(thread_number);
-		pthread_exit( NULL);
-	}
-	return NULL;
 }

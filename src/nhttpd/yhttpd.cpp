@@ -28,6 +28,7 @@ static CyParser yParser;
 // Setting yhttpd Instance
 //-----------------------------------------------------------------------------
 #include "yhttpd.h"
+#include <api/apiserver.h>
 static Cyhttpd *yhttpd = NULL;
 CStringList Cyhttpd::ConfigList;
 //=============================================================================
@@ -262,6 +263,7 @@ void Cyhttpd::hooks_attach() {
 	NeutrinoAPI = new CNeutrinoAPI();
 	CyhookHandler::attach(NeutrinoAPI->NeutrinoYParser);
 	CyhookHandler::attach(NeutrinoAPI->ControlAPI);
+	yapi::init(NeutrinoAPI);
 #else
 #ifdef Y_CONFIG_USE_YPARSER
 	CyhookHandler::attach(&yParser);
@@ -401,6 +403,8 @@ void Cyhttpd::ReadConfig(void) {
 	ConfigList["configfile.version"] = Config->getInt32("configfile.version", CONF_VERSION);
 	ConfigList["server.log.loglevel"] = itoa(Config->getInt32("server.log.loglevel", 0));
 	ConfigList["server.no_keep-alive_ips"] = Config->getString("server.no_keep-alive_ips", "");
+	// bearer tokens of the REST API: level:token,... with level read, write or system
+	ConfigList["api.tokens"] = Config->getString("api.tokens", "");
 	webserver->conf_no_keep_alive_ips = Config->getStringVector("server.no_keep-alive_ips");
 
 	// MainSite

@@ -30,6 +30,7 @@ neutrino_libs = [
 	libnhttpd_tuxboxapi,
 	libyhttpdmods,
 	libyhttpd,
+	libyapi,
 	libneutrino_system,
 	libsectionsdclient,
 	libtimerdclient,

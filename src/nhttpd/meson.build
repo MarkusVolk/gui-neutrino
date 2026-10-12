@@ -1,6 +1,7 @@
 subdir('yhttpd_core')
 subdir('yhttpd_mods')
 subdir('tuxboxapi')
+subdir('api')
 
 libnhttpd = static_library('nhttpd',
 	'yhttpd.cpp',
