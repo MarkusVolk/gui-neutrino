@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <sys/timex.h>
 #include <time.h>
 #include <connection/basicsocket.h>
 #include <connection/basicserver.h>
@@ -1574,6 +1575,14 @@ static bool doNtpTimeSync(void)
 	return false;
 }
 
+/* the kernel clock is kept in sync by a time service of the system, such as systemd-timesyncd */
+static bool systemClockSynced()
+{
+	struct timex tx = {};
+	int state = adjtimex(&tx);
+	return state != -1 && state != TIME_ERROR && !(tx.status & STA_UNSYNC);
+}
+
 void CTimeThread::run()
 {
 	/* without root the time is the system's business */
@@ -1695,6 +1704,11 @@ void CTimeThread::run()
 				debug(DEBUG_ERROR, "%s: Time set via %s, going to sleep for %d seconds.", name.c_str(),
 						time_ntp ? "NTP" : first_time ? "DVB (TDT)" : "DVB (TOT)", sleep_time);
 			}
+			first_time = false;
+		} else if (!timeset && systemClockSynced()) {
+			sendTimeEvent(false, 0);
+			debug(DEBUG_ERROR, "%s: Time set from the synchronized system clock, going to sleep for %d seconds.",
+					name.c_str(), sleep_time);
 			first_time = false;
 		} else {
 			debug(DEBUG_ERROR, "%s: Time set FAILED (enabled: ntp %d dvb %d)", name.c_str(), ntpenable, dvb_time_update);
