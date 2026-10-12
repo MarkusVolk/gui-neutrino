@@ -131,6 +131,7 @@ extern CTimeOSD *FileTimeOSD;
 #define WEBTV_ACTIVITY_GAP_MS 5000
 #define WEBTV_BUDGET_REFRESH_WINDOW_MS 60000
 #define WEBTV_NETWORK_WAIT_MS 30000
+#define WEBTV_NETWORK_POLL_MS 1000
 
 CMoviePlayerGui* CMoviePlayerGui::instance_mp = NULL;
 CMoviePlayerGui* CMoviePlayerGui::instance_bg = NULL;
@@ -1859,37 +1860,30 @@ bool CMoviePlayerGui::checkWebtvDns(uint64_t generation, t_channel_id chan, cons
 	return true;
 }
 
-/* a default route over IPv4 or IPv6, the box is online */
-static bool webtvHaveDefaultRoute(void)
+/* no name server answered: the network is not up yet, as opposed to a
+ * name server that answered that the name does not exist */
+static bool webtvNoNameServer(int gai_error)
 {
-	std::ifstream v4("/proc/net/route");
-	std::string line;
-	std::getline(v4, line);
-	while (std::getline(v4, line)) {
-		char iface[32];
-		unsigned long dest = 1;
-		if (sscanf(line.c_str(), "%31s %lx", iface, &dest) == 2 && dest == 0)
-			return true;
-	}
-
-	std::ifstream v6("/proc/net/ipv6_route");
-	while (std::getline(v6, line)) {
-		char dest[33], iface[32];
-		unsigned int plen = 1;
-		if (sscanf(line.c_str(), "%32s %x %*s %*s %*s %*s %*s %*s %*s %31s", dest, &plen, iface) == 3 &&
-		    plen == 0 && strcmp(iface, "lo") && strspn(dest, "0") == 32)
-			return true;
-	}
-	return false;
+	/* also what webtvGetaddrinfoWithTimeout returns when it gives up */
+	return gai_error == EAI_AGAIN;
 }
 
-/* wait for a default route as long as the request is the current one */
-bool CMoviePlayerGui::waitForWebtvNetwork(uint64_t generation, t_channel_id chan)
+/* wait until a name server answers for the host name of the channel, as
+ * long as the request is the current one; the name itself decides, as a
+ * network without a gateway never gets a default route and a route may
+ * come up before the name server is reachable */
+bool CMoviePlayerGui::waitForWebtvNetwork(uint64_t generation, t_channel_id chan, const std::string &host)
 {
-	printf("[webtv] waiting for the network channel=%llx generation=%llu\n",
-		(unsigned long long)chan, (unsigned long long)generation);
-	for (int waited = 0; waited < WEBTV_NETWORK_WAIT_MS; waited += 250) {
-		usleep(250 * 1000);
+	printf("[webtv] waiting for the network channel=%llx generation=%llu host=%s\n",
+		(unsigned long long)chan, (unsigned long long)generation, host.c_str());
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	const int64_t start = time_monotonic_ms();
+	int64_t waited = 0;
+	while (waited < WEBTV_NETWORK_WAIT_MS) {
+		usleep(WEBTV_NETWORK_POLL_MS * 1000);
 		mutex.lock();
 		bool request_current = webtv_request.generation == generation && webtv_request.channel_id == chan &&
 				       webtv_abort_generation != generation;
@@ -1898,14 +1892,20 @@ bool CMoviePlayerGui::waitForWebtvNetwork(uint64_t generation, t_channel_id chan
 			recordWebtvFailure(WEBTV_ERROR_USER_ZAP_CANCELLED_RETRY, chan, generation);
 			return false;
 		}
-		if (webtvHaveDefaultRoute()) {
-			printf("[webtv] network is up after %d ms channel=%llx generation=%llu\n",
-				waited + 250, (unsigned long long)chan, (unsigned long long)generation);
+		struct addrinfo *result = NULL;
+		int sys_errno = 0;
+		int ret = webtvGetaddrinfoWithTimeout(host, &hints, &result, &sys_errno);
+		if (result)
+			freeaddrinfo(result);
+		waited = time_monotonic_ms() - start;
+		if (!webtvNoNameServer(ret)) {
+			printf("[webtv] network is up after %lld ms channel=%llx generation=%llu\n",
+				(long long)waited, (unsigned long long)chan, (unsigned long long)generation);
 			return true;
 		}
 	}
-	printf("[webtv] no network after %d ms channel=%llx generation=%llu\n",
-		WEBTV_NETWORK_WAIT_MS, (unsigned long long)chan, (unsigned long long)generation);
+	printf("[webtv] no network after %lld ms channel=%llx generation=%llu\n",
+		(long long)waited, (unsigned long long)chan, (unsigned long long)generation);
 	return false;
 }
 
@@ -1924,8 +1924,8 @@ bool CMoviePlayerGui::StartWebtv(void)
 	if (isWebChannel && !checkWebtvDns(request_generation, request_channel, request_url, dns)) {
 		/* right after the start the network may not be up yet */
 		if ((dns.reason != WEBTV_ERROR_DNS_FAILED && dns.reason != WEBTV_ERROR_DNS_TIMEOUT) ||
-		    webtvHaveDefaultRoute() ||
-		    !waitForWebtvNetwork(request_generation, request_channel) ||
+		    !webtvNoNameServer(dns.gai_error) ||
+		    !waitForWebtvNetwork(request_generation, request_channel, dns.host) ||
 		    !checkWebtvDns(request_generation, request_channel, request_url, dns))
 			return false;
 	}
