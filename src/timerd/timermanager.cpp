@@ -85,11 +85,13 @@ CTimerManager* CTimerManager::getInstance()
 	return instance;
 }
 
+/* the timer thread sleeps on this until its next round; a new event that is due wakes it */
+static pthread_mutex_t dummy_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t dummy_cond = PTHREAD_COND_INITIALIZER;
+
 //------------------------------------------------------------
 void* CTimerManager::timerThread(void *arg)
 {
-	pthread_mutex_t dummy_mutex = PTHREAD_MUTEX_INITIALIZER;
-	pthread_cond_t dummy_cond = PTHREAD_COND_INITIALIZER;
 	struct timespec wait;
 	set_threadname("n:timermanager");
 
@@ -263,7 +265,10 @@ int CTimerManager::addEvent(CTimerEvent* evt, bool save)
 		evt->printEvent();
 		dprintf("\n");
 	}
+	bool due = evt->announceTime <= time(NULL) || evt->alarmTime <= time(NULL);
 	pthread_mutex_unlock(&tm_eventsMutex);
+	if (due)
+		pthread_cond_signal(&dummy_cond);
 	return eventID;					// return unique id
 }
 
