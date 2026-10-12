@@ -3150,6 +3150,7 @@ webradio.xml.auto WebRadio-bestanden automatisch laden
 webtv.dns.blocker_suspected De streamhost is naar een blokkeeradres omgezet:\n\nHost: %s\nAdres: %s\n\nDit kan wijzen op een DNS-blokkering zoals Pi-hole, AdGuard Home of een\nrouterfilter.
 webtv.dns.diagnostics DNS-diagnose
 webtv.dns.failed DNS-opzoeking mislukt voor:\n%s\n\nControleer de internetverbinding, de DNS-instellingen of de router.
+webtv.no_teletext Webkanalen hebben geen teletekst.
 webtv.head WebTV
 webtv.stream_restart_attempts Herstarts van de stream na verbroken verbinding
 webtv.xml WebTV XML bestand

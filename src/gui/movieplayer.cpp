@@ -3708,6 +3708,8 @@ void CMoviePlayerGui::PlayFileLoop(void)
 				g_EventList->exec(CNeutrinoApp::getInstance()->channelList->getActiveChannel_ChannelID(), CNeutrinoApp::getInstance()->channelList->getActiveChannelName());
 			else if (msg == NeutrinoMessages::SHOW_EPG)
 				g_EpgData->show(CNeutrinoApp::getInstance()->channelList->getActiveChannel_ChannelID());
+			else if (IS_WEBCHAN(CZapit::getInstance()->GetCurrentChannelID()))
+				ShowHint(LOCALE_MESSAGEBOX_INFO, LOCALE_WEBTV_NO_TELETEXT);
 			else {
 				if (g_settings.cacheTXT)
 					tuxtxt_stop();

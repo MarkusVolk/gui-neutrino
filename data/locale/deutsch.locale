@@ -3150,6 +3150,7 @@ webradio.xml.auto WebRadio-Dateien automatisch laden
 webtv.dns.blocker_suspected Der Stream-Host wurde auf eine Block-Adresse aufgelöst:\n\nHost: %s\nAdresse: %s\n\nDas kann auf einen DNS-Blocker wie Pi-hole, AdGuard Home oder einen\nRouter-Filter hinweisen.
 webtv.dns.diagnostics DNS-Diagnose
 webtv.dns.failed DNS-Auflösung fehlgeschlagen für:\n%s\n\nBitte Internetverbindung, DNS-Einstellungen oder Router prüfen.
+webtv.no_teletext Web-Kanäle haben keinen Videotext.
 webtv.head WebTV
 webtv.stream_restart_attempts Stream-Neustarts nach Verbindungsabbruch
 webtv.xml WebTV-Dateien

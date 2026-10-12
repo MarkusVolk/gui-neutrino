@@ -3178,6 +3178,7 @@ const char * locale_real_names[] =
 	"webtv.dns.diagnostics",
 	"webtv.dns.failed",
 	"webtv.head",
+	"webtv.no_teletext",
 	"webtv.stream_restart_attempts",
 	"webtv.xml",
 	"webtv.xml.auto",

@@ -3150,6 +3150,7 @@ webradio.xml.auto Auto-load WebRadio files
 webtv.dns.blocker_suspected The stream host resolved to a block address:\n\nHost: %s\nAddress: %s\n\nThis can indicate a DNS blocker such as Pi-hole, AdGuard Home or a\nrouter filter.
 webtv.dns.diagnostics DNS diagnostics
 webtv.dns.failed DNS lookup failed for:\n%s\n\nPlease check the internet connection, DNS settings or router.
+webtv.no_teletext Web channels have no teletext.
 webtv.head WebTV
 webtv.stream_restart_attempts Stream restarts after connection reset
 webtv.xml WebTV files

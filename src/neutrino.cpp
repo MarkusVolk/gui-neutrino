@@ -3819,6 +3819,9 @@ void CNeutrinoApp::RealRun()
 			else if (usermenu.showUserMenu(msg)) {
 			}
 			/* hardcoded key values, if not redefined in keybind or user menu */
+			else if (msg == CRCInput::RC_text && (mode == NeutrinoModes::mode_webtv || mode == NeutrinoModes::mode_webradio)) {
+				ShowHint(LOCALE_MESSAGEBOX_INFO, LOCALE_WEBTV_NO_TELETEXT);
+			}
 			else if( msg == CRCInput::RC_text) {
 				g_RCInput->clearRCMsg();
 				InfoClock->enableInfoClock(false);

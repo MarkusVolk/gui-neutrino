@@ -3150,6 +3150,7 @@ webradio.xml.auto Automatické načítanie WebRádio súborov
 webtv.dns.blocker_suspected Hostiteľ streamu sa preložil na blokovaciu adresu:\n\nHostiteľ: %s\nAdresa: %s\n\nMôže to znamenať blokovač DNS ako Pi-hole, AdGuard Home alebo\nfilter v routeri.
 webtv.dns.diagnostics Diagnostika DNS
 webtv.dns.failed Vyhľadanie DNS zlyhalo pre:\n%s\n\nSkontrolujte prosím pripojenie na internet, nastavenia DNS alebo router.
+webtv.no_teletext Webové kanály nemajú teletext.
 webtv.head WebTV
 webtv.stream_restart_attempts Reštarty streamu po prerušení spojenia
 webtv.xml WebTV súbory
