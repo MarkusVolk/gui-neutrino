@@ -128,6 +128,7 @@ class CLuaInstMenu
 		static int MenuNew(lua_State *L);
 		static int MenuAddKey(lua_State *L);
 		static int MenuAddItem(lua_State *L);
+		static int MenuSetFooter(lua_State *L);
 		static int MenuExec(lua_State *L);
 		static int MenuHide(lua_State *L);
 		static int MenuSetActive(lua_State *L);

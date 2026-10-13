@@ -79,6 +79,7 @@ void CLuaInstMenu::MenuRegister(lua_State *L)
 		{ "getSelected",   CLuaInstMenu::MenuGetSelected },
 		{ "setValue",   CLuaInstMenu::MenuSetValue },
 		{ "paintItem",   CLuaInstMenu::MenuPaintItem },
+		{ "setFooter",   CLuaInstMenu::MenuSetFooter },
 		{ "__gc",      CLuaInstMenu::MenuDelete },
 		{ NULL, NULL }
 	};
@@ -337,6 +338,32 @@ int CLuaInstMenu::MenuAddKey(lua_State *L)
 		D->m->addKey(directkey, forwarder, action);
 		D->targets.push_back(forwarder);
 	}
+	return 0;
+}
+
+/* the colour keys at the foot of the menu: a list of { icon = "btn_red", text = "..." } */
+int CLuaInstMenu::MenuSetFooter(lua_State *L)
+{
+	CLuaMenu *D = MenuCheck(L, 1);
+	if (!D || !lua_istable(L, 2))
+		return 0;
+
+	std::vector<button_label_cc> labels;
+	for (lua_pushnil(L); lua_next(L, 2); lua_pop(L, 1)) {
+		if (!lua_istable(L, -1))
+			continue;
+		std::string icon; tableLookup(L, "icon", icon);
+		std::string text; tableLookup(L, "text", text);
+		if (icon.empty() && text.empty())
+			continue;
+		char *name = strdup(icon.c_str());
+		D->tofree.push_back(name);
+		button_label_cc label;
+		label.button = name;
+		label.text = text;
+		labels.push_back(label);
+	}
+	D->m->setFooter(labels);
 	return 0;
 }
 
