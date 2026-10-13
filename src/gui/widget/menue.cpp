@@ -1813,12 +1813,17 @@ void CMenuWidget::setFooter(const struct button_label *_fbutton_labels, const in
 {
 	fbutton_count = _fbutton_count;
 	fbutton_labels = _fbutton_labels;
+	if (fbutton_labels)
+		fbutton_texts.clear();
 
 	if (fbutton_count){
 		if (!footer)
 			footer = new CComponentsFooter(x, y + height, width + scrollbar_width, 0, 0, NULL, CC_SHADOW_ON);
 		footer->setWidth(width + scrollbar_width);
-		footer->setButtonLabels(fbutton_labels, fbutton_count);
+		if (fbutton_labels)
+			footer->setButtonLabels(fbutton_labels, fbutton_count);
+		else
+			footer->setButtonLabels(fbutton_texts, 0, 0);
 		footer_height = footer->getHeight();
 		// store the body width (excl. the scrollbar column); calcSize() does
 		// width = max(width, footer_width), so including scrollbar_width here
@@ -1835,6 +1840,12 @@ void CMenuWidget::setFooter(const struct button_label *_fbutton_labels, const in
 
 	if (repaint)
 		paint();
+}
+
+void CMenuWidget::setFooter(const std::vector<button_label_cc> &labels, bool repaint)
+{
+	fbutton_texts = labels;
+	setFooter(NULL, labels.size(), repaint);
 }
 
 int CMenuWidget::getSelectedByName(const std::string& Name)
