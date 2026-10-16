@@ -6,6 +6,7 @@ project('neutrino', 'c', 'cpp',
 		'warning_level=1',
 		'cpp_rtti=false',
 		'cpp_eh=none',
+		'cpp_std=gnu++23',
 	],
 )
 
