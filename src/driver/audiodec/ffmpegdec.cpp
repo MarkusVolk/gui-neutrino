@@ -302,11 +302,8 @@ CBaseDec::RetCode CFfmpegDec::Decoder(FILE *_in, int /*OutputFd*/, State* state,
 	mSampleRate = samplerate;
 	mChannels = 2; // AV_CHANNEL_LAYOUT_STEREO.nb_channels
 
-#if !HAVE_ARM_HARDWARE
+	/* the samples are little-endian on every box; the ARM/MIPS HAL used to read the flag inverted */
 	audioDecoder->PrepareClipPlay(mChannels, mSampleRate, 16, 1);
-#else
-	audioDecoder->PrepareClipPlay(mChannels, mSampleRate, 16, 0);
-#endif
 
 	AVFrame *frame = NULL;
 	AVPacket rpacket;
