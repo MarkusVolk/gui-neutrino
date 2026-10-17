@@ -49,6 +49,15 @@ AS_CASE([" $CXXFLAGS "],
 	[*" -fno-strict-aliasing "*], [],
 	[CXXFLAGS="$CXXFLAGS -fno-strict-aliasing"])
 
+dnl The code shared by all boxtypes relies on C++11 (std::thread, std::mutex,
+dnl override); the generic build follows the Meson build and uses gnu++23.
+dnl An explicit -std in CXXFLAGS (cdk mode) is left alone.
+AS_CASE([" $CXXFLAGS "],
+	[*" -std="*], [],
+	[AS_IF([test "$BOXTYPE" = "generic"],
+		[CXXFLAGS="$CXXFLAGS -std=gnu++23"],
+		[CXXFLAGS="$CXXFLAGS -std=gnu++11"])])
+
 # Set default for ARFLAGS, since autoconf does not have a macro for it.
 # This allows people to set it when running configure or make
 test -n "$ARFLAGS" || ARFLAGS="cr"
