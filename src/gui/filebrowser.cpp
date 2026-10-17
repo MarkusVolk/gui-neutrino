@@ -423,7 +423,7 @@ and add to neutrino playlist
 	curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, GET_SHOUTCAST_TIMEOUT);
 
 	/* error handling */
-	char error[CURL_ERROR_SIZE];
+	char error[CURL_ERROR_SIZE] = { 0 };
 	curl_easy_setopt(curl_handle, CURLOPT_ERRORBUFFER, error);
 	/* get it! */
 	httpres = curl_easy_perform(curl_handle);
@@ -534,11 +534,12 @@ printf("CFileBrowser::readDir_sc: read done, size %d\n", (int)answer.size());
 	}
 
 	/* since all CURL error messages use only US-ASCII characters, when can safely print them as if they were UTF-8 encoded */
+	std::string errmsg(error);
 	if (httpres == 22) {
-	    strcat(error, "\nProbably wrong link.");
+	    errmsg += "\nProbably wrong link.";
 	}
-printf("CFileBrowser::readDir_sc: httpres %d error, %s\n", httpres, error);
-	DisplayErrorMessage(error); // UTF-8
+printf("CFileBrowser::readDir_sc: httpres %d error, %s\n", httpres, errmsg.c_str());
+	DisplayErrorMessage(errmsg.c_str()); // UTF-8
 	CFile file;
 
 	file.Name = dirname + "..";

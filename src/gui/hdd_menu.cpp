@@ -105,6 +105,33 @@ static int my_filter(const struct dirent * dent)
 	return CHDDMenuHandler::getInstance()->filterDevName(dent->d_name);
 }
 
+/* device names are taken from /sys/block or blkid, but travel through menu action keys */
+/* the label is typed by the user and goes through popen(): quote it for the shell */
+static std::string shell_single_quote(const std::string &arg)
+{
+	std::string out = "'";
+	for (size_t i = 0; i < arg.size(); i++) {
+		if (arg[i] == '\'')
+			out += "'\\''";
+		else
+			out += arg[i];
+	}
+	out += "'";
+	return out;
+}
+
+static bool valid_devname(const std::string &dev)
+{
+	if (dev.empty() || dev.length() > 32)
+		return false;
+	for (size_t i = 0; i < dev.length(); i++)
+		if (!isalnum((unsigned char)dev[i]) && dev[i] != '-' && dev[i] != '_')
+			return false;
+	struct stat st;
+	std::string devname = "/dev/" + dev;
+	return stat(devname.c_str(), &st) == 0 && S_ISBLK(st.st_mode);
+}
+
 CHDDMenuHandler::CHDDMenuHandler()
 {
 	width = 58;
@@ -310,8 +337,7 @@ bool CHDDMenuHandler::mount_dev(std::string name)
 	std::string eject = find_executable("eject");
 	printf("CHDDMenuHandler::mount_dev: eject = %s\n", eject.c_str());
 	if (dev == "sr" && !eject.empty()) {
-		eject += " -t /dev/" + name;
-		system(eject.c_str());
+		my_system(3, eject.c_str(), "-t", ("/dev/" + name).c_str());
 		sleep(3);
 	}
 	std::string cmd;
@@ -330,7 +356,22 @@ bool CHDDMenuHandler::mount_dev(std::string name)
 #endif
 	}
 	printf("CHDDMenuHandler::mount_dev: mount cmd [%s]\n", cmd.c_str());
-	system(cmd.c_str());
+#ifdef ENABLE_UDISKS
+	if (geteuid())
+		my_system(4, "udisksctl", "mount", "-b", ("/dev/" + name).c_str());
+	else
+#endif
+	{
+#ifdef ASSUME_MDEV
+		setenv("ACTION", "add", 1);
+		setenv("MDEV", name.c_str(), 1);
+		my_system(1, MDEV_MOUNT);
+		unsetenv("ACTION");
+		unsetenv("MDEV");
+#else
+		my_system(3, "mount", ("/dev/" + name).c_str(), (MOUNT_BASE + name).c_str());
+#endif
+	}
 	lock_refresh = true;
 	return is_mounted(name.c_str());
 }
@@ -341,7 +382,7 @@ bool CHDDMenuHandler::umount_dev(std::string name)
 	if (geteuid()) {
 		std::string cmd = "udisksctl unmount -b /dev/" + name;
 		printf("CHDDMenuHandler::umount_dev: umount cmd [%s]\n", cmd.c_str());
-		if (system(cmd.c_str()))
+		if (my_system(4, "udisksctl", "unmount", "-b", ("/dev/" + name).c_str()))
 			return false;
 	} else
 #endif
@@ -349,7 +390,11 @@ bool CHDDMenuHandler::umount_dev(std::string name)
 #ifdef ASSUME_MDEV
 		std::string cmd = std::string("ACTION=remove") + " MDEV=" + name + " " + MDEV_MOUNT;
 		printf("CHDDMenuHandler::umount_dev: umount cmd [%s]\n", cmd.c_str());
-		system(cmd.c_str());
+		setenv("ACTION", "remove", 1);
+		setenv("MDEV", name.c_str(), 1);
+		my_system(1, MDEV_MOUNT);
+		unsetenv("ACTION");
+		unsetenv("MDEV");
 #else
 		std::string path = MOUNT_BASE + name;
 		if (::umount(path.c_str()))
@@ -360,8 +405,7 @@ bool CHDDMenuHandler::umount_dev(std::string name)
 	std::string eject = find_executable("eject");
 	printf("CHDDMenuHandler::umount_dev: eject = %s\n", eject.c_str());
 	if (dev == "sr" && !eject.empty()) {
-		eject += " /dev/" + name;
-		system(eject.c_str());
+		my_system(2, eject.c_str(), ("/dev/" + name).c_str());
 	}
 	lock_refresh = true;
 	return !is_mounted(name.c_str());
@@ -774,7 +818,7 @@ bool CHDDMenuHandler::scanDevices()
 			f = fopen(str, "r");
 		}
 		if (f) {
-			fscanf(f, "%s", vendor);
+			fscanf(f, "%127s", vendor);
 			fclose(f);
 		} else {
 			oldkernel = true;
@@ -792,7 +836,7 @@ bool CHDDMenuHandler::scanDevices()
 			f = fopen(str, "r");
 		}
 		if (f) {
-			fscanf(f, "%s", model);
+			fscanf(f, "%127s", model);
 			fclose(f);
 		}
 #if 0
@@ -978,7 +1022,7 @@ static int umount_all(const char *dev)
 	printf("HDD: %s dev = '%s' d = '%s'\n", __func__, dev, d);
 	for (i = 1; i < 16; i++)
 	{
-		sprintf(buffer, "/dev/%s%d", d, i);
+		snprintf(buffer, sizeof(buffer), "/dev/%s%d", d, i);
 		// printf("checking for '%s'\n", buffer);
 		if (access(buffer, R_OK))
 			continue;	/* device does not exist? */
@@ -986,12 +1030,16 @@ static int umount_all(const char *dev)
 		/* we can't use a 'remove' uevent, as that would also remove the device node
 		 * which we certainly need for formatting :-) */
 		if (! access("/etc/mdev/mdev-mount.sh", X_OK)) {
-			sprintf(buffer, "MDEV=%s%d ACTION=remove /etc/mdev/mdev-mount.sh block", d, i);
-			printf("-> running '%s'\n", buffer);
-			my_system(3, "/bin/sh", "-c", buffer);
+			snprintf(buffer, sizeof(buffer), "%s%d", d, i);
+			printf("-> running 'MDEV=%s ACTION=remove /etc/mdev/mdev-mount.sh block'\n", buffer);
+			setenv("MDEV", buffer, 1);
+			setenv("ACTION", "remove", 1);
+			my_system(2, "/etc/mdev/mdev-mount.sh", "block");
+			unsetenv("MDEV");
+			unsetenv("ACTION");
 		}
 #endif
-		sprintf(buffer, "/dev/%s%d", d, i);
+		snprintf(buffer, sizeof(buffer), "/dev/%s%d", d, i);
 		/* just to make sure */
 		swapoff(buffer);
 		if (dev_umount(buffer) && errno != ENOENT)
@@ -1077,6 +1125,9 @@ int CHDDMenuHandler::formatDevice(std::string dev)
 
 	printf("CHDDMenuHandler::formatDevice: dev %s hdd_fs %d\n", dev.c_str(), g_settings.hdd_fs);
 
+	if (!valid_devname(dev))
+		return menu_return::RETURN_REPAINT;
+
 	if (g_settings.hdd_fs < 0 || g_settings.hdd_fs >= (int) FS_MAX)
 		return menu_return::RETURN_REPAINT;
 
@@ -1094,7 +1145,7 @@ int CHDDMenuHandler::formatDevice(std::string dev)
 
 	std::string mkfscmd = devtool->mkfs + " " + devtool->mkfs_options + " ";
 	if (!devtool->mkfs_labelswitch.empty() && !mkfs_label.empty())
-		mkfscmd += devtool->mkfs_labelswitch + " \"" + mkfs_label + "\" ";
+		mkfscmd += devtool->mkfs_labelswitch + " " + shell_single_quote(mkfs_label) + " ";
 	mkfscmd += partname;
 	printf("mkfs cmd: [%s]\n", mkfscmd.c_str());
 
@@ -1196,6 +1247,8 @@ int CHDDMenuHandler::formatDevice(std::string dev)
 		if (in == EOF)
 			break;
 
+		if (pos >= (int)sizeof(buf) - 1)
+			pos = 0; /* overlong line, start over */
 		buf[pos] = (char)in;
 		pos++;
 		buf[pos] = 0;
@@ -1322,6 +1375,9 @@ int CHDDMenuHandler::checkDevice(std::string dev)
 	std::string devname = "/dev/" + dev;
 
 	printf("CHDDMenuHandler::checkDevice: dev %s\n", dev.c_str());
+
+	if (!valid_devname(dev))
+		return menu_return::RETURN_REPAINT;
 
 	std::string fmt = getFmtType(dev);
 	devtool_s * devtool = get_dev_tool(fmt);

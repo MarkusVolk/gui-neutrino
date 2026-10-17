@@ -858,7 +858,7 @@ void CNetworkSetup::restoreNetworkSettings()
 	networkConfig->nameserver 	= network_nameserver;
 	networkConfig->hostname 	= network_hostname;
 
-	networkConfig->commitConfig();
+	settings_written = networkConfig->commitConfig();
 	changeNotify(LOCALE_NETWORKMENU_SELECT_IF, NULL);
 }
 

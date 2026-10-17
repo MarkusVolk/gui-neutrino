@@ -1410,7 +1410,7 @@ void CUpnpBrowserGui::showPicture(std::string name)
 	g_PicViewer->SetScaling((CPictureViewer::ScalingMode)g_settings.picviewer_scaling);
 	g_PicViewer->SetVisible(g_settings.screen_StartX, g_settings.screen_EndX, g_settings.screen_StartY, g_settings.screen_EndY);
 
-	if (g_settings.video_Format == 3)
+	if (g_settings.video_Format == DISPLAY_AR_16_9)
 		g_PicViewer->SetAspectRatio(16.0 / 9);
 	else
 		g_PicViewer->SetAspectRatio(4.0 / 3);

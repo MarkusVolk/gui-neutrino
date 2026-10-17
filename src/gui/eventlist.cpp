@@ -273,6 +273,9 @@ void CEventList::getChannelNames(t_channel_id &channel_id, std::string &current_
 		return;
 	}
 	t_bouquet_id current_bouquet_id = bouquetList->getActiveBouquetNumber();
+	if(current_bouquet_id >= bouquetList->Bouquets.size()){
+		return;
+	}
 	const unsigned int channel_nr = bouquetList->Bouquets[current_bouquet_id]->channelList->getSize();
 	if(channel_nr < 2){
 		channel_id = 0;

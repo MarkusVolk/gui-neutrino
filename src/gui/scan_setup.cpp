@@ -1244,7 +1244,7 @@ int CScanSetup::showScanMenuLnbSetup()
 
 		char opt[100];
 		if ((fe->getDiseqcType() == DISEQC_UNICABLE ) || (fe->getDiseqcType() == DISEQC_UNICABLE2 ))
-			sprintf(opt, "%s %2d", g_Locale->getText(LOCALE_UNICABLE_LNB), sit->second.diseqc);
+			snprintf(opt, sizeof(opt), "%s %2d", g_Locale->getText(LOCALE_UNICABLE_LNB), sit->second.diseqc);
 		else
 			sprintf(opt, "diseqc %2d / rotor %2d", sit->second.diseqc+1, sit->second.motor_position);
 		satoptions.push_back(opt);

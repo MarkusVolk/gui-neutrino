@@ -989,7 +989,7 @@ void CInfoViewer::initLiveStreamInfo()
 			cPlayback *playback = CMoviePlayerGui::getInstance().getPlayback();
 			if (playback)
 				playback->GetMetadata(keys, values);
-			size_t count = keys.size();
+			size_t count = std::min(keys.size(), values.size());
 			if (count > 0)
 			{
 				for (size_t i = 0; i < count; i++)
@@ -1620,7 +1620,7 @@ int CInfoViewer::handleMsg (const neutrino_msg_t msg, neutrino_msg_data_t data)
 void CInfoViewer::sendNoEpg(const t_channel_id for_channel_id)
 {
 	if (!zap_mode/* & IV_MODE_DEFAULT*/) {
-		char *p = new char[sizeof(t_channel_id)];
+		unsigned char *p = new unsigned char[sizeof(t_channel_id)];
 		memcpy(p, &for_channel_id, sizeof(t_channel_id));
 		g_RCInput->postMsg (NeutrinoMessages::EVT_NOEPG_YET, (neutrino_msg_data_t) p, false);
 	}
@@ -1660,7 +1660,7 @@ void CInfoViewer::getEPG(const t_channel_id for_channel_id, CSectionsdClient::Cu
 
 	if (info.current_uniqueKey != oldinfo.current_uniqueKey || info.next_uniqueKey != oldinfo.next_uniqueKey)
 	{
-		char *p = new char[sizeof(t_channel_id)];
+		unsigned char *p = new unsigned char[sizeof(t_channel_id)];
 		memcpy(p, &for_channel_id, sizeof(t_channel_id));
 		neutrino_msg_t msg;
 		if (info.flags & (CSectionsdClient::epgflags::has_current | CSectionsdClient::epgflags::has_next))

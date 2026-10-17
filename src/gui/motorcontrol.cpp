@@ -437,7 +437,7 @@ void CMotorControl::paintStatus()
 			break;
 		case STEP_MODE_TIMED:
 			strcpy(buf1, g_Locale->getText(LOCALE_MOTORCONTROL_TIMED_MODE));
-			sprintf(buf2, "%d %s", stepSize * stepDelay, g_Locale->getText(LOCALE_MOTORCONTROL_MSEC));
+			snprintf(buf2, sizeof(buf2), "%d %s", stepSize * stepDelay, g_Locale->getText(LOCALE_MOTORCONTROL_MSEC));
 			break;
 	}
 	paintLine(xpos2, ypos, width2, buf1);
@@ -450,7 +450,7 @@ void CMotorControl::paintStatus()
 
 	paintSeparator(xpos1, &ypos, width, g_Locale->getText(LOCALE_MOTORCONTROL_STATUS));
 
-	sprintf(buf1, "%s %d", g_Locale->getText(LOCALE_MOTORCONTROL_SAT_POS), satellitePosition);
+	snprintf(buf1, sizeof(buf1), "%s %d", g_Locale->getText(LOCALE_MOTORCONTROL_SAT_POS), satellitePosition);
 	paintLine(xpos1, &ypos, width1, buf1);
 
 	paintSeparator(xpos1, &ypos, width, g_Locale->getText(LOCALE_MOTORCONTROL_SETTINGS));

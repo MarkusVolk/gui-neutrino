@@ -121,10 +121,11 @@ int CBuildInfo::exec(CMenuTarget *parent, const string & /*actionKey*/)
 
 void CBuildInfo::Scroll(bool scrollDown)
 {
-	CTextBox *ctb = static_cast<CComponentsExtTextForm *>(ccw_body->getCCItem(3))->getTextObject()->getCTextBoxObject();
-	ctb->enableBackgroundPaint(true); // FIXME: behavior of CTextBox scroll is broken with disabled background paint
+	CComponentsExtTextForm *info = static_cast<CComponentsExtTextForm *>(ccw_body->getCCItem(3));
+	CTextBox *ctb = info ? info->getTextObject()->getCTextBoxObject() : NULL;
 	if (ctb)
 	{
+		ctb->enableBackgroundPaint(true); // FIXME: behavior of CTextBox scroll is broken with disabled background paint
 		if (scrollDown)
 			ctb->scrollPageDown(1);
 		else

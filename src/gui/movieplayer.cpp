@@ -515,7 +515,11 @@ static int webtvGetaddrinfoWithTimeout(const std::string &host, const struct add
 
 	webtv_resolver_ctx_t *ctx = new webtv_resolver_ctx_t;
 	pthread_mutex_init(&ctx->mutex, NULL);
-	pthread_cond_init(&ctx->cond, NULL);
+	pthread_condattr_t condattr;
+	pthread_condattr_init(&condattr);
+	pthread_condattr_setclock(&condattr, CLOCK_MONOTONIC);
+	pthread_cond_init(&ctx->cond, &condattr);
+	pthread_condattr_destroy(&condattr);
 	ctx->done = false;
 	ctx->abandoned = false;
 	ctx->ret = EAI_FAIL;
@@ -535,7 +539,7 @@ static int webtvGetaddrinfoWithTimeout(const std::string &host, const struct add
 	}
 
 	struct timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
+	clock_gettime(CLOCK_MONOTONIC, &ts);
 	ts.tv_sec += WEBTV_DNS_TIMEOUT_MS / 1000;
 	ts.tv_nsec += (WEBTV_DNS_TIMEOUT_MS % 1000) * 1000000;
 	if (ts.tv_nsec >= 1000000000) {
@@ -1898,7 +1902,6 @@ bool CMoviePlayerGui::waitForWebtvNetwork(uint64_t generation, t_channel_id chan
 	const int64_t start = time_monotonic_ms();
 	int64_t waited = 0;
 	while (waited < WEBTV_NETWORK_WAIT_MS) {
-		usleep(WEBTV_NETWORK_POLL_MS * 1000);
 		mutex.lock();
 		bool request_current = webtv_request.generation == generation && webtv_request.channel_id == chan &&
 				       webtv_abort_generation != generation;
@@ -1918,6 +1921,7 @@ bool CMoviePlayerGui::waitForWebtvNetwork(uint64_t generation, t_channel_id chan
 				(long long)waited, (unsigned long long)chan, (unsigned long long)generation);
 			return true;
 		}
+		usleep(WEBTV_NETWORK_POLL_MS * 1000);
 	}
 	printf("[webtv] no network after %lld ms channel=%llx generation=%llu\n",
 		(long long)waited, (unsigned long long)chan, (unsigned long long)generation);
@@ -2350,11 +2354,14 @@ bool CMoviePlayerGui::luaGetUrl(const std::string &script, const std::string &fi
 	/* remove duplicate resolutions */
 	livestream_info_t *_info;
 	int res_old = 0;
-	for (size_t i = 0; i < streamList.size(); ++i) {
+	for (size_t i = 0; i < streamList.size();) {
 		_info = &(streamList[i]);
-		if (res_old == _info->res1)
+		if (res_old == _info->res1) {
 			streamList.erase(streamList.begin()+i);
+			continue;
+		}
 		res_old = _info->res1;
+		++i;
 	}
 
 	if (box != NULL) {
@@ -3708,8 +3715,6 @@ void CMoviePlayerGui::PlayFileLoop(void)
 				g_EventList->exec(CNeutrinoApp::getInstance()->channelList->getActiveChannel_ChannelID(), CNeutrinoApp::getInstance()->channelList->getActiveChannelName());
 			else if (msg == NeutrinoMessages::SHOW_EPG)
 				g_EpgData->show(CNeutrinoApp::getInstance()->channelList->getActiveChannel_ChannelID());
-			else if (IS_WEBCHAN(CZapit::getInstance()->GetCurrentChannelID()))
-				ShowHint(LOCALE_MESSAGEBOX_INFO, LOCALE_WEBTV_NO_TELETEXT);
 			else {
 				if (g_settings.cacheTXT)
 					tuxtxt_stop();

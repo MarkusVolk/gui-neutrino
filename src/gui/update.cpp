@@ -401,7 +401,7 @@ bool CFlashUpdate::getUpdateImage(const std::string &version)
 	else
 		return false;
 
-	sprintf(dest_name, "%s/%s", g_settings.update_dir.c_str(), fname);
+	snprintf(dest_name, sizeof(dest_name), "%s/%s", g_settings.update_dir.c_str(), fname);
 	showStatusMessageUTF(std::string(g_Locale->getText(LOCALE_FLASHUPDATE_GETUPDATEFILE)) + ' ' + version);
 
 	dprintf(DEBUG_NORMAL, "[update] get update (url): %s - %s\n", filename.c_str(), dest_name);
@@ -426,7 +426,7 @@ bool CFlashUpdate::checkVersion4Update()
 		hide();
 
 		CFlashVersionInfo versionInfo(newVersion);
-		sprintf(msg, g_Locale->getText(LOCALE_FLASHUPDATE_MSGBOX), versionInfo.getType(true), versionInfo.getVersionString(), versionInfo.getDate(), versionInfo.getTime());
+		snprintf(msg, sizeof(msg), g_Locale->getText(LOCALE_FLASHUPDATE_MSGBOX), versionInfo.getType(true), versionInfo.getVersionString(), versionInfo.getDate(), versionInfo.getTime());
 
 		if (gotImage)
 		{
@@ -546,7 +546,7 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 			DisplayErrorMessage(g_Locale->getText(LOCALE_FLASHUPDATE_GETUPDATEFILEERROR));
 			return menu_return::RETURN_REPAINT;
 		}
-		sprintf(fullname, "%s/%s", g_settings.update_dir.c_str(), fname);
+		snprintf(fullname, sizeof(fullname), "%s/%s", g_settings.update_dir.c_str(), fname);
 		filename = std::string(fullname);
 	}
 
@@ -731,15 +731,18 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 		FILE *fd = fopen(filename.c_str(), "r");
 		if (fd)
 		{
-			char *buffer;
+			char *buffer = NULL;
 			off_t filesize = lseek(fileno(fd), 0, SEEK_END);
 			lseek(fileno(fd), 0, SEEK_SET);
-			buffer = (char *) malloc((uint32_t)filesize + 1);
-			fread(buffer, (uint32_t)filesize, 1, fd);
+			if (filesize >= 0)
+				buffer = (char *) malloc((size_t)filesize + 1);
+			size_t got = buffer ? fread(buffer, 1, (size_t)filesize, fd) : 0;
 			fclose(fd);
-			buffer[filesize] = 0;
-			ShowMsg(LOCALE_MESSAGEBOX_INFO, buffer, CMsgBox::mbrBack, CMsgBox::mbBack);
-			free(buffer);
+			if (buffer) {
+				buffer[got] = 0;
+				ShowMsg(LOCALE_MESSAGEBOX_INFO, buffer, CMsgBox::mbrBack, CMsgBox::mbBack);
+				free(buffer);
+			}
 		}
 	}
 	else // not image, install
@@ -1014,7 +1017,7 @@ void CFlashExpert::readmtd(int preadmtd)
 		showGlobalStatus(100);
 		showStatusMessageUTF(g_Locale->getText(LOCALE_FLASHUPDATE_READY));
 		char message[500];
-		sprintf(message, g_Locale->getText(LOCALE_FLASHUPDATE_SAVESUCCESS), filename.c_str());
+		snprintf(message, sizeof(message), g_Locale->getText(LOCALE_FLASHUPDATE_SAVESUCCESS), filename.c_str());
 		sleep(1);
 		hide();
 #ifdef BOXMODEL_CST_HD2

@@ -156,7 +156,7 @@ void CScreenSaver::Start()
 	m_viewer->SetScaling((CPictureViewer::ScalingMode)g_settings.picviewer_scaling);
 	m_viewer->SetVisible(g_settings.screen_StartX, g_settings.screen_EndX, g_settings.screen_StartY, g_settings.screen_EndY);
 
-	if (g_settings.video_Format == 3)
+	if (g_settings.video_Format == DISPLAY_AR_16_9)
 		m_viewer->SetAspectRatio(float(16.0 / 9));
 	else
 		m_viewer->SetAspectRatio(float(4.0 / 3));

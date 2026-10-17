@@ -2633,6 +2633,8 @@ void CChannelList::paint_events()
 			continue;
 		while(!sem_trywait(&paint_events_sem));
 		int current_index = paint_events_index;
+		if (current_index < 0 || (size_t)current_index >= chanlist->size())
+			continue;
 
 		CChannelEventList evtlist;
 		readEvents((*chanlist)[current_index]->getEpgID(), evtlist);

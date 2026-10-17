@@ -613,13 +613,13 @@ bool CVideoSettings::changeNotify(const neutrino_locale_t OptionName, void * /* 
 	}
 	else if (ARE_LOCALES_EQUAL(OptionName, LOCALE_VIDEOMENU_VIDEOFORMAT) || ARE_LOCALES_EQUAL(OptionName, LOCALE_VIDEOMENU_43MODE))
 	{
-		if (g_settings.video_Format != 1 && g_settings.video_Format != 3 && g_settings.video_Format != 2
+		if (g_settings.video_Format != DISPLAY_AR_4_3 && g_settings.video_Format != DISPLAY_AR_16_9 && g_settings.video_Format != DISPLAY_AR_14_9
 #if !HAVE_CST_HARDWARE
 		    && !(g_info.hw_caps->can_ar_21_9 && g_settings.video_Format == DISPLAY_AR_21_9)
 		    && !(g_info.hw_caps->can_ar_16_10 && g_settings.video_Format == DISPLAY_AR_16_10)
 #endif
 		   )
-			g_settings.video_Format = 3;
+			g_settings.video_Format = DISPLAY_AR_16_9;
 
 		g_Zapit->setMode43(g_settings.video_43mode);
 		videoDecoder->setAspectRatio(g_settings.video_Format, -1);

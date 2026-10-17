@@ -268,8 +268,7 @@ int CKeybindSetup::showKeySetup()
 	snprintf(RC_HW_str[CRCInput::RC_HW_COOLSTREAM], sizeof(RC_HW_str[CRCInput::RC_HW_COOLSTREAM]) - 1, "%s", g_Locale->getText(LOCALE_KEYBINDINGMENU_REMOTECONTROL_HARDWARE_COOLSTREAM));
 	snprintf(RC_HW_str[CRCInput::RC_HW_DBOX],       sizeof(RC_HW_str[CRCInput::RC_HW_DBOX]) - 1,       "%s", g_Locale->getText(LOCALE_KEYBINDINGMENU_REMOTECONTROL_HARDWARE_DBOX));
 	snprintf(RC_HW_str[CRCInput::RC_HW_PHILIPS],    sizeof(RC_HW_str[CRCInput::RC_HW_PHILIPS]) - 1,    "%s", g_Locale->getText(LOCALE_KEYBINDINGMENU_REMOTECONTROL_HARDWARE_PHILIPS));
-	char RC_HW_msg[256];
-	snprintf(RC_HW_msg, sizeof(RC_HW_msg) - 1, "%s", g_Locale->getText(LOCALE_KEYBINDINGMENU_REMOTECONTROL_HARDWARE_MSG_PART1));
+	std::string RC_HW_msg = g_Locale->getText(LOCALE_KEYBINDINGMENU_REMOTECONTROL_HARDWARE_MSG_PART1);
 
 	// keysetup menu
 	CMenuWidget *keySettings = new CMenuWidget(LOCALE_MAINSETTINGS_HEAD, NEUTRINO_ICON_KEYBINDING, width, MN_WIDGET_ID_KEYSETUP);
@@ -345,10 +344,10 @@ int CKeybindSetup::showKeySetup()
 	if (org_remote_control_hardware != g_settings.remote_control_hardware)
 	{
 		g_RCInput->CRCInput::set_rc_hw();
-		strcat(RC_HW_msg, RC_HW_str[org_remote_control_hardware]);
-		strcat(RC_HW_msg, g_Locale->getText(LOCALE_KEYBINDINGMENU_REMOTECONTROL_HARDWARE_MSG_PART2));
-		strcat(RC_HW_msg, RC_HW_str[g_settings.remote_control_hardware]);
-		strcat(RC_HW_msg, g_Locale->getText(LOCALE_KEYBINDINGMENU_REMOTECONTROL_HARDWARE_MSG_PART3));
+		RC_HW_msg += RC_HW_str[org_remote_control_hardware];
+		RC_HW_msg += g_Locale->getText(LOCALE_KEYBINDINGMENU_REMOTECONTROL_HARDWARE_MSG_PART2);
+		RC_HW_msg += RC_HW_str[g_settings.remote_control_hardware];
+		RC_HW_msg += g_Locale->getText(LOCALE_KEYBINDINGMENU_REMOTECONTROL_HARDWARE_MSG_PART3);
 		if (ShowMsg(LOCALE_MESSAGEBOX_INFO, RC_HW_msg, CMsgBox::mbrNo, CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_INFO, 450, 15, true) == CMsgBox::mbrNo)
 		{
 			g_settings.remote_control_hardware = org_remote_control_hardware;
