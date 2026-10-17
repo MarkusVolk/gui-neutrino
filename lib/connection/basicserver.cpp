@@ -28,6 +28,8 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <errno.h>
 
 #include <inttypes.h>
 #include <sys/poll.h>
@@ -67,6 +69,8 @@ char * CBasicServer::receive_string(int fd)
 	if (receive_data(fd, &length, sizeof(length)))
 	{
 		char * data = (char *)malloc(((size_t)length) + 1);
+		if (data == NULL)
+			return NULL;
 		if (receive_data(fd, data, length))
 		{
 			data[length] = 0; /* add terminating 0 */
@@ -88,6 +92,11 @@ bool CBasicServer::prepare(const char* socketname)
 
 	memset(&servaddr, 0, sizeof(struct sockaddr_un));
 	servaddr.sun_family = AF_UNIX;
+	if (strlen(socketname) >= sizeof(servaddr.sun_path))
+	{
+		printf("[CBasicServer] socket name too long: %s\n", socketname);
+		return false;
+	}
 	strcpy(servaddr.sun_path, socketname);
 	clilen = sizeof(servaddr.sun_family) + strlen(servaddr.sun_path);
 
@@ -129,6 +138,15 @@ bool CBasicServer::parse(bool (parse_command)(CBasicMessage::Header &rmsg, int c
 
 	CBasicMessage::Header rmsg;
 	conn_fd = accept(sock_fd, (struct sockaddr*) &servaddr, (socklen_t*) &clilen);
+	if (conn_fd < 0)
+	{
+		int err = errno;
+		printf("[%s] accept failed: %s\n", name.c_str(), strerror(err));
+		/* out of descriptors: do not spin on the listening socket */
+		if (err == EMFILE || err == ENFILE || err == ENOBUFS || err == ENOMEM)
+			usleep(100000);
+		return parse_another_command;
+	}
 	memset(&rmsg, 0, sizeof(rmsg));
 	ssize_t r = read(conn_fd, &rmsg, sizeof(rmsg));
 

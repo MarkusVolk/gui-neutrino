@@ -322,8 +322,12 @@ void CEventServer::registerEvent(const int fd)
 	commandRegisterEvent msg;
 
 	int readresult = read(fd, &msg, sizeof(msg));
-	if (readresult <= 0)
+	if (readresult != (int)sizeof(msg))
+	{
 		perror("[eventserver]: read");
+		return;
+	}
+	msg.udsName[sizeof(msg.udsName) - 1] = 0;
 //	printf("[eventserver]: read from %d %x bytes  %d/%d\n", fd, errno, readresult,  sizeof(msg));
 //	printf("[eventserver]: registered event (%d) to: %d - %s\n", msg.eventID, msg.clientID, msg.udsName);
 	registerEvent2(msg.eventID, msg.clientID, msg.udsName);
@@ -356,7 +360,11 @@ void CEventServer::unRegisterEvent2(const unsigned int eventID, const unsigned i
 void CEventServer::unRegisterEvent(const int fd)
 {
 	commandUnRegisterEvent msg;
-	ssize_t ignored __attribute__((unused)) = read(fd, &msg, sizeof(msg));
+	if (read(fd, &msg, sizeof(msg)) != (ssize_t)sizeof(msg))
+	{
+		perror("[eventserver]: read");
+		return;
+	}
 	unRegisterEvent2(msg.eventID, msg.clientID);
 }
 

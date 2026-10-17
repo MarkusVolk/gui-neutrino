@@ -88,6 +88,23 @@ CTimerManager* CTimerManager::getInstance()
 /* the timer thread sleeps on this until its next round; a new event that is due wakes it */
 static pthread_mutex_t dummy_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t dummy_cond = PTHREAD_COND_INITIALIZER;
+static bool timer_wakeup = false; /* set under dummy_mutex, so a signal before the wait is not lost */
+
+static void timerWaitCleanup(void *mutex)
+{
+	pthread_mutex_unlock((pthread_mutex_t *)mutex);
+}
+
+/* wait until abstime or until a wakeup is pending; the thread is cancelled while waiting here */
+static void timerWait(const struct timespec *abstime)
+{
+	pthread_mutex_lock(&dummy_mutex);
+	pthread_cleanup_push(timerWaitCleanup, &dummy_mutex);
+	if (!timer_wakeup)
+		pthread_cond_timedwait(&dummy_cond, &dummy_mutex, abstime);
+	timer_wakeup = false;
+	pthread_cleanup_pop(1);
+}
 
 //------------------------------------------------------------
 void* CTimerManager::timerThread(void *arg)
@@ -117,7 +134,7 @@ void* CTimerManager::timerThread(void *arg)
 				dprintf("waiting for time to be set\n");
 				wait.tv_sec = time(NULL) + 5 ;
 				wait.tv_nsec = 0;
-				pthread_cond_timedwait(&dummy_cond, &dummy_mutex, &wait);
+				timerWait(&wait);
 			}
 		}
 		else
@@ -132,7 +149,7 @@ void* CTimerManager::timerThread(void *arg)
 			pthread_mutex_lock(&tm_eventsMutex);
 
 			CTimerEventMap::iterator pos = timerManager->events.begin();
-			for(;pos != timerManager->events.end();++pos)
+			for(;pos != timerManager->events.end();)
 			{
 #ifdef ENABLE_GRAPHLCD
 				if (!setTimerIcon) {
@@ -196,9 +213,9 @@ void* CTimerManager::timerThread(void *arg)
 					delete pos->second;										// delete event
 					timerManager->events.erase(pos++);				// remove from list
 					timerManager->m_saveEvents = true;
-					if(pos == timerManager->events.end())
-						break;
+					continue;
 				}
+				++pos;
 			}
 #ifdef ENABLE_GRAPHLCD
 			if (setTimerIcon)
@@ -222,7 +239,7 @@ void* CTimerManager::timerThread(void *arg)
 
 			wait.tv_sec = (((time(NULL) / sleeptime) * sleeptime) + sleeptime);
 			wait.tv_nsec = 0;
-			pthread_cond_timedwait(&dummy_cond, &dummy_mutex, &wait);
+			timerWait(&wait);
 		}
 	}
 	return 0;
@@ -232,11 +249,11 @@ void* CTimerManager::timerThread(void *arg)
 CTimerEvent* CTimerManager::getNextEvent()
 {
 	pthread_mutex_lock(&tm_eventsMutex);
-	CTimerEvent *erg = events[0];
+	CTimerEvent *erg = NULL;
 	CTimerEventMap::iterator pos = events.begin();
 	for(;pos!=events.end();++pos)
 	{
-		if(pos->second <= erg)
+		if(erg == NULL || pos->second->alarmTime < erg->alarmTime)
 		{
 			erg = pos->second;
 		}
@@ -265,10 +282,16 @@ int CTimerManager::addEvent(CTimerEvent* evt, bool save)
 		evt->printEvent();
 		dprintf("\n");
 	}
-	bool due = evt->announceTime <= time(NULL) || evt->alarmTime <= time(NULL);
+	time_t now = time(NULL);
+	bool due = (evt->announceTime > 0 && evt->announceTime <= now) || (evt->alarmTime > 0 && evt->alarmTime <= now);
 	pthread_mutex_unlock(&tm_eventsMutex);
 	if (due)
+	{
+		pthread_mutex_lock(&dummy_mutex);
+		timer_wakeup = true;
 		pthread_cond_signal(&dummy_cond);
+		pthread_mutex_unlock(&dummy_mutex);
+	}
 	return eventID;					// return unique id
 }
 
@@ -927,21 +950,6 @@ CTimerEvent::CTimerEvent( CTimerd::CTimerEventTypes evtype, time_t announcetime,
 }
 
 //------------------------------------------------------------
-CTimerEvent::CTimerEvent( CTimerd::CTimerEventTypes evtype, int mon, int day, int hour, int min, CTimerd::CTimerEventRepeat evrepeat, uint32_t repeatcount)
-{
-
-	time_t mtime = time(NULL);
-	struct tm *tmtime = localtime(&mtime);
-
-	if(mon > 0)
-		tmtime->tm_mon = mon -1;
-	if(day > 0)
-		tmtime->tm_mday = day;
-	tmtime->tm_hour = hour;
-	tmtime->tm_min = min;
-	CTimerEvent(evtype, (time_t) 0, mktime(tmtime), (time_t)0, evrepeat, repeatcount);
-}
-//------------------------------------------------------------
 CTimerEvent::CTimerEvent(CTimerd::CTimerEventTypes evtype,CConfigFile *config, int iId)
 {
 	dprintf("CTimerEvent: constructor with config\n");
@@ -983,10 +991,13 @@ void CTimerEvent::Reschedule()
 	else
 	{
 		time_t now = time(NULL);
+		struct tm tm_buf;
 		while(alarmTime <= now)
 		{
 			time_t diff = 0;
-			struct tm *t= localtime(&alarmTime);
+			struct tm *t= localtime_r(&alarmTime, &tm_buf);
+			if(!t)
+				break;
 			int isdst1=t->tm_isdst;
 			switch(eventRepeat)
 			{
@@ -1024,18 +1035,28 @@ void CTimerEvent::Reschedule()
 							weekday_arr[4]=((weekdays & 0x8) > 0); //Do
 							weekday_arr[5]=((weekdays & 0x10) > 0); //Fr
 							weekday_arr[6]=((weekdays & 0x20) > 0); //Sa
-							struct tm *lt= localtime(&alarmTime);
+							struct tm *lt= t;
 							int day;
-							for(day=1 ; !weekday_arr[(lt->tm_wday+day)%7] ; day++){}
-							lt->tm_mday+=day;
+							for(day=1 ; day<=7 && !weekday_arr[(lt->tm_wday+day)%7] ; day++){}
+							if(day<=7)
+								lt->tm_mday+=day;
 						}
 					}
 					else
 						dprintf("unknown repeat type %d\n",eventRepeat);
 			}
 			diff = mktime(t)-alarmTime;
+			if(diff <= 0)
+			{
+				/* repeat type does not advance the time: terminate instead of looping forever */
+				dprintf("event %d cannot be rescheduled (repeat %d), event will be terminated\n",eventID,eventRepeat);
+				eventState = CTimerd::TIMERSTATE_TERMINATED;
+				return;
+			}
 			alarmTime += diff;
-			t = localtime(&alarmTime);
+			t = localtime_r(&alarmTime, &tm_buf);
+			if(!t)
+				break;
 			int isdst2 = t->tm_isdst;
 			if(isdst2 > isdst1) //change from winter to summer
 			{
@@ -1063,11 +1084,14 @@ void CTimerEvent::Reschedule()
 //------------------------------------------------------------
 void CTimerEvent::printEvent(void)
 {
+	struct tm alarm_buf, announce_buf;
 	struct tm *alarmtime, *announcetime;
 	dprintf("eventID: %03d type: %d state: %d repeat: %d ,repeatCount %d\n",eventID,eventType,eventState,((int)eventRepeat)&0x1FF,repeatCount);
-	announcetime = localtime(&announceTime);
+	announcetime = localtime_r(&announceTime, &announce_buf);
+	alarmtime = localtime_r(&alarmTime, &alarm_buf);
+	if(!announcetime || !alarmtime)
+		return;
 	dprintf(" announce: %u %02d.%02d. %02d:%02d:%02d\n",(uint) announceTime,announcetime->tm_mday,announcetime->tm_mon+1,announcetime->tm_hour,announcetime->tm_min,announcetime->tm_sec);
-	alarmtime = localtime(&alarmTime);
 	dprintf(" alarm: %u %02d.%02d. %02d:%02d:%02d\n",(uint) alarmTime,alarmtime->tm_mday,alarmtime->tm_mon+1,alarmtime->tm_hour,alarmtime->tm_min,alarmtime->tm_sec);
 	switch(eventType)
 	{
@@ -1610,7 +1634,8 @@ CTimerEvent(CTimerd::TIMER_REMIND, config, iId)
 	std::stringstream ostr;
 	ostr << iId;
 	std::string id=ostr.str();
-	strcpy(message, config->getString("MESSAGE_"+id).c_str());
+	memset(message, 0, sizeof(message));
+	strncpy(message, config->getString("MESSAGE_"+id).c_str(), sizeof(message)-1);
 	dprintf("read MESSAGE_%s %s (%p)\n",id.c_str(),message,message);
 }
 //------------------------------------------------------------
@@ -1653,7 +1678,8 @@ CTimerEvent(CTimerd::TIMER_EXEC_PLUGIN, config, iId)
 	std::stringstream ostr;
 	ostr << iId;
 	std::string id=ostr.str();
-	strcpy(name, config->getString("NAME_"+id).c_str());
+	memset(name, 0, sizeof(name));
+	strncpy(name, config->getString("NAME_"+id).c_str(), sizeof(name)-1);
 	dprintf("read NAME_%s %s (%p)\n",id.c_str(),name,name);
 }
 //------------------------------------------------------------
