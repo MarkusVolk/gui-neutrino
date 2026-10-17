@@ -847,18 +847,10 @@ static bool waitForXMLTVNameServer(const std::string &url)
 	}
 }
 
-void *insertEventsfromXMLTV(void * data)
+void readEventsFromXMLTVUrl(std::string url)
 {
-	set_threadname(__func__);
 	readerStarted();
 	int ev_count = 0;
-	if (!data)
-	{
-		readerFinished();
-		pthread_exit(NULL);
-	}
-	std::string url = (std::string)(char *) data;
-	free(data);
 	std::string tmp_name = randomFile(getFileExt(url), "/tmp", 8);
 
 	int64_t now = time_monotonic_ms();
@@ -891,7 +883,7 @@ void *insertEventsfromXMLTV(void * data)
 		{
 			unlink(tmp_name.c_str());
 			readerFinished();
-			pthread_exit(NULL);
+			return;
 		}
 		if (!access(tmp_name.c_str(), R_OK))
 		{
@@ -911,8 +903,6 @@ void *insertEventsfromXMLTV(void * data)
 	       time_monotonic_ms()-now, ev_count, url.c_str());
 
 	readerFinished();
-
-	pthread_exit(NULL);
 }
 
 static void write_epg_xml_header(FILE * fd, const t_original_network_id onid, const t_transport_stream_id tsid, const t_service_id sid)

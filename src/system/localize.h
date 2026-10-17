@@ -37,6 +37,7 @@
 #include <locale.h>
 #include <time.h>
 #include <string>
+#include <atomic>
 #include <map>
 
 #include <OpenThreads/Mutex>
@@ -51,18 +52,21 @@ extern std::map<std::string, std::string> iso639rev;
 class CLocaleManager
 {
 	private:
-		char * * localeData;
+		/* The table of a language is built aside and published whole; the
+		 * table and block of the load before stay until the next load, so a
+		 * pointer getText handed out keeps pointing at text for that long. */
+		std::atomic<char **> localeData;
 		char * * defaultData;
+		char * * oldLocaleData;
 
 		char * localeDataMem;
 		char * defaultDataMem;
+		char * oldLocaleDataMem;
 
-		/* Loading a language frees the block every entry in the table points
-		 * into and writes the whole table again. getString copies under this
-		 * so a caller on another thread cannot be handed a pointer into what
-		 * is being freed. getText hands the pointer itself over and is not
-		 * held: what it is safe by is being called from the loop that loads. */
+		/* Serialises the loads against each other and against getString. */
 		mutable OpenThreads::Mutex catalog_mutex;
+
+		void publish(bool asdefault, char **table, char *mem);
 
 	public:
 		enum loadLocale_ret_t
@@ -77,12 +81,10 @@ class CLocaleManager
 
 		loadLocale_ret_t loadLocale(const char * const locale, bool asdefault = false);
 
-		/* The pointer itself, which stays this manager's. Only safe on the
-		 * thread that loads a language; anywhere else getString is the one to
-		 * ask. */
+		/* The pointer itself, which stays this manager's: it points at text
+		 * until the second language load from now. A copy is what to keep. */
 		const char * getText(const neutrino_locale_t keyName) const;
-		// A copy taken under the lock, which is what a thread other than the
-		// loop's may ask for.
+		// A copy taken under the lock.
 		std::string getString(const neutrino_locale_t keyName) const;
 		std::string getTextAsString(const neutrino_locale_t keyName) const {return (static_cast<std::string>(getText(keyName)));}
 

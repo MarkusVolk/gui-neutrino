@@ -91,50 +91,69 @@ const char * getISO639Description(const char * const iso)
 
 CLocaleManager::CLocaleManager()
 {
-	localeData = new char * [sizeof(locale_real_names)/sizeof(const char *)];
+	char **table = new char * [sizeof(locale_real_names)/sizeof(const char *)];
 	defaultData = new char * [sizeof(locale_real_names)/sizeof(const char *)];
-	memcpy(localeData, locale_real_names, sizeof(locale_real_names));
+	memcpy(table, locale_real_names, sizeof(locale_real_names));
 	memcpy(defaultData, locale_real_names, sizeof(locale_real_names));
-	defaultDataMem = localeDataMem = NULL;
+	localeData = table;
+	oldLocaleData = NULL;
+	defaultDataMem = localeDataMem = oldLocaleDataMem = NULL;
 
 	loadLocale(DEFAULT_LOCALE, true);
 }
 
 CLocaleManager::~CLocaleManager()
 {
-	delete[] localeData;
+	delete[] localeData.load();
 	delete[] defaultData;
+	delete[] oldLocaleData;
 
 	if (localeDataMem)
 		::free(localeDataMem);
 	if (defaultDataMem)
 		::free(defaultDataMem);
+	if (oldLocaleDataMem)
+		::free(oldLocaleDataMem);
+}
+
+/* The table of the load before last goes now; the one before this load stays,
+   a reader off the loop may still hold a pointer getText gave into it. The
+   default is loaded once, at construction, and taken over as it is. */
+void CLocaleManager::publish(bool asdefault, char **table, char *mem)
+{
+	if (asdefault)
+	{
+		delete[] defaultData;
+		if (defaultDataMem)
+			::free(defaultDataMem);
+		defaultData = table;
+		defaultDataMem = mem;
+		return;
+	}
+	delete[] oldLocaleData;
+	if (oldLocaleDataMem)
+		::free(oldLocaleDataMem);
+	oldLocaleData = localeData.exchange(table, std::memory_order_acq_rel);
+	oldLocaleDataMem = localeDataMem;
+	localeDataMem = mem;
 }
 
 const char * path[2] = { LOCALEDIR_VAR, LOCALEDIR };
 
 CLocaleManager::loadLocale_ret_t CLocaleManager::loadLocale(const char * const locale, bool asdefault)
 {
-	/* From here to the end, because between the free below and the last entry
-	   being written the table points partly into a block that has gone. Held
-	   against getString and against nothing else: a reader on another thread
-	   is safe only through getString, which waits for one string copy, and
-	   getText is not held. Here no caller off the loop asks getString yet.
-	   Reading the file inside is what such a caller would wait for, and a
-	   language is loaded when somebody changes it. */
+	/* One load at a time, and getString waits for it. getText does not: it
+	   reads the table published last, which is complete, and the one before
+	   it stays until the next load. */
 	OpenThreads::ScopedLock<OpenThreads::Mutex> lock(catalog_mutex);
 
 	FILE * fd = NULL;
-	char ** loadData = asdefault ? defaultData : localeData;
-
-	char **mem = asdefault ? &defaultDataMem : &localeDataMem;
+	/* built aside, published whole at the end */
+	char ** loadData = new char * [sizeof(locale_real_names)/sizeof(const char *)];
 
 	if(!asdefault && !strcmp(locale, DEFAULT_LOCALE)) {
-		if (*mem) {
-			free(*mem);
-			*mem = NULL;
-		}
 		memcpy(loadData, defaultData, sizeof(locale_real_names));
+		publish(asdefault, loadData, NULL);
 		return UNICODE_FONT;
 	}
 
@@ -156,23 +175,21 @@ CLocaleManager::loadLocale_ret_t CLocaleManager::loadLocale(const char * const l
 	if (!fd)
 	{		
 		perror("cannot read locale");
+		delete[] loadData;
 		return NO_SUCH_LOCALE;
-	}
-
-	if (*mem) {
-		free (*mem);
-		*mem = NULL;
 	}
 
 	memcpy(loadData, locale_real_names, sizeof(locale_real_names));
 
-	*mem = (char *) malloc(st.st_size);
-	if (!*mem)
+	char *mem = (char *) malloc(st.st_size);
+	if (!mem)
 	{
 		perror("loadLocale");
+		fclose(fd);
+		delete[] loadData;
 		return NO_SUCH_LOCALE;
 	}
-	char *memp = *mem;
+	char *memp = mem;
 
 	char *buf=NULL;
 	size_t len = 0;
@@ -235,15 +252,15 @@ CLocaleManager::loadLocale_ret_t CLocaleManager::loadLocale(const char * const l
 	fclose(fd);
 	if(buf)
 		free(buf);
-	if(memp - *mem > 0){
-		char *_mem = (char *) realloc(*mem, memp - *mem);
+	if(memp - mem > 0){
+		char *_mem = (char *) realloc(mem, memp - mem);
 		if (_mem) {
-			if (_mem != *mem) {
+			if (_mem != mem) {
 				// most likely doesn't happen
 				for(unsigned int i = 1; i < sizeof(locale_real_names)/sizeof(const char *); i++)
 					if (loadData[i] != locale_real_names[i])
-						loadData[i] -= *mem - _mem;
-				*mem = _mem;
+						loadData[i] -= mem - _mem;
+				mem = _mem;
 			}
 		}
 	}
@@ -255,12 +272,13 @@ CLocaleManager::loadLocale_ret_t CLocaleManager::loadLocale(const char * const l
 				loadData[j] = defaultData[j];
 		}
 
+	publish(asdefault, loadData, mem);
 	return UNICODE_FONT;
 }
 
 const char * CLocaleManager::getText(const neutrino_locale_t keyName) const
 {
-	return localeData[keyName];
+	return localeData.load(std::memory_order_acquire)[keyName];
 }
 
 /* A copy, taken with the lock held, which is the whole of what makes this one
@@ -268,7 +286,7 @@ const char * CLocaleManager::getText(const neutrino_locale_t keyName) const
 std::string CLocaleManager::getString(const neutrino_locale_t keyName) const
 {
 	OpenThreads::ScopedLock<OpenThreads::Mutex> lock(catalog_mutex);
-	return (std::string) localeData[keyName];
+	return (std::string) localeData.load()[keyName];
 }
 
 /* The way back from the name a locale is written under to the value the screens

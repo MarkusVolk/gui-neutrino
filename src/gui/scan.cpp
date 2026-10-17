@@ -97,7 +97,7 @@ void CScanTs::prev_next_TP( bool up)
 	else if (CFrontend::isTerr(delsys))
 		position = CServiceManager::getInstance()->GetSatellitePosition(scansettings.terrestrialName);
 
-	transponder_list_t &select_transponders = CServiceManager::getInstance()->GetSatelliteTransponders(position);
+	transponder_list_t select_transponders = CServiceManager::getInstance()->GetSatelliteTranspondersCopy(position);
 	transponder_list_t::iterator tI;
 	bool next_tp = false;
 

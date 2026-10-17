@@ -2475,13 +2475,20 @@ bool getDefaultNetworkInterface(std::string &ifname, bool prefer_route)
 		return !ifname.empty();
 
 	struct dirent *entry;
+	std::vector<std::string> allnames;
 	while ((entry = readdir(dir)) != NULL)
 	{
-		if (!isHardwareNetworkInterface(entry->d_name))
+		if (entry->d_name[0] == '.' || strcmp(entry->d_name, "lo") == 0)
 			continue;
-		ifnames.push_back(entry->d_name);
+		allnames.push_back(entry->d_name);
+		if (isHardwareNetworkInterface(entry->d_name))
+			ifnames.push_back(entry->d_name);
 	}
 	closedir(dir);
+
+	/* a bridge or a SoC NIC has no device below it: then everything but lo */
+	if (ifnames.empty())
+		ifnames.swap(allnames);
 
 	if (ifnames.empty())
 		return false;

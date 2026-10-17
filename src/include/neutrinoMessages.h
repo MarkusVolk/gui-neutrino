@@ -137,7 +137,6 @@ struct NeutrinoMessages
 		EVT_AUTO_SET_VIDEOSYSTEM		= CRCInput::RC_Events + 62, /* data = new video system */
 
 		/* sectionsd */
-		EVT_RELOAD_XMLTV			= CRCInput::RC_Events + 63,
 
 		/* END of CRCInput::RC_Events */
 

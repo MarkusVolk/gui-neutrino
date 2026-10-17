@@ -84,8 +84,7 @@ class CSectionsdClient : private CBasicClient
 			EVT_SERVICES_UPDATE,
 			EVT_BOUQUETS_UPDATE,
 #endif
-			EVT_WRITE_SI_FINISHED,
-			EVT_RELOAD_XMLTV
+			EVT_WRITE_SI_FINISHED
 		};
 
 	struct epgflags {
@@ -202,6 +201,9 @@ class CSectionsdClient : private CBasicClient
 	void readSIfromXML(const char * epgxmlname);
 
 	void readSIfromXMLTV(const char * url);
+
+	/* the whole XMLTV configuration at once; it replaces what sectionsd reads hourly */
+	void setXMLTVUrls(const std::vector<std::string> &urls);
 
 	void writeSI2XML(const char * epgxmlname);
 

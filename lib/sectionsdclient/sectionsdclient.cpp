@@ -222,6 +222,22 @@ void CSectionsdClient::readSIfromXMLTV(const char * url)
 	close_connection();
 }
 
+void CSectionsdClient::setXMLTVUrls(const std::vector<std::string> &urls)
+{
+	/* one NUL-terminated URL after the other */
+	std::string data;
+	for (std::vector<std::string>::const_iterator it = urls.begin(); it != urls.end(); ++it)
+		if (!it->empty())
+			data.append(it->c_str(), it->length() + 1);
+
+	RequestGuard guard(*this);
+
+	send(sectionsd::setXMLTVUrls, data.c_str(), data.length());
+
+	readResponse();
+	close_connection();
+}
+
 void CSectionsdClient::writeSI2XML(const char * epgxmlname)
 {
 	RequestGuard guard(*this);

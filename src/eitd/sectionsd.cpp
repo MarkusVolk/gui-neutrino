@@ -40,6 +40,7 @@
 #include <sys/timex.h>
 #include <time.h>
 #include <set>
+#include <vector>
 #include <limits>
 #include <string>
 #include <connection/basicsocket.h>
@@ -1360,23 +1361,42 @@ static std::set<std::string> xmltv_urls;
 static int64_t xmltv_read_at;
 static pthread_mutex_t xmltv_urls_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static void startXMLTVReader(const std::string &address)
+/* one thread reads the guides of a list one after the other; a guide taken
+ * out of the configuration in the meantime is left out */
+static void *xmltvReaderThread(void *data)
 {
+	set_threadname("sd:xmltv");
+	std::vector<std::string> *urls = (std::vector<std::string> *) data;
+	for (std::vector<std::string>::const_iterator it = urls->begin(); it != urls->end() && !sectionsd_stop; ++it)
+	{
+		pthread_mutex_lock(&xmltv_urls_lock);
+		bool wanted = xmltv_urls.find(*it) != xmltv_urls.end();
+		pthread_mutex_unlock(&xmltv_urls_lock);
+		if (wanted)
+			readEventsFromXMLTVUrl(*it);
+	}
+	delete urls;
+	pthread_exit(NULL);
+}
+
+static void startXMLTVReader(const std::vector<std::string> &urls)
+{
+	if (urls.empty())
+		return;
+
 	pthread_t thrInsertXMLTV;
 
-	/* the next one may come before this one is read: the thread gets its own copy and frees it */
-	char *url = strdup(address.c_str());
-	if (url == NULL)
-		return ;
+	/* the next list may come before this one is read: the thread gets its own copy and frees it */
+	std::vector<std::string> *list = new std::vector<std::string>(urls);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
-	if (pthread_create (&thrInsertXMLTV, &attr, insertEventsfromXMLTV, (void *)url ))
+	if (pthread_create (&thrInsertXMLTV, &attr, xmltvReaderThread, (void *)list ))
 	{
 		perror("sectionsd: pthread_create()");
-		free(url);
+		delete list;
 	}
 
 	pthread_attr_destroy(&attr);
@@ -1385,14 +1405,14 @@ static void startXMLTVReader(const std::string &address)
 static void readXMLTVAgain(void)
 {
 	pthread_mutex_lock(&xmltv_urls_lock);
-	std::set<std::string> urls = xmltv_urls;
+	std::vector<std::string> urls(xmltv_urls.begin(), xmltv_urls.end());
 	xmltv_read_at = time_monotonic_ms();
 	pthread_mutex_unlock(&xmltv_urls_lock);
 
-	for (std::set<std::string>::const_iterator it = urls.begin(); it != urls.end(); ++it)
-		startXMLTVReader(*it);
+	startXMLTVReader(urls);
 }
 
+/* one guide more, read at once (sectionsdcontrol --readxmltvepg) */
 static void commandReadSIfromXMLTV(int connfd, char *data, const unsigned dataLength)
 {
 	sendEmptyResponse(connfd, NULL, 0);
@@ -1406,7 +1426,31 @@ static void commandReadSIfromXMLTV(int connfd, char *data, const unsigned dataLe
 	xmltv_read_at = time_monotonic_ms();
 	pthread_mutex_unlock(&xmltv_urls_lock);
 
-	startXMLTVReader(url);
+	startXMLTVReader(std::vector<std::string>(1, url));
+}
+
+/* the whole configuration, NUL-separated: it replaces the set, so a guide
+ * taken out of the settings is not read again until it is asked for again */
+static void commandSetXMLTVUrls(int connfd, char *data, const unsigned dataLength)
+{
+	sendEmptyResponse(connfd, NULL, 0);
+
+	std::set<std::string> urls;
+	for (unsigned pos = 0; pos < dataLength; )
+	{
+		size_t len = strnlen(data + pos, dataLength - pos);
+		if (len > 0)
+			urls.insert(std::string(data + pos, len));
+		pos += len + 1;
+	}
+	std::vector<std::string> list(urls.begin(), urls.end());
+
+	pthread_mutex_lock(&xmltv_urls_lock);
+	xmltv_urls.swap(urls);
+	xmltv_read_at = time_monotonic_ms();
+	pthread_mutex_unlock(&xmltv_urls_lock);
+
+	startXMLTVReader(list);
 }
 
 static void commandWriteSI2XML(int connfd, char *data, const unsigned dataLength)
@@ -1444,6 +1488,7 @@ static s_cmd_table connectionCommands[sectionsd::numberOfCommands] = {
 	{	commandWriteSI2XML,			"commandWriteSI2XML"			},
 	{	commandSetConfig,			"commandSetConfig"			},
 	{	commandReadSIfromXMLTV,			"commandReadSIfromXMLTV"		},
+	{	commandSetXMLTVUrls,			"commandSetXMLTVUrls"			},
 };
 
 bool sectionsd_parse_command(CBasicMessage::Header &rmsg, int connfd)
@@ -2465,13 +2510,12 @@ static void *houseKeepingThread(void *)
 		if (sectionsd_stop)
 			break;
 
-		if (epg_read_frequently > 0) {
-			pthread_mutex_lock(&xmltv_urls_lock);
-			bool again = !xmltv_urls.empty() && time_monotonic_ms() - xmltv_read_at >= XMLTV_READ_AGAIN_MS;
-			pthread_mutex_unlock(&xmltv_urls_lock);
-			if (again)
-				readXMLTVAgain();
-		}
+		/* the guides are read again whatever the EPG cache setting says */
+		pthread_mutex_lock(&xmltv_urls_lock);
+		bool xmltv_again = !xmltv_urls.empty() && time_monotonic_ms() - xmltv_read_at >= XMLTV_READ_AGAIN_MS;
+		pthread_mutex_unlock(&xmltv_urls_lock);
+		if (xmltv_again)
+			readXMLTVAgain();
 
 		if (!scanning) {
 			scount++;

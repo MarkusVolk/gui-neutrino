@@ -247,6 +247,12 @@ class CServiceManager
 		bool GetTransponder(transponder_id_t tid, transponder &t);
 		transponder_list_t & GetTransponders() { return transponders; }
 		transponder_list_t & GetSatelliteTransponders(t_satellite_position position) { return satelliteTransponders[position]; }
+		/* a copy for a reader off the zapit thread: the scan thread writes under channels_mutex */
+		transponder_list_t GetSatelliteTranspondersCopy(t_satellite_position position)
+		{
+			ChannelGuard guard;
+			return satelliteTransponders[position];
+		}
 		void KeepNumbers(bool enable) { keep_numbers = enable; };
 		void SetCIFilter(void);
 };

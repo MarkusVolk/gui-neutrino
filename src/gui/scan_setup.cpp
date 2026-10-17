@@ -2149,7 +2149,7 @@ int CTPSelectHandler::exec(CMenuTarget* parent, const std::string &actionkey)
 		CServiceManager::getInstance()->GetTransponder(channel->getTransponderId(), ct);
 
 	int i = menu.getItemsCount();
-	transponder_list_t &select_transponders = CServiceManager::getInstance()->GetSatelliteTransponders(position);
+	transponder_list_t select_transponders = CServiceManager::getInstance()->GetSatelliteTranspondersCopy(position);
 	for (transponder_list_t::iterator tI = select_transponders.begin(); tI != select_transponders.end(); ++tI) {
 		snprintf(cnt, sizeof(cnt), "%d", i);
 		transponder & t = tI->second;

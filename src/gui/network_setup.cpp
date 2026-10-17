@@ -232,6 +232,23 @@ static int my_filter(const struct dirent *dent)
 	return isHardwareNetworkInterface(dent->d_name);
 }
 
+/* a bridge or a SoC NIC has no device below it: then everything but lo */
+static int any_filter(const struct dirent *dent)
+{
+	return dent->d_name[0] != '.' && strcmp(dent->d_name, "lo") != 0;
+}
+
+static int scanInterfaces(struct dirent ***namelist)
+{
+	int ifcount = scandir("/sys/class/net", namelist, my_filter, alphasort);
+	if (ifcount == 0)
+	{
+		free(*namelist);
+		ifcount = scandir("/sys/class/net", namelist, any_filter, alphasort);
+	}
+	return ifcount;
+}
+
 void CNetworkSetup::setBroadcast(void)
 {
 	struct in_addr na, nm;
@@ -252,7 +269,7 @@ int CNetworkSetup::showNetworkSetup()
 
 	//if select
 
-	int ifcount = scandir("/sys/class/net", &namelist, my_filter, alphasort);
+	int ifcount = scanInterfaces(&namelist);
 
 	bool found = false;
 
@@ -553,7 +570,7 @@ int CNetworkSetup::showInterfaceSelectMenu()
 	int res = menu_return::RETURN_REPAINT;
 	struct dirent **namelist;
 
-	int ifcount = scandir("/sys/class/net", &namelist, my_filter, alphasort);
+	int ifcount = scanInterfaces(&namelist);
 	if (ifcount <= 0)
 	{
 		if (ifcount >= 0)

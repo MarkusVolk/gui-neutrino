@@ -273,15 +273,16 @@ public:
 		if (find(g_settings.xmltv_xml_auto.begin(), g_settings.xmltv_xml_auto.end(), _xmltv_url) == g_settings.xmltv_xml_auto.end())
 			g_settings.xmltv_xml_auto.push_back(_xmltv_url);
 	}
+	/* both lists in one message: sectionsd replaces its set, so a guide taken out is not read again */
 	void xmltv_xml_readepg()
 	{
-		for (std::list<std::string>::iterator it = g_settings.xmltv_xml.begin(); it != g_settings.xmltv_xml.end(); it++)
-			g_Sectionsd->readSIfromXMLTV((*it).c_str());
+		std::vector<std::string> urls(g_settings.xmltv_xml.begin(), g_settings.xmltv_xml.end());
+		urls.insert(urls.end(), g_settings.xmltv_xml_auto.begin(), g_settings.xmltv_xml_auto.end());
+		g_Sectionsd->setXMLTVUrls(urls);
 	}
 	void xmltv_xml_auto_readepg()
 	{
-		for (std::list<std::string>::iterator it = g_settings.xmltv_xml_auto.begin(); it != g_settings.xmltv_xml_auto.end(); it++)
-			g_Sectionsd->readSIfromXMLTV((*it).c_str());
+		xmltv_xml_readepg();
 	}
 };
 #endif

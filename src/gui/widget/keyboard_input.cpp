@@ -902,11 +902,13 @@ void CKeyboardInput::paintChar(int pos)
 
 std::string CKeyboardInput::maskedString()
 {
-	/* one star for each character, a space stays a space */
-	std::string out;
+	/* a star for every cell up to the last character typed, spaces included:
+	   neither the length of the field nor the places of the spaces show */
+	size_t last = 0;
 	for (size_t i = 0; i < inputString->length(); i++)
-		out += (inputString->at(i) == " " || inputString->at(i).empty()) ? ' ' : '*';
-	return out;
+		if (inputString->at(i) != " " && !inputString->at(i).empty())
+			last = i + 1;
+	return std::string(last, '*');
 }
 
 void CKeyboardInput::paintChar(int pos, std::string &c)
@@ -923,7 +925,7 @@ void CKeyboardInput::paintChar(int pos, std::string &c)
 	frameBuffer->paintBoxFrame(xpos, ypos, input_w, input_h, 1, COL_MENUCONTENT_PLUS_2);
 
 	std::string star = "*";
-	std::string &shown = (masked && c != " " && !c.empty()) ? star : c;
+	std::string &shown = (masked && pos < (int) maskedString().length()) ? star : c;
 
 	int ch_w = g_Font[SNeutrinoSettings::FONT_TYPE_MENU]->getRenderWidth(shown);
 	int ch_x = xpos + std::max(input_w/2 - ch_w/2, 0);

@@ -3037,7 +3037,6 @@ void CNeutrinoApp::InitSectiondClient()
 	g_Sectionsd->registerEvent(CSectionsdClient::EVT_GOT_CN_EPG, 222, NEUTRINO_UDS_NAME);
 	g_Sectionsd->registerEvent(CSectionsdClient::EVT_EIT_COMPLETE, 222, NEUTRINO_UDS_NAME);
 	g_Sectionsd->registerEvent(CSectionsdClient::EVT_WRITE_SI_FINISHED, 222, NEUTRINO_UDS_NAME);
-	g_Sectionsd->registerEvent(CSectionsdClient::EVT_RELOAD_XMLTV, 222, NEUTRINO_UDS_NAME);
 }
 
 #if HAVE_CST_HARDWARE
@@ -3476,7 +3475,6 @@ TIMER_STOP("################################## after all #######################
 #endif
 
 	xmltv_xml_readepg();
-	xmltv_xml_auto_readepg();
 
 #if ENABLE_PIP
 	if (g_info.hw_caps->can_pip && g_info.hw_caps->pip_warmup)
@@ -5106,12 +5104,6 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 	}
 	else if (msg == NeutrinoMessages::EVT_CALL_IN_MAIN) {
 		main_call::handle(data);
-		return messages_return::handled;
-	}
-	else if (msg == NeutrinoMessages::EVT_RELOAD_XMLTV) {
-		printf("CNeutrinoApp::handleMsg: reload xmltv epg\n");
-		xmltv_xml_readepg();
-		xmltv_xml_auto_readepg();
 		return messages_return::handled;
 	}
 	if ((msg >= CRCInput::RC_WithData) && (msg < CRCInput::RC_WithData + 0x10000000)) {
