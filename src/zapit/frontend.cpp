@@ -1908,23 +1908,34 @@ bool CFrontend::setInput(CZapitChannel * channel, bool nvod)
 	if (tuned && (ct == current_id))
 		return false;
 
-	if (nvod) {
-		for (tpI = transponders.begin(); tpI != transponders.end(); ++tpI) {
-			if ((ct & 0xFFFFFFFFULL) == (tpI->first & 0xFFFFFFFFULL))
-				break;
-		}
-	} else
-		tpI = transponders.find(channel->getTransponderId());
+	transponder_id_t tpid;
+	uint32_t frequency;
+	uint8_t polarization;
+	{
+		/* The global transponder map is under the channel lock; the scan
+		   thread adds to it meanwhile. Copied out, the lock given back. */
+		CServiceManager::ChannelGuard guard;
+		if (nvod) {
+			for (tpI = transponders.begin(); tpI != transponders.end(); ++tpI) {
+				if ((ct & 0xFFFFFFFFULL) == (tpI->first & 0xFFFFFFFFULL))
+					break;
+			}
+		} else
+			tpI = transponders.find(channel->getTransponderId());
 
-	if (tpI == transponders.end()) {
-		printf("Transponder %" PRIx64 " for channel %" PRIx64 " not found\n", ct, channel->getChannelID());
-		return false;
+		if (tpI == transponders.end()) {
+			printf("Transponder %" PRIx64 " for channel %" PRIx64 " not found\n", ct, channel->getChannelID());
+			return false;
+		}
+		tpid = tpI->first;
+		frequency = tpI->second.getFrequency();
+		polarization = tpI->second.getPolarization();
 	}
 
-	currentTransponder.setTransponderId(tpI->first);
+	currentTransponder.setTransponderId(tpid);
 
 	currentSatellitePosition = channel->getSatellitePosition();
-	setInput(channel->getSatellitePosition(), tpI->second.getFrequency(), tpI->second.getPolarization());
+	setInput(channel->getSatellitePosition(), frequency, polarization);
 	return true;
 }
 
@@ -2047,10 +2058,17 @@ uint32_t CFrontend::sendEN50607TuningCommand(const uint32_t frequency, const int
 
 bool CFrontend::tuneChannel(CZapitChannel * /*channel*/, bool /*nvod*/)
 {
-	transponder_list_t::iterator transponder = transponders.find(currentTransponder.getTransponderId());
-	if (transponder == transponders.end())
-		return false;
-	return tuneFrequency(&transponder->second.feparams, false);
+	FrontendParameters feparams;
+	{
+		/* Copied out under the channel lock, which the transponder map is
+		   under, so that the tune below runs without it. */
+		CServiceManager::ChannelGuard guard;
+		transponder_list_t::iterator transponder = transponders.find(currentTransponder.getTransponderId());
+		if (transponder == transponders.end())
+			return false;
+		feparams = transponder->second.feparams;
+	}
+	return tuneFrequency(&feparams, false);
 }
 
 int CFrontend::tuneFrequency(FrontendParameters *feparams, bool nowait)

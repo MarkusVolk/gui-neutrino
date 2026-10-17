@@ -1107,6 +1107,10 @@ void CServiceManager::SaveServices(bool tocopy, bool if_changed, bool no_deleted
 	if(if_changed && !services_changed)
 		return;
 
+	/* Walks the transponder and channel maps, from the zapit, scan, GUI and
+	   web threads, while the scan thread adds to both. */
+	OpenThreads::ScopedLock<OpenThreads::Mutex> lock(channels_mutex);
+
 #ifdef SAVE_DEBUG
 	set<t_channel_id> chans_processed;
 #endif
@@ -1268,6 +1272,9 @@ bool CServiceManager::SaveCurrentServices(transponder_id_t tpid)
 	bool updated = 0;
 	bool tpdone = 0;
 	bool satfound = 0;
+
+	/* On the SDT monitor thread, reading the maps that zapit reloads. */
+	OpenThreads::ScopedLock<OpenThreads::Mutex> lock(channels_mutex);
 
 	tI = transponders.find(tpid);
 	if(tI == transponders.end()) {
@@ -1473,6 +1480,7 @@ void CServiceManager::UseNumber(int number, bool radio)
 #endif
 bool CServiceManager::GetTransponder(transponder_id_t tid, transponder &t)
 {
+	OpenThreads::ScopedLock<OpenThreads::Mutex> lock(channels_mutex);
 	stiterator tI = transponders.find(tid);
 	if(tI != transponders.end()) {
 		t = tI->second;

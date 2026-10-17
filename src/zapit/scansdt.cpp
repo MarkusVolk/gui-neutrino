@@ -403,8 +403,11 @@ bool CSdt::ParseServiceDescriptor(ServiceDescription * service, ServiceDescripto
 	t_channel_id channel_id = CZapitChannel::makeChannelId(satellitePosition,
 			freq_id, transport_stream_id, original_network_id, service_id);
 	if(current) {
-		if(CServiceManager::getInstance()->FindCurrentChannel(channel_id))
-			return false;
+		{
+			CServiceManager::ChannelGuard guard;
+			if(CServiceManager::getInstance()->FindCurrentChannel(channel_id))
+				return false;
+		}
 
 		CZapitChannel * channel = new CZapitChannel(serviceName, channel_id,
 				real_type, satellitePosition, freq_id);
@@ -496,6 +499,8 @@ bool CSdt::ParseServiceDescriptor(ServiceDescription * service, ServiceDescripto
 CZapitChannel * CSdt::CheckChannelId(t_service_id service_id)
 {
 	int flist[5] = { freq_id, freq_id-1, freq_id+1, freq_id-2, freq_id+2 };
+	/* The lookups only: the caller takes the lock again before it writes. */
+	CServiceManager::ChannelGuard guard;
 	for(int i = 0; i < 5; i++) {
 		freq_id_t freq = flist[i];
 		t_channel_id channel_id = CREATE_CHANNEL_ID64;

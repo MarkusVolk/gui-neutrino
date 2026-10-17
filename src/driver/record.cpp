@@ -2115,7 +2115,7 @@ CRecordInstance* CRecordManager::getUseCI()
 	for(recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++) {
 		CRecordInstance * inst = it->second;
 		CZapitChannel * channel = CServiceManager::getInstance()->FindChannel(inst->GetChannelId());
-		if (channel->bUseCI) {
+		if (channel && channel->bUseCI) {
 			mutex.unlock();
 			return inst;
 		}

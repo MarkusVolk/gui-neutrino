@@ -86,7 +86,10 @@ class CServiceManager
 		bool services_changed;
 
 		/* Web and GUI threads read the three channel maps while zapit
-		 * rebuilds them. */
+		 * rebuilds them. The global transponder map is under this lock as
+		 * well: LoadServices clears and refills it under it already, the
+		 * scan thread inserts while zapit, the SDT monitor and the frontends
+		 * look up, and a lock of its own would only add an order to keep. */
 		OpenThreads::Mutex channels_mutex;
 
 		/* LoadServices has an entry point on the zapit thread and one on the

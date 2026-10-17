@@ -320,9 +320,12 @@ bool CBat::ParseLogicalChannels(LogicalChannelDescriptor * ld, BouquetAssociatio
 		logical_map[channel_id] = lcn;
 #ifdef DEBUG_LCN
 		std::string name;
-		CZapitChannel * chan = CServiceManager::getInstance()->FindChannel48(channel_id);
-		if(chan)
-			name = chan->getName();
+		{
+			CServiceManager::ChannelGuard guard;
+			CZapitChannel * chan = CServiceManager::getInstance()->FindChannel48(channel_id);
+			if(chan)
+				name = chan->getName();
+		}
 		printf("BAT: logical channel %05d: tsid %04x onid %04x %016" PRIx64 " [%s] visible %d\n", lcn, transport_stream_id, original_network_id, channel_id, name.c_str(), (*it)->getVisibleServiceFlag());
 #endif
 	}

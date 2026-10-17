@@ -699,7 +699,12 @@ bool CZapit::ZapIt(const t_channel_id channel_id, bool forupdate, bool startplay
 	CZapitChannel* newchannel;
 
 	abort_zapit = 0;
-	if((newchannel = CServiceManager::getInstance()->FindChannel(channel_id, &current_is_nvod)) == NULL) {
+	{
+		/* The lookup only: the scan thread adds to the map meanwhile. */
+		CServiceManager::ChannelGuard guard;
+		newchannel = CServiceManager::getInstance()->FindChannel(channel_id, &current_is_nvod);
+	}
+	if(newchannel == NULL) {
 		INFO("channel_id " PRINTF_CHANNEL_ID_TYPE " not found", channel_id);
 		return false;
 	}
@@ -985,7 +990,11 @@ bool CZapit::StartPip(const t_channel_id channel_id, int pip)
 	   this is for the case temporary timeshift is running, it do not lock its frontend */
 	bool need_lock = !playbackStopForced || (currentMode & RECORD_MODE);
 
-	if((newchannel = CServiceManager::getInstance()->FindChannel(channel_id)) == NULL) {
+	{
+		CServiceManager::ChannelGuard guard;
+		newchannel = CServiceManager::getInstance()->FindChannel(channel_id);
+	}
+	if(newchannel == NULL) {
 		INFO("channel_id " PRINTF_CHANNEL_ID_TYPE " not found", channel_id);
 		return false;
 	}
@@ -1086,7 +1095,11 @@ bool CZapit::ZapForRecord(const t_channel_id channel_id)
 	/* retry tuning, at least twice when using unicable */
 	int retry = std::max(config.feRetries, (live_fe->getDiseqcType() == DISEQC_UNICABLE) * 2);
 
-	if((newchannel = CServiceManager::getInstance()->FindChannel(channel_id)) == NULL) {
+	{
+		CServiceManager::ChannelGuard guard;
+		newchannel = CServiceManager::getInstance()->FindChannel(channel_id);
+	}
+	if(newchannel == NULL) {
 		INFO("channel_id " PRINTF_CHANNEL_ID_TYPE " not found", channel_id);
 		return false;
 	}
@@ -1130,7 +1143,13 @@ bool CZapit::ZapForEpg(const t_channel_id channel_id, bool instandby)
 	CZapitChannel* newchannel;
 	bool transponder_change;
 
-	if((newchannel = CServiceManager::getInstance()->FindChannel(channel_id)) == NULL) {
+	{
+		/* Given back before the frontend lock below: the EPG scan takes the
+		   frontends first and this lock second. */
+		CServiceManager::ChannelGuard guard;
+		newchannel = CServiceManager::getInstance()->FindChannel(channel_id);
+	}
+	if(newchannel == NULL) {
 		INFO("channel_id " PRINTF_CHANNEL_ID_TYPE " not found", channel_id);
 		return false;
 	}
@@ -1759,11 +1778,14 @@ bool CZapit::ParseCommand(CBasicMessage::Header &rmsg, int connfd)
 		VALGRIND_PARANOIA(response);
 		CBasicServer::receive_data(connfd, &requested_channel_id, sizeof(requested_channel_id));
 		response.name[0] = 0;
-		CZapitChannel * channel = (requested_channel_id == 0) ? current_channel :
-			CServiceManager::getInstance()->FindChannel(requested_channel_id);
-		if(channel) {
-			strncpy(response.name, channel->getName().c_str(), CHANNEL_NAME_SIZE-1);
-			response.name[CHANNEL_NAME_SIZE-1] = 0;
+		{
+			CServiceManager::ChannelGuard guard;
+			CZapitChannel * channel = (requested_channel_id == 0) ? current_channel :
+				CServiceManager::getInstance()->FindChannel(requested_channel_id);
+			if(channel) {
+				strncpy(response.name, channel->getName().c_str(), CHANNEL_NAME_SIZE-1);
+				response.name[CHANNEL_NAME_SIZE-1] = 0;
+			}
 		}
 		CBasicServer::send_data(connfd, &response, sizeof(response));
 		break;
@@ -1803,7 +1825,10 @@ bool CZapit::ParseCommand(CBasicMessage::Header &rmsg, int connfd)
 		t_channel_id cid = live_channel_id ? live_channel_id : (current_channel ? current_channel->getChannelID() : 0);
 		PrepareChannels();
 
-		current_channel = CServiceManager::getInstance()->FindChannel(cid);
+		{
+			CServiceManager::ChannelGuard guard;
+			current_channel = CServiceManager::getInstance()->FindChannel(cid);
+		}
 		if (current_channel)
 			ParsePatPmt(current_channel);//reinit pids
 		else
@@ -2498,11 +2523,14 @@ void CZapit::addChannelToBouquet(const unsigned int bouquet, const t_channel_id 
 {
 	//DBG("addChannelToBouquet(%d, %d)\n", bouquet, channel_id);
 
+	/* One hold over the lookup and the insert, so the channel cannot go
+	   between them; addService would take the lock a second time. */
+	CServiceManager::ChannelGuard guard;
 	CZapitChannel* chan = CServiceManager::getInstance()->FindChannel(channel_id);
 
 	if (chan != NULL)
 		if (bouquet < g_bouquetManager->Bouquets.size())
-			g_bouquetManager->Bouquets[bouquet]->addService(chan);
+			g_bouquetManager->Bouquets[bouquet]->addServiceLocked(chan);
 		else
 			WARN("bouquet not found");
 	else
@@ -2663,6 +2691,7 @@ void CZapit::sendChannels(int connfd, const CZapitClient::channelsMode mode, con
 	else if (order == CZapitClient::SORT_ALPHA)
 	{
 		// ATTENTION: in this case response.nr does not return the actual number of the channel for zapping!
+		CServiceManager::ChannelGuard guard;
 		if (((currentMode & RADIO_MODE) && (mode == CZapitClient::MODE_CURRENT)) || (mode == CZapitClient::MODE_RADIO)) {
 			CServiceManager::getInstance()->GetAllRadioChannels(channels);
 		} else {
@@ -2853,7 +2882,11 @@ void CZapit::leaveStandby(void)
 		/* tune channel, with stopped playback to not bypass the parental PIN check */
 		ZapIt(live_channel_id, false, false);
 		if (IS_WEBCHAN(live_channel_id)) {
-			CZapitChannel* newchannel = CServiceManager::getInstance()->FindChannel(last_channel_id);
+			CZapitChannel* newchannel;
+			{
+				CServiceManager::ChannelGuard guard;
+				newchannel = CServiceManager::getInstance()->FindChannel(last_channel_id);
+			}
 			CFrontend * fe = newchannel ? CFEManager::getInstance()->allocateFE(newchannel) : NULL;
 			bool transponder_change;
 			if (fe)
@@ -3088,7 +3121,10 @@ bool CZapit::Start(Z_start_arg *ZapStart_arg)
 		return false;
 	}
 
-	current_channel = CServiceManager::getInstance()->FindChannel(live_channel_id);
+	{
+		CServiceManager::ChannelGuard guard;
+		current_channel = CServiceManager::getInstance()->FindChannel(live_channel_id);
+	}
 
 	// some older? hw needs this sleep. e.g. my hd-1c.
 	// if sleep is not set -> blackscreen after boot.
@@ -3377,8 +3413,12 @@ void CZapitSdtMonitor::run()
 			if(CServiceScan::getInstance()->Scanning() || CZapit::getInstance()->Recording())
 				continue;
 
-			transponder_list_t::iterator tI = transponders.find(tpid);
-			if(tI == transponders.end()) {
+			bool have_tp;
+			{
+				CServiceManager::ChannelGuard guard;
+				have_tp = transponders.find(tpid) != transponders.end();
+			}
+			if(!have_tp) {
 				printf("[sdt monitor] tp not found ?!\n");
 				continue;
 			}

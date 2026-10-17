@@ -213,11 +213,17 @@ bool CStreamInstance::Open()
 	printf("CStreamInstance::run: %" PRIx64 "\n", channel_id);
 	set_threadname("n:streaminstance");
 
-	CZapitChannel * tmpchan = CServiceManager::getInstance()->FindChannel(channel_id);
-	if (!tmpchan)
-		return false;
+	int stream_demux;
+	{
+		/* On the stream thread, against zapit reloading the map. */
+		CServiceManager::ChannelGuard guard;
+		CZapitChannel * tmpchan = CServiceManager::getInstance()->FindChannel(channel_id);
+		if (!tmpchan)
+			return false;
+		stream_demux = tmpchan->getStreamDemux();
+	}
 
-	dmx = new cDemux(tmpchan->getStreamDemux());//FIXME
+	dmx = new cDemux(stream_demux);//FIXME
 	if(!dmx)
 		return false;
 	return dmx->Open(DMX_TP_CHANNEL, NULL, DMX_BUFFER_SIZE);
@@ -511,6 +517,8 @@ bool CStreamManager::Parse(int fd, stream_pids_t &pids, t_channel_id &chid, CFro
 	if (strstr(bp,"id="))
 	{
 		if (sscanf(bp, "id=%" SCNx64, &tmpid) == 1) {
+			/* The lookup only, on the stream manager's thread. */
+			CServiceManager::ChannelGuard guard;
 			tmp_channel = CServiceManager::getInstance()->FindChannel(tmpid);
 			if (tmp_channel)
 			{
@@ -528,6 +536,7 @@ bool CStreamManager::Parse(int fd, stream_pids_t &pids, t_channel_id &chid, CFro
 		if (sscanf(bp, "%X:0:%X:%X:%X:%X:%X:0:0:0:", &service, &i1, &i2, &i3, &i4, &satpos) == 6)
 		{
 			tmpid = (((t_channel_id)i3) << 32) | (((t_channel_id)i4) << 16) | (t_channel_id)i2;
+			CServiceManager::ChannelGuard guard;
 			tmp_channel = CServiceManager::getInstance()->FindChannel48Pos(tmpid, satpos >> 16);
 			if (tmp_channel == NULL)
 				tmp_channel = CServiceManager::getInstance()->FindChannel48(tmpid);
@@ -975,17 +984,23 @@ void CStreamStream::Close()
 
 bool CStreamStream::Open()
 {
-	CZapitChannel * channel = CServiceManager::getInstance()->FindChannel(channel_id);
-	if (!channel)
-		return false;
-
-	std::string url = channel->getUrl();
+	std::string url, script;
+	{
+		/* Copied out on the stream thread; the script below may run long. */
+		CServiceManager::ChannelGuard guard;
+		CZapitChannel * channel = CServiceManager::getInstance()->FindChannel(channel_id);
+		if (!channel)
+			return false;
+		url = channel->getUrl();
+		script = channel->getScriptName();
+	}
 
 	if (url.empty())
 		return false;
 
 	std::string pretty_name, livestreamInfo1, livestreamInfo2, headers, dumb;
-	if (!CMoviePlayerGui::getInstance(true).getLiveUrl(channel->getUrl(), channel->getScriptName(), url, pretty_name, livestreamInfo1, livestreamInfo2,headers,dumb)) {
+	const std::string channel_url = url;
+	if (!CMoviePlayerGui::getInstance(true).getLiveUrl(channel_url, script, url, pretty_name, livestreamInfo1, livestreamInfo2,headers,dumb)) {
 		printf("%s: getLiveUrl() [%s] failed!\n", __FUNCTION__, url.c_str());
 		return false;
 	}
@@ -1016,14 +1031,14 @@ bool CStreamStream::Open()
 #endif
 
 	if (avformat_open_input(&ifcx, url.c_str(), NULL, &options) != 0) {
-		printf("%s: Cannot open input [%s]!\n", __FUNCTION__, channel->getUrl().c_str());
+		printf("%s: Cannot open input [%s]!\n", __FUNCTION__, channel_url.c_str());
 			av_dict_free(&options);
 		return false;
 	}
 	av_dict_free(&options);
 
 	if (avformat_find_stream_info(ifcx, NULL) < 0) {
-		printf("%s: Cannot find stream info [%s]!\n", __FUNCTION__, channel->getUrl().c_str());
+		printf("%s: Cannot find stream info [%s]!\n", __FUNCTION__, channel_url.c_str());
 		avformat_close_input(&ifcx);
 		return false;
 	}

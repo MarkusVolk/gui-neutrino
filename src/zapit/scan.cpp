@@ -230,6 +230,7 @@ bool CServiceScan::AddFromNit()
 			scantransponders.insert(transponder_pair_t(ntI->first, ntI->second));
 		}
 		/* common satellites.xml have V/H, update to L/R if found */
+		CServiceManager::ChannelGuard guard;
 		stiterator stI = transponders.find(ntI->first);
 		if(stI != transponders.end() && stI->second == ntI->second) {
 			stI->second.feparams.polarization = ntI->second.feparams.polarization;
@@ -331,6 +332,8 @@ _repeat:
 			continue;
 		}
 		scanedtransponders.insert(transponder_pair_t(t.transponder_id, t));
+		/* The global transponder map is under the channel lock. */
+		CServiceManager::ChannelGuard guard;
 		/* partial compare with existent transponders, update params if found */
 		for (stiterator ttI = transponders.begin(); ttI != transponders.end(); ++ttI) {
 			if(t == ttI->second) {
@@ -366,23 +369,28 @@ _repeat:
 		else
 			bouquet = g_bouquetManager->Bouquets[bouquetId];
 
-		if (flags & SCAN_LOGICAL_HD) {
-			for(channel_number_map_t::iterator cit = nit_hd_logical_map.begin(); cit != nit_hd_logical_map.end(); ++cit) {
-				//nit_logical_map.erase(cit->first);
-				CZapitChannel * channel = CServiceManager::getInstance()->FindChannel48(cit->first);
-				if (channel) {
-					channel->number = cit->second;
-					if (!bouquet->getChannelByChannelID(channel->getChannelID()))
-						bouquet->addService(channel);
+		{
+			/* One hold over the lookups and the inserts; addService would take
+			   the lock a second time, and the sort below takes it itself. */
+			CServiceManager::ChannelGuard guard;
+			if (flags & SCAN_LOGICAL_HD) {
+				for(channel_number_map_t::iterator cit = nit_hd_logical_map.begin(); cit != nit_hd_logical_map.end(); ++cit) {
+					//nit_logical_map.erase(cit->first);
+					CZapitChannel * channel = CServiceManager::getInstance()->FindChannel48(cit->first);
+					if (channel) {
+						channel->number = cit->second;
+						if (!bouquet->getChannelByChannelID(channel->getChannelID()))
+							bouquet->addServiceLocked(channel);
+					}
 				}
 			}
-		}
-		for(channel_number_map_t::iterator cit = nit_logical_map.begin(); cit != nit_logical_map.end(); ++cit) {
-			CZapitChannel * channel = CServiceManager::getInstance()->FindChannel48(cit->first);
-			if (channel && !channel->number) {
-				channel->number = cit->second;
-				if (!bouquet->getChannelByChannelID(channel->getChannelID()))
-					bouquet->addService(channel);
+			for(channel_number_map_t::iterator cit = nit_logical_map.begin(); cit != nit_logical_map.end(); ++cit) {
+				CZapitChannel * channel = CServiceManager::getInstance()->FindChannel48(cit->first);
+				if (channel && !channel->number) {
+					channel->number = cit->second;
+					if (!bouquet->getChannelByChannelID(channel->getChannelID()))
+						bouquet->addServiceLocked(channel);
+				}
 			}
 		}
 		bouquet->sortBouquetByNumber();
@@ -487,7 +495,10 @@ bool CServiceScan::ScanProvider(t_satellite_position satellitePosition)
 	 * some channels set the service_type in the BAT or the NIT.
 	 * should the NIT be parsed on every transponder? */
 	FixServiceTypes();
-	CServiceManager::getInstance()->UpdateSatTransponders(satellitePosition);
+	{
+		CServiceManager::ChannelGuard guard;
+		CServiceManager::getInstance()->UpdateSatTransponders(satellitePosition);
+	}
 
 	TIMER_STOP_SEC("[scan] scanning took");
 	return true;
@@ -526,6 +537,7 @@ void CServiceScan::CheckSatelliteChannels(t_satellite_position satellitePosition
 	satHaveChannels = false;
 
 	ZapitChannelList zapitList;
+	CServiceManager::ChannelGuard guard;
 	if(CServiceManager::getInstance()->GetAllSatelliteChannels(zapitList, satellitePosition))
 		satHaveChannels = true;
 }
@@ -653,7 +665,10 @@ bool CServiceScan::ScanTransponder()
 	/* read network information table */
 	ReadNitSdt(satellitePosition);
 	FixServiceTypes();
-	CServiceManager::getInstance()->UpdateSatTransponders(satellitePosition);
+	{
+		CServiceManager::ChannelGuard guard;
+		CServiceManager::getInstance()->UpdateSatTransponders(satellitePosition);
+	}
 #if 0
 	if (found_channels)
 		ReplaceTransponderParams(freq, satellitePosition, &TP->feparams);

@@ -397,13 +397,16 @@ bool CServiceScan::ParseFst(unsigned short pid, fast_scan_operator_t * op)
 	CServiceManager::getInstance()->RemoveAllChannels();
 #endif
 	ZapitChannelList ChannelList;
-	CServiceManager::getInstance()->GetAllTvChannels(ChannelList, CZapitChannel::FASTSCAN);
-	for (zapit_list_it_t oldI = ChannelList.begin(); oldI != ChannelList.end(); ++oldI)
-		(*oldI)->flags = CZapitChannel::REMOVED;
+	{
+		CServiceManager::ChannelGuard guard;
+		CServiceManager::getInstance()->GetAllTvChannels(ChannelList, CZapitChannel::FASTSCAN);
+		for (zapit_list_it_t oldI = ChannelList.begin(); oldI != ChannelList.end(); ++oldI)
+			(*oldI)->flags = CZapitChannel::REMOVED;
 
-	CServiceManager::getInstance()->GetAllRadioChannels(ChannelList, CZapitChannel::FASTSCAN);
-	for (zapit_list_it_t oldI = ChannelList.begin(); oldI != ChannelList.end(); ++oldI)
-		(*oldI)->flags = CZapitChannel::REMOVED;
+		CServiceManager::getInstance()->GetAllRadioChannels(ChannelList, CZapitChannel::FASTSCAN);
+		for (zapit_list_it_t oldI = ChannelList.begin(); oldI != ChannelList.end(); ++oldI)
+			(*oldI)->flags = CZapitChannel::REMOVED;
+	}
 
 	for (std::list<std::vector<uint8_t> >::iterator it = fst_sections.begin(); it != fst_sections.end(); ++it) {
 		uint8_t * buffer = (*it).data();
@@ -476,13 +479,17 @@ bool CServiceScan::ParseFst(unsigned short pid, fast_scan_operator_t * op)
 						CZapitChannel * newchannel;
 
 						int flist[5] = { freq, freq-1, freq+1, freq-2, freq+2 };
-						for(int i = 0; i < 5; i++) {
-							freq_id_t freq_id = flist[i];
-							t_channel_id newid = CZapitChannel::makeChannelId(satellitePosition,
-									freq_id, transport_stream_id, original_network_id, service_id);
-							newchannel = CServiceManager::getInstance()->FindChannel(newid);
-							if(newchannel)
-								break;
+						{
+							/* The lookups only; AddChannel below takes the lock itself. */
+							CServiceManager::ChannelGuard guard;
+							for(int i = 0; i < 5; i++) {
+								freq_id_t freq_id = flist[i];
+								t_channel_id newid = CZapitChannel::makeChannelId(satellitePosition,
+										freq_id, transport_stream_id, original_network_id, service_id);
+								newchannel = CServiceManager::getInstance()->FindChannel(newid);
+								if(newchannel)
+									break;
+							}
 						}
 						if(newchannel == NULL) {
 							newchannel = new CZapitChannel (
@@ -678,10 +685,14 @@ bool CServiceScan::ParseFnt(unsigned short pid, unsigned short operator_id)
 							process_satellite_delivery_system_descriptor(buffer + pos2, &feparams, &satellitePosition);
 							freq = feparams.frequency / 1000;
 							TsidOnid = CREATE_TRANSPONDER_ID64(freq, satellitePosition, original_network_id, transport_stream_id);
-							stI = transponders.find(TsidOnid);
-							if(stI == transponders.end()) {
-								transponder t(TsidOnid, feparams);
-								transponders.insert(transponder_pair_t(TsidOnid, t));
+							{
+								/* The global transponder map is under the channel lock. */
+								CServiceManager::ChannelGuard guard;
+								stI = transponders.find(TsidOnid);
+								if(stI == transponders.end()) {
+									transponder t(TsidOnid, feparams);
+									transponders.insert(transponder_pair_t(TsidOnid, t));
+								}
 							}
 							found_transponders++;
 #if 0
