@@ -40,6 +40,7 @@
 #include <sys/timex.h>
 #include <time.h>
 #include <set>
+#include <limits>
 #include <string>
 #include <connection/basicsocket.h>
 #include <connection/basicserver.h>
@@ -209,6 +210,9 @@ static int64_t lockstart = 0;
 #endif
 
 int sectionsd_stop = 0; /* also read by the XMLTV reader (xmlutil.cpp) */
+/* the housekeeping thread waits on this instead of polling sectionsd_stop */
+static pthread_mutex_t housekeeping_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t housekeeping_cond;
 
 static bool slow_addevent = true;
 
@@ -722,40 +726,66 @@ static const SIevent& findSIeventForEventUniqueKey(const t_event_id eventUniqueK
 	return nullEvt;
 }
 
+/* First event of a service in the (service, first start time, event id) ordered set:
+ * the probe sorts before every event of that service, so lower_bound lands on its first one.
+ * Callers compare the elements' get_channel_id() with the key themselves, so a key that
+ * does not survive the id round trip (no event can carry it) still finds nothing. */
+static MySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey::iterator firstSIeventOfServiceUniqueKey(const t_channel_id serviceUniqueKey)
+{
+	SIevent probe(GET_ORIGINAL_NETWORK_ID_FROM_CHANNEL_ID(serviceUniqueKey),
+		      GET_TRANSPORT_STREAM_ID_FROM_CHANNEL_ID(serviceUniqueKey),
+		      GET_SERVICE_ID_FROM_CHANNEL_ID(serviceUniqueKey), 0);
+	probe.times.insert(SItime(std::numeric_limits<time_t>::min(), 0));
+	return mySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey.lower_bound(&probe);
+}
+
+/* Both functions below used to scan all of mySIeventsOrderFirstEndTimeServiceIDEventUniqueKey
+ * and return the first event of the service that fits. They now walk only the service's
+ * events in the start time ordered set (same events, both sets are filled and emptied
+ * together) and return the fitting event that is smallest under
+ * OrderFirstEndTimeServiceIDEventUniqueKey, i.e. the one the scan would have reached first.
+ * The flags do not depend on the visiting order: has_anything is set by any event of the
+ * service, has_later by any time ending later, and a returned event sets both anyway. */
 static const SIevent& findActualSIeventForServiceUniqueKey(const t_channel_id serviceUniqueKey, SItime& zeit, long plusminus = 0, unsigned *flag = 0)
 {
 	time_t azeit = time(NULL);
+	SIeventPtr found = NULL;
+	OrderFirstEndTimeServiceIDEventUniqueKey before;
 
 	if (flag != 0)
 		*flag = 0;
 
-	for (MySIeventsOrderFirstEndTimeServiceIDEventUniqueKey::iterator e = mySIeventsOrderFirstEndTimeServiceIDEventUniqueKey.begin(); e != mySIeventsOrderFirstEndTimeServiceIDEventUniqueKey.end(); ++e)
-		if ((*e)->get_channel_id() == serviceUniqueKey)
-		{
-			if (flag != 0)
-				*flag |= CSectionsdClient::epgflags::has_anything; // berhaupt was da...
+	for (MySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey::iterator e = firstSIeventOfServiceUniqueKey(serviceUniqueKey);
+			e != mySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey.end() && (*e)->get_channel_id() == serviceUniqueKey; ++e)
+	{
+		if (flag != 0)
+			*flag |= CSectionsdClient::epgflags::has_anything; // berhaupt was da...
 
-//			for (SItimes::reverse_iterator t = (*e)->times.rend(); t != (*e)->times.rbegin(); t--) {
-			for (SItimes::iterator t = (*e)->times.begin(); t != (*e)->times.end(); ++t) {
-				if ((long)(azeit + plusminus) < (long)(t->startzeit + t->dauer))
+		for (SItimes::iterator t = (*e)->times.begin(); t != (*e)->times.end(); ++t) {
+			if ((long)(azeit + plusminus) < (long)(t->startzeit + t->dauer))
+			{
+				if (flag != 0)
+					*flag |= CSectionsdClient::epgflags::has_later; // later events are present...
+
+				if (t->startzeit <= (long)(azeit + plusminus))
 				{
+					//debug(DEBUG_NORMAL, "azeit %d, startzeit+t->dauer %d ", azeit, (long)(t->startzeit+t->dauer) );
+
 					if (flag != 0)
-						*flag |= CSectionsdClient::epgflags::has_later; // later events are present...
+						*flag |= CSectionsdClient::epgflags::has_current; // aktuelles event da...
 
-					if (t->startzeit <= (long)(azeit + plusminus))
-					{
-						//debug(DEBUG_NORMAL, "azeit %d, startzeit+t->dauer %d ", azeit, (long)(t->startzeit+t->dauer) );
-
-						if (flag != 0)
-							*flag |= CSectionsdClient::epgflags::has_current; // aktuelles event da...
-
+					if (found == NULL || before(*e, found)) {
+						found = *e;
 						zeit = *t;
-
-						return *(*e);
 					}
+					break;
 				}
 			}
 		}
+	}
+
+	if (found != NULL)
+		return *found;
 
 	return nullEvt;
 }
@@ -763,17 +793,25 @@ static const SIevent& findActualSIeventForServiceUniqueKey(const t_channel_id se
 static const SIevent& findNextSIeventForServiceUniqueKey(const t_channel_id serviceUniqueKey, SItime& zeit)
 {
 	time_t azeit = time(NULL);
+	SIeventPtr found = NULL;
+	OrderFirstEndTimeServiceIDEventUniqueKey before;
 
-	for (MySIeventsOrderFirstEndTimeServiceIDEventUniqueKey::iterator e = mySIeventsOrderFirstEndTimeServiceIDEventUniqueKey.begin(); e != mySIeventsOrderFirstEndTimeServiceIDEventUniqueKey.end(); ++e)
-		if ((*e)->get_channel_id() == serviceUniqueKey)
-		{
-			for (SItimes::iterator t = (*e)->times.begin(); t != (*e)->times.end(); ++t)
-				if ((long)(azeit) < (long)(t->startzeit + t->dauer))
-				{
+	for (MySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey::iterator e = firstSIeventOfServiceUniqueKey(serviceUniqueKey);
+			e != mySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey.end() && (*e)->get_channel_id() == serviceUniqueKey; ++e)
+	{
+		for (SItimes::iterator t = (*e)->times.begin(); t != (*e)->times.end(); ++t)
+			if ((long)(azeit) < (long)(t->startzeit + t->dauer))
+			{
+				if (found == NULL || before(*e, found)) {
+					found = *e;
 					zeit = *t;
-					return *(*e);
 				}
-		}
+				break;
+			}
+	}
+
+	if (found != NULL)
+		return *found;
 
 	return nullEvt;
 }
@@ -2392,6 +2430,11 @@ static void print_meminfo(void)
 // housekeeping-thread
 // does cleaning on fetched datas
 //---------------------------------------------------------------------
+static void houseKeepingUnlock(void *)
+{
+	pthread_mutex_unlock(&housekeeping_lock);
+}
+
 static void *houseKeepingThread(void *)
 {
 	int count = 0, scount = 0, ecount = 0;
@@ -2408,15 +2451,17 @@ static void *houseKeepingThread(void *)
 			count = 0;
 		}
 
-		int i = HOUSEKEEPING_SLEEP;
-
-		/* asynchronous cancel only while sleeping: the rest of the loop holds mutexes */
-		pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, 0);
-		while (i > 0 && !sectionsd_stop) {
-			sleep(1);
-			i--;
-		}
-		pthread_setcanceltype (PTHREAD_CANCEL_DEFERRED, 0);
+		/* sleep HOUSEKEEPING_SLEEP seconds on the monotonic clock, woken early at stop.
+		 * The wait is a cancellation point taken without any other lock held; a cancel
+		 * acted upon inside it returns with housekeeping_lock held, hence the cleanup. */
+		struct timespec abs_wait;
+		clock_gettime(CLOCK_MONOTONIC, &abs_wait);
+		abs_wait.tv_sec += HOUSEKEEPING_SLEEP;
+		pthread_mutex_lock(&housekeeping_lock);
+		pthread_cleanup_push(houseKeepingUnlock, NULL);
+		while (!sectionsd_stop && pthread_cond_timedwait(&housekeeping_cond, &housekeeping_lock, &abs_wait) != ETIMEDOUT)
+			;
+		pthread_cleanup_pop(1);
 		if (sectionsd_stop)
 			break;
 
@@ -2599,6 +2644,11 @@ debug(DEBUG_NORMAL, "SIevent size: %d", (int)sizeof(SIevent));
 #endif
 
 	// housekeeping-Thread starten
+	pthread_condattr_t hk_attr;
+	pthread_condattr_init(&hk_attr);
+	pthread_condattr_setclock(&hk_attr, CLOCK_MONOTONIC);
+	pthread_cond_init(&housekeeping_cond, &hk_attr);
+	pthread_condattr_destroy(&hk_attr);
 	rc = pthread_create(&threadHouseKeeping, 0, houseKeepingThread, 0);
 
 	if (rc) {
@@ -2647,9 +2697,13 @@ debug(DEBUG_NORMAL, "SIevent size: %d", (int)sizeof(SIevent));
 	/* sometimes, pthread_cancel seems to not work, maybe it is a bad idea to mix
 	 * plain pthread and OpenThreads? */
 	sectionsd_stop = 1;
+	pthread_mutex_lock(&housekeeping_lock);
+	pthread_cond_broadcast(&housekeeping_cond);
+	pthread_mutex_unlock(&housekeeping_lock);
 	pthread_cancel(threadHouseKeeping);
 	debug(DEBUG_ERROR, "join Housekeeping");
 	pthread_join(threadHouseKeeping, NULL);
+	pthread_cond_destroy(&housekeeping_cond);
 
 	debug(DEBUG_ERROR, "join TOT");
 	threadTIME.Stop();

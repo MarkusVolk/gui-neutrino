@@ -80,20 +80,24 @@ inline unsigned min(unsigned a, unsigned b)
 
 static OpenThreads::Mutex countryMutex;
 static std::vector<std::string> countryVector;
+static std::map<std::string,unsigned int> countryMap; /* country -> index in countryVector */
 
 unsigned int getCountryIndex(const std::string &country)
 {
-	unsigned int ix = 0;
 	OpenThreads::ScopedLock<OpenThreads::Mutex> m_lock(countryMutex);
 	if (countryVector.empty()) {
 		countryVector.push_back("DEU"); // 0
 		countryVector.push_back("FRA"); // 1
 		countryVector.push_back("ITA"); // 2
 		countryVector.push_back("ESP"); // 3
+		for (unsigned int i = 0; i < countryVector.size(); i++)
+			countryMap[countryVector[i]] = i;
 	}
-	for (std::vector<std::string>::iterator it = countryVector.begin(); it != countryVector.end(); ++it, ++ix)
-		if (*it == country)
-			return ix;
+	std::map<std::string,unsigned int>::const_iterator it = countryMap.find(country);
+	if (it != countryMap.end())
+		return it->second;
+	unsigned int ix = countryVector.size();
+	countryMap[country] = ix;
 	countryVector.push_back(country);
 	return ix;
 }

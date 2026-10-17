@@ -64,13 +64,13 @@ void SIsectionEIT::parse(void)
 	for (EventConstIterator eit = elist.begin(); eit != elist.end(); ++eit) {
 		Event &event = (**eit);
 
-		SIevent e(onid, tsid, sid, event.getEventId());
+		/* build the event in place, a second deep copy per event is not needed */
+		evts.push_back(SIevent(onid, tsid, sid, event.getEventId()));
+		SIevent &e = evts.back();
 		e.table_id = tid;
 		e.version = version;
 
 		e.parse(event);
-		//evts.insert(e);
-		evts.push_back(e);
 	}
 	parsed = 1;
 }
@@ -100,7 +100,8 @@ void SIsectionEIT::parse(void)
 
 	while (actPos < bufEnd - sizeof(struct eit_event)) {
 		evt = (struct eit_event *) actPos;
-		SIevent e(evt);
+		evts.push_back(SIevent(evt));
+		SIevent &e = evts.back();
 		e.service_id = service_id();
 		e.original_network_id = original_network_id();
 		e.transport_stream_id = transport_stream_id();
@@ -108,8 +109,6 @@ void SIsectionEIT::parse(void)
 		e.version = version_number;
 		descriptors_loop_length = sizeof(struct eit_event) + ((evt->descriptors_loop_length_hi << 8) | evt->descriptors_loop_length_lo);
 		e.parseDescriptors(actPos, min((unsigned)(bufEnd - actPos), descriptors_loop_length));
-		//evts.insert(e);
-		evts.push_back(e);
 		actPos += descriptors_loop_length;
 	}
 	parsed = 1;

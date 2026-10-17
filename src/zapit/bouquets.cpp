@@ -460,6 +460,19 @@ bool CBouquetManager::saveUBouquets(void)
 	return writeBouquetFile(UBOUQUETS_XML, true);
 }
 
+/* the service types CZapitBouquet::addServiceLocked puts into the tv or the radio list */
+static bool isListedServiceType(unsigned char serviceType)
+{
+	switch (serviceType) {
+		case ST_DIGITAL_TELEVISION_SERVICE:
+		case ST_NVOD_REFERENCE_SERVICE:
+		case ST_NVOD_TIME_SHIFTED_SERVICE:
+		case ST_DIGITAL_RADIO_SOUND_SERVICE:
+			return true;
+	}
+	return false;
+}
+
 void CBouquetManager::saveBouquets(const CZapitClient::bouquetMode bouquetMode, const char * const providerName, t_satellite_position satellitePosition)
 {
 	if (bouquetMode == CZapitClient::BM_DELETEBOUQUETS) {
@@ -498,19 +511,38 @@ void CBouquetManager::saveBouquets(const CZapitClient::bouquetMode bouquetMode, 
 			else
 				bouquet = g_bouquetManager->Bouquets[dest];
 
+			/* the ids existsChannelInBouquet(dest, id) would find, tv and radio list of the
+			 * destination; kept in step with the adds below when they go into that bouquet */
+			std::set<t_channel_id> inDest;
+			bool trackDest = false;
+			if (dest >= 0 && (unsigned int)dest < g_bouquetManager->Bouquets.size()) {
+				CZapitBouquet *db = g_bouquetManager->Bouquets[dest];
+				for (unsigned int i = 0; i < db->tvChannels.size(); i++)
+					inDest.insert(db->tvChannels[i]->getChannelID());
+				for (unsigned int i = 0; i < db->radioChannels.size(); i++)
+					inDest.insert(db->radioChannels[i]->getChannelID());
+				trackDest = (db == bouquet);
+			}
+
 			/* list from scanned exist in file */
 			for(unsigned int i = 0; i < Bouquets[0]->tvChannels.size(); i++) {
-				if(!(g_bouquetManager->existsChannelInBouquet(dest, Bouquets[0]->tvChannels[i]->getChannelID()))) {
-					bouquet->addService(Bouquets[0]->tvChannels[i]);
+				CZapitChannel *ch = Bouquets[0]->tvChannels[i];
+				if(inDest.find(ch->getChannelID()) == inDest.end()) {
+					bouquet->addService(ch);
+					if (trackDest && isListedServiceType(ch->getServiceType()))
+						inDest.insert(ch->getChannelID());
 					//Bouquets[0]->tvChannels[i]->pname = (char *) bouquet->Name.c_str();
-					DBG("save Bouquets: adding channel %s\n", Bouquets[0]->tvChannels[i]->getName().c_str());
+					DBG("save Bouquets: adding channel %s\n", ch->getName().c_str());
 				}
 			}
 			for(unsigned int i = 0; i < Bouquets[0]->radioChannels.size(); i++) {
-				if(!(g_bouquetManager->existsChannelInBouquet(dest, Bouquets[0]->radioChannels[i]->getChannelID()))) {
-					bouquet->addService(Bouquets[0]->radioChannels[i]);
+				CZapitChannel *ch = Bouquets[0]->radioChannels[i];
+				if(inDest.find(ch->getChannelID()) == inDest.end()) {
+					bouquet->addService(ch);
+					if (trackDest && isListedServiceType(ch->getServiceType()))
+						inDest.insert(ch->getChannelID());
 					//Bouquets[0]->tvChannels[i]->pname = (char *) bouquet->Name.c_str();
-					DBG("save Bouquets: adding channel %s\n", Bouquets[0]->radioChannels[i]->getName().c_str());
+					DBG("save Bouquets: adding channel %s\n", ch->getName().c_str());
 				}
 			}
 
