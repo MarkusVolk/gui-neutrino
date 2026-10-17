@@ -941,7 +941,8 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 				CMenuItem* titem = items[i];
 				if ((titem->directKey != CRCInput::RC_nokey) && (titem->directKey == msg)) {
 					if (titem->isSelectable()) {
-						items[selected]->paint( false );
+						if (selected >= 0 && selected < (int)items.size())
+							items[selected]->paint( false );
 						selected= i;
 						if (selected > page_start[current_page + 1] || selected < page_start[current_page]) {
 							/* different page */
@@ -1023,11 +1024,13 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 					default: /* fallthrough or RC_down => dir = 1 */
 						pos += dir;
 						if (pos < 0 || pos >= (int)items.size())
-							pos -= dir * items.size();
+							pos -= dir * (int)items.size();
 						wrap = true;
 				}
 				if (!items.empty() && pos >= (int)items.size())
 					pos = (int)items.size() - 1;
+				if (pos < 0)
+					pos = 0;
 				do {
 					if(items.empty())
 						break;
@@ -1035,7 +1038,8 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 					if (item->isSelectable()) {
 						if (pos < page_start[current_page + 1] && pos >= page_start[current_page]) {
 							/* in current page */
-							items[selected]->paint(false);
+							if (selected >= 0 && selected < (int)items.size())
+								items[selected]->paint(false);
 							item->activateNotify();
 							item->paint(true);
 							paintHint(pos);
@@ -1049,7 +1053,7 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 					}
 					pos += dir;
 					if (wrap && (pos >= (int)items.size() || pos < 0)) {
-						pos -= dir * items.size();
+						pos -= dir * (int)items.size();
 						wrap = false; /* wrap only once, avoids endless loop */
 					}
 				} while (pos >= 0 && pos < (int)items.size());

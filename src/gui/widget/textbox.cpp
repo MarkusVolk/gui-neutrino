@@ -444,7 +444,7 @@ void CTextBox::refreshTextLineArray(void)
 				if( ((pos < TextChars) && (m_cText[pos] == '\n')) || loop == false)
 				{
 					// current line ends with an carriage return, make new line
-					if ((pos < TextChars) && (m_cText[pos] == '\n'))
+					if ((pos < TextChars) && (m_cText[pos] == '\n') && !aktLine.empty())
 						aktLine.erase(aktLine.size() - 1,1);
 					m_cLineArray.push_back(aktLine);
 					m_nNrOfLines++;

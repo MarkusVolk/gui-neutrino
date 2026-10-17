@@ -65,9 +65,10 @@ std::string UTF8ToString(const char * &text)
 
 		for (int i = 0; i < remaining_unicode_length; i++)
 		{
-			text++;
-			if (((*text) & 0xc0) != 0x80)
+			/* stay on the last consumed byte, a truncated sequence must not step past the NUL */
+			if (((*(text + 1)) & 0xc0) != 0x80)
 				break;
+			text++;
 			res += *text;
 		}
 	}
@@ -829,8 +830,7 @@ int CKeyboardInput::exec(CMenuTarget* parent, const std::string &)
 	{
 		if (observ)
 			observ->changeNotify(title, (void *) valueString->c_str());
-		if (msg == CRCInput::RC_red)
-			OnAfterSave();
+		OnAfterSave();
 	}
 
 #ifdef ENABLE_GRAPHLCD

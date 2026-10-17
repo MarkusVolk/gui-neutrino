@@ -398,13 +398,14 @@ void CHintBox::ReSize()
 	int h = (ccw_head ? ccw_head->getHeight() : 0);
 	for (size_t i= 0; i< ccw_body->size(); i++){
 		CComponentsItem *item = ccw_body->getCCItem(i);
-		h += item->getHeight();
+		if (item)
+			h += item->getHeight();
 	}
 	height = min(HINTBOX_MAX_HEIGHT, max(HINTBOX_MIN_HEIGHT, max(height,h)));
 
 	/* set hint box position general to center and refresh window */
 	setCenterPos(CC_ALONG_X);
-	y = frameBuffer->getScreenY() + ((frameBuffer->getScreenHeight() - height) >> 2),
+	y = frameBuffer->getScreenY() + ((frameBuffer->getScreenHeight() - height) >> 2);
 	Refresh();
 }
 

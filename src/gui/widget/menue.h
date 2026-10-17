@@ -680,7 +680,7 @@ class CMenuWidget : public CMenuTarget, public CComponentsSignals
 		};
 		void addKey(neutrino_msg_t key, CMenuTarget *menue, const std::string &action);
 		void setFooter(const struct button_label *_fbutton_label, const int _fbutton_count, bool repaint = false);
-		/* buttons with a text of their own rather than a locale; the icon names must outlive the menu */
+		/* buttons with a text of their own rather than a locale */
 		void setFooter(const std::vector<button_label_cc> &labels, bool repaint = false);
 
 		void setNextShortcut(int sc) { nextShortcut = sc; };

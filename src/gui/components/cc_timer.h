@@ -33,6 +33,8 @@
 #include <sigc++/adaptors/retype_return.h>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
+#include <atomic>
 #include <string>
 
 /**CComponentsTimer
@@ -46,8 +48,9 @@ class CComponentsTimer : public sigc::trackable
 		///thread
 		std::thread  *tm_thread;
 		std::mutex tm_mutex;
+		std::condition_variable tm_cond;
 		///flag to control thread state
-		bool tm_enable;
+		std::atomic<bool> tm_enable;
 
 		///refresh interval in seconds
 		int64_t tm_interval;

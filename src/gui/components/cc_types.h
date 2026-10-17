@@ -198,7 +198,7 @@ typedef struct cc_string_ext_txt_t
 //for 'button_label' type with string
 typedef struct button_label_cc
 {
-	const char *			button; // icon name
+	std::string			button; // icon name
 	std::string 			text;
 	neutrino_locale_t 		locale;
 	std::vector<neutrino_msg_t>	directKeys;
@@ -214,7 +214,7 @@ typedef struct button_label_cc
 	sigc::slot<void>		btn_slot;
 	bool 				enabled;
 	//defaults
-	button_label_cc(): 	button(NULL),
+	button_label_cc(): 	button(),
 				text(std::string()),
 				locale(NONEXISTANT_LOCALE),
 				directKeys(0, RC_NOKEY /*CRCInput::RC_nokey*/),

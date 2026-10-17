@@ -465,7 +465,7 @@ void CComponentsForm::insertCCItem(const uint& cc_item_id, CComponentsItem* cc_I
 
 void CComponentsForm::removeCCItem(const uint& cc_item_id)
 {
-	if (!v_cc_items.empty()){
+	if (cc_item_id < v_cc_items.size()){
 		std::lock_guard<std::mutex> g(cc_frm_mutex);
 		if (v_cc_items.at(cc_item_id)) {
 			delete v_cc_items.at(cc_item_id);
@@ -475,7 +475,7 @@ void CComponentsForm::removeCCItem(const uint& cc_item_id)
 		}
 	}
 	else
-		dprintf(DEBUG_NORMAL, "[CComponentsForm]  %s removing of cc_Item [id=%u] not possible, v_cc_items is empty...\n", __func__, cc_item_id);
+		dprintf(DEBUG_NORMAL, "[CComponentsForm]  %s removing of cc_Item [id=%u] not possible, id out of range or v_cc_items is empty...\n", __func__, cc_item_id);
 }
 
 void CComponentsForm::removeCCItem(CComponentsItem* cc_Item)

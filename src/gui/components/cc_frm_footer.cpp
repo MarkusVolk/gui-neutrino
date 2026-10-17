@@ -215,7 +215,7 @@ void CComponentsFooter::setButtonLabels(const struct button_label_cc * const con
 	 * If parameter label_width is too large, we use maximal possible value.
 	*/
 	int btn_offset = cch_offset/2;
-	int dx_btn = (dx_container - btn_offset * (int)l_count-1) / (int)l_count;
+	int dx_btn = (dx_container - btn_offset * ((int)l_count - 1)) / (int)l_count;
 	if (label_width)
 		if (label_width < dx_btn)
 			dx_btn = label_width;
@@ -237,7 +237,7 @@ void CComponentsFooter::setButtonLabels(const struct button_label_cc * const con
 		 * init button label face values
 		*/
 		string txt 		= content[i].locale == NONEXISTANT_LOCALE ? content[i].text : g_Locale->getText(content[i].locale);
-		string icon_name 	= content[i].button ? string(content[i].button) : "";
+		string icon_name 	= content[i].button;
 
 		/*
 		 * Ignore item, if no text and no icon is defined.
@@ -256,7 +256,7 @@ void CComponentsFooter::setButtonLabels(const struct button_label_cc * const con
 		btn->setButtonFont(NULL/*ccf_btn_font*/); // ensure init font type by item itself
 		btn->doPaintBg(ccf_enable_button_bg);
 		
-		x_btn += btn_container->getCCItem(i)->getWidth();
+		x_btn += btn->getWidth();
 		x_btn += btn_offset;
 
 		btn->setButtonDirectKeys(content[i].directKeys);
@@ -297,10 +297,11 @@ void CComponentsFooter::setButtonLabels(const struct button_label_cc * const con
 	int dy_font_max = 0;
 	CComponentsButton *btn_smallest = NULL;
 	
-	for (size_t i = 0; i < l_count; i++){
+	/* skipped (empty) labels have no button, so iterate over the container, not over the labels */
+	for (size_t i = 0; i < btn_container->size(); i++){
 		CComponentsButton *btn = static_cast<CComponentsButton*>(btn_container->getCCItem(i));
 		/* a button with an icon only has no font */
-		if (!btn->getButtonFont())
+		if (!btn || !btn->getButtonFont())
 			continue;
 		int dy_font_tmp = btn->getButtonFont()->getHeight();
 		if (dy_font_tmp < dy_font_min)
@@ -317,9 +318,10 @@ void CComponentsFooter::setButtonLabels(const struct button_label_cc * const con
 	if (btn_smallest)
 	{
 		Font* tmp_font = btn_smallest->getButtonFont();
-		for (size_t i = 0; i < l_count; i++){
+		for (size_t i = 0; i < btn_container->size(); i++){
 			CComponentsButton *btn = static_cast<CComponentsButton*>(btn_container->getCCItem(i));
-			btn->setButtonFont(tmp_font);
+			if (btn)
+				btn->setButtonFont(tmp_font);
 		}
 // 		dprintf(DEBUG_NORMAL, "[CComponentsFooter]\t[%s - %d]\tsmallest button font height: dy_font_min [%d] dy_font_max [%d]\n", __func__, __LINE__, dy_font_min, dy_font_max);
 	}
@@ -333,7 +335,7 @@ void CComponentsFooter::setButtonLabels(const struct button_label * const conten
 
 	for (size_t i = 0; i < label_count; i++) {
 		button_label_cc button;
-		button.button = content[i].button;
+		button.button = content[i].button ? content[i].button : "";
 		button.locale = content[i].locale;
 		//NOTE: here are used default values, because old button label struct don't know about this,
 		//if it possible, don't use this methode!
@@ -370,7 +372,7 @@ void CComponentsFooter::setButtonLabel(	const char *button_icon,
 {
 	button_label_cc button[1];
 
-	button[0].button = button_icon;
+	button[0].button = button_icon ? button_icon : "";
 	button[0].text = text;
 	button[0].directKeys.push_back(msg);
 	button[0].btn_result = result_value;
@@ -421,7 +423,8 @@ void CComponentsFooter::paintButtons(const int& x_pos,
 
 void CComponentsFooter::setButtonText(const uint& btn_id, const std::string& text)
 {
-	CComponentsItem *item = getButtonChainObject()->getCCItem(btn_id);
+	CComponentsFrmChain *chain = getButtonChainObject();
+	CComponentsItem *item = chain ? chain->getCCItem(btn_id) : NULL;
 	if (item){
 		CComponentsButton *button = static_cast<CComponentsButton*>(item);
 		button->setCaption(text);

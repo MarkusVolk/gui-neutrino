@@ -71,35 +71,25 @@ void CComponentsTimer::threadCallback(CComponentsTimer *tm)
 
 	dprintf(DEBUG_DEBUG,"\033[32m[CComponentsTimer] thread [%p] [%s] [%s - %d] loop start \033[0m\n", tm->tm_thread, tm->tn.c_str(), __func__, __LINE__);
 
-#if HAVE_CST_HARDWARE //time offset
-	const int64_t MAX_COUNT = tm->tm_interval  / 10;
-#else
-	const int64_t MAX_COUNT = tm->tm_interval;
-#endif
-	int64_t i = 0;
-
 	TIMER_START();
 	tm->tm_ticks = 0;
+	std::unique_lock<std::mutex> lock(tm->tm_mutex);
 	while(tm->tm_enable) //exit loop handled in destructor
 	{
 		if (tm->tm_interval > 0)
 		{
-			for (i = 0; i < MAX_COUNT; i++)
-				i += tm->tm_interval;
-			i = 0;
-
 			if (!tm->OnTimer.blocked())
 			{
+				lock.unlock();
 				tm->OnTimer();
-				while (i < MAX_COUNT)
-				{
-					if (tm->tm_enable)
-						this_thread::sleep_for(std::chrono::milliseconds(1));
-					i++;
-				}
+				lock.lock();
 			}
+			/* one interval per tick; stopThread() wakes us up early */
+			tm->tm_cond.wait_for(lock, std::chrono::milliseconds(tm->tm_interval), [tm]{ return !tm->tm_enable; });
 			tm->tm_ticks ++;
 		}
+		else
+			tm->tm_cond.wait(lock, [tm]{ return !tm->tm_enable; });
 	}
 	dprintf(DEBUG_DEBUG,"\033[32m[CComponentsTimer] thread [%p] [%s] [%s - %d] loop/callback finished\033[0m\n ", tm->tm_thread, tm->tn.c_str(), __func__, __LINE__);
 }
@@ -112,15 +102,17 @@ void CComponentsTimer::initThread()
 	{
 		tm_enable = true;
 		tm_thread = new std::thread (threadCallback, this);
-		tm_mutex.lock();
 	}
 }
 
 void CComponentsTimer::stopThread()
 {
 	if (tm_thread) {
-		tm_enable = false;
-		tm_mutex.unlock();
+		{
+			std::lock_guard<std::mutex> lock(tm_mutex);
+			tm_enable = false;
+		}
+		tm_cond.notify_all();
 		tm_thread->join();
 		dprintf(DEBUG_DEBUG,"\033[32m[CComponentsTimer] thread [%p] [%s] [%s - %d] joined\033[0m\n", tm_thread, tn.c_str(), __func__, __LINE__);
 
@@ -152,7 +144,10 @@ void CComponentsTimer::setTimerInterval(const int64_t& interval)
 	if (tm_interval == interval)
 		return;
 
+	/* a new interval must not start a stopped timer */
+	bool run = isRun();
 	stopTimer();
 	tm_interval 	= interval;
-	startTimer();
+	if (run)
+		startTimer();
 }

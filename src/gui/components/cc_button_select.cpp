@@ -37,6 +37,8 @@ CComponentsFrmChain* CCButtonSelect::getButtonChainObject()
 
 CComponentsButton* CCButtonSelect::getSelectedButtonObject()
 {
+	if (!btn_container)
+		return NULL;
 	CComponentsButton* ret = static_cast<CComponentsButton*>(btn_container->getSelectedItemObject());
 	return ret;
 }

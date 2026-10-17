@@ -305,6 +305,8 @@ gradientData_t* CCDraw::getGradientData()
 	gdata->boxBuf 		= NULL;
 	gdata->direction 	= cc_body_gradient_direction;
 	gdata->mode 		= CFrameBuffer::pbrg_noFree;
+	gdata->x		= 0;
+	gdata->dx		= 0;
 	CColorGradient ccGradient;
 	int gsize = cc_body_gradient_direction == CFrameBuffer::gradientVertical ? height : width;
 	switch (cc_body_gradient_enable){

@@ -163,6 +163,10 @@ bool YaFT_p::init()
 			   ... so just let's get the width of a wide glyph (it's a monospace font after all */
 			fw = font->getRenderWidth("@");
 			fh = font->getHeight();
+			if (fw < 1) /* no usable glyph metrics, avoid division by zero */
+				fw = 1;
+			if (fh < 1)
+				fh = 1;
 			fprintf(stderr, "FONT[%d]: fw %2d(%2d) fh: %2d sx %d sy %d w %d h %d\n",
 					i, fw, font->getWidth(), fh, scalex, scaley, width, height);
 			scalex = 64 * width / (fw * COLS) + 1;
@@ -173,6 +177,10 @@ bool YaFT_p::init()
 		fh = height / LINES;
 		fw = width / COLS;
 	}
+	if (fw < 1)
+		fw = 1;
+	if (fh < 1)
+		fh = 1;
 
 	CELL_WIDTH = fw;
 	CELL_HEIGHT = fh;

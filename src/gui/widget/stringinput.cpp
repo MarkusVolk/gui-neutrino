@@ -960,7 +960,7 @@ const char * CPLPINInput::getHint1(void)
 	}
 	else
 	{
-		sprintf(hint, g_Locale->getText(LOCALE_PARENTALLOCK_LOCKEDPROGRAM), fsk);
+		snprintf(hint, sizeof(hint), g_Locale->getText(LOCALE_PARENTALLOCK_LOCKEDPROGRAM), fsk);
 		return hint;
 	}
 }
@@ -985,8 +985,7 @@ int CPLPINInput::exec( CMenuTarget* parent, const std::string & )
 	if (pixbuf)
 	{
 		frameBuffer->RestoreScreen(x - borderwidth, y- borderwidth, width+ 2* borderwidth, height+ 2* borderwidth, pixbuf);
-		delete[] pixbuf;//Mismatching allocation and deallocation: pixbuf
-		pixBuf = NULL;
+		delete[] pixbuf;
 	}
 
 	return ( res );

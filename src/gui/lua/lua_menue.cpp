@@ -345,8 +345,8 @@ int CLuaInstMenu::MenuAddKey(lua_State *L)
 int CLuaInstMenu::MenuSetFooter(lua_State *L)
 {
 	CLuaMenu *D = MenuCheck(L, 1);
-	if (!D || !lua_istable(L, 2))
-		return 0;
+	if (!D) return 0;
+	luaL_checktype(L, 2, LUA_TTABLE);
 
 	std::vector<button_label_cc> labels;
 	for (lua_pushnil(L); lua_next(L, 2); lua_pop(L, 1)) {
@@ -356,10 +356,8 @@ int CLuaInstMenu::MenuSetFooter(lua_State *L)
 		std::string text; tableLookup(L, "text", text);
 		if (icon.empty() && text.empty())
 			continue;
-		char *name = strdup(icon.c_str());
-		D->tofree.push_back(name);
 		button_label_cc label;
-		label.button = name;
+		label.button = icon;
 		label.text = text;
 		labels.push_back(label);
 	}
@@ -597,6 +595,10 @@ int CLuaInstMenu::MenuDelete(lua_State *L)
 {
 	CLuaMenu *D = MenuCheck(L, 1);
 	if (!D) return 0;
+
+	/* the menu items still point at the targets and strings freed below, so the widget goes first */
+	delete D->m;
+	D->m = NULL;
 
 	while (!D->targets.empty()) {
 		delete D->targets.back();
