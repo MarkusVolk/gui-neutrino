@@ -593,6 +593,27 @@ bool by_number(CZapitChannel *a, CZapitChannel *b)
 	return a->number < b->number;
 }
 
+/* "webtv" and "webradio" name every web channel in one list, the ones with EPG first */
+bool web_list(const std::string &id, ZapitChannelList &list, bool epg_first = false)
+{
+	if (id == "webtv")
+		CServiceManager::getInstance()->GetAllWebTVChannels(list);
+	else if (id == "webradio")
+		CServiceManager::getInstance()->GetAllWebRadioChannels(list);
+	else
+		return false;
+	std::sort(list.begin(), list.end(), by_number);
+	if (!epg_first)
+		return true;
+	neutrino_api->GetChannelEvents();
+	std::stable_partition(list.begin(), list.end(), [](CZapitChannel *ch) {
+		CChannelEvent event;
+		neutrino_api->GetChannelEvent(ch->getChannelID(), event);
+		return event.eventID != 0;
+	});
+	return true;
+}
+
 CZapitChannel *channel_arg(Call &c, const std::string &arg)
 {
 	uint64_t id;
@@ -628,7 +649,7 @@ void ep_channels(Call &c)
 		return;
 	}
 	ZapitChannelList list;
-	if (c.has("bouquet")) {
+	if (c.has("bouquet") && !web_list(c.q("bouquet"), list, true)) {
 		uint64_t nr;
 		if (!parse_uint(c.q("bouquet"), nr) || nr < 1 || nr > 2147483647) {
 			problem(c.out, 400, "bad-int", "bouquet is a number from 1");
@@ -640,7 +661,7 @@ void ep_channels(Call &c)
 		}
 		CZapitBouquet *b = g_bouquetManager->Bouquets[nr - 1];
 		list = radio ? b->radioChannels : b->tvChannels;
-	} else {
+	} else if (!c.has("bouquet")) {
 		if (radio)
 			CServiceManager::getInstance()->GetAllRadioChannels(list);
 		else
@@ -787,6 +808,26 @@ void ep_bouquets(Call &c)
 	}
 	Json::Value v(Json::objectValue);
 	v["items"] = Json::Value(Json::arrayValue);
+	static const struct { const char *id; neutrino_locale_t name; bool radio; } web[] = {
+		{ "webtv", LOCALE_BOUQUETNAME_WEBTV, false },
+		{ "webradio", LOCALE_BOUQUETNAME_WEBRADIO, true },
+	};
+	for (size_t w = 0; w < sizeof(web) / sizeof(web[0]); w++) {
+		ZapitChannelList list;
+		if (!(web[w].radio ? g_settings.make_webradio_list : g_settings.make_webtv_list) || !web_list(web[w].id, list) || list.empty())
+			continue;
+		if (holds && std::none_of(list.begin(), list.end(), [holds](CZapitChannel *ch) { return ch->getChannelID() == holds; }))
+			continue;
+		Json::Value bv(Json::objectValue);
+		bv["id"] = web[w].id;
+		bv["name"] = g_Locale->getText(web[w].name);
+		bv["hidden"] = false;
+		bv["locked"] = false;
+		bv["user_bouquet"] = false;
+		bv["tv_count"] = (Json::UInt) (web[w].radio ? 0 : list.size());
+		bv["radio_count"] = (Json::UInt) (web[w].radio ? list.size() : 0);
+		v["items"].append(bv);
+	}
 	for (size_t i = 0; g_bouquetManager && i < g_bouquetManager->Bouquets.size(); i++) {
 		CZapitBouquet *b = g_bouquetManager->Bouquets[i];
 		if (holds && !g_bouquetManager->existsChannelInBouquet(i, holds))
@@ -1057,7 +1098,7 @@ void ep_epg_grid(Call &c)
 		return;
 	}
 	ZapitChannelList list;
-	if (c.has("bouquet")) {
+	if (c.has("bouquet") && !web_list(c.q("bouquet"), list)) {
 		uint64_t nr;
 		if (!parse_uint(c.q("bouquet"), nr) || nr < 1) {
 			problem(c.out, 400, "bad-int", "bouquet is a number from 1");
@@ -1070,7 +1111,7 @@ void ep_epg_grid(Call &c)
 		CZapitBouquet *b = g_bouquetManager->Bouquets[nr - 1];
 		list = b->tvChannels;
 		list.insert(list.end(), b->radioChannels.begin(), b->radioChannels.end());
-	} else {
+	} else if (!c.has("bouquet")) {
 		std::string rest = c.q("channels"), part;
 		while (!rest.empty()) {
 			ySplitStringExact(rest, ",", part, rest);
