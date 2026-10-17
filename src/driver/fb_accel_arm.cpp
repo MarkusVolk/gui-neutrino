@@ -495,12 +495,23 @@ void CFbAccelARM::paintRect(const int x, const int y, const int dx, const int dy
 		}
 	}
 
-	int line = 0;
-	fb_pixel_t *fbp = getFrameBufferPointer() + (swidth * y);
+	// clip to visible framebuffer area to avoid out-of-bounds writes
+	int x0 = x, x1 = x + dx;
+	int y0 = y, y1 = y + dy;
+	if (x0 < 0)
+		x0 = 0;
+	if (y0 < 0)
+		y0 = 0;
+	if (x1 > (int)xRes)
+		x1 = (int)xRes;
+	if (y1 > (int)yRes)
+		y1 = (int)yRes;
+	int line = y0;
+	fb_pixel_t *fbp = getFrameBufferPointer() + (swidth * y0);
 	int pos;
-	while (line < dy)
+	while (line < y1)
 	{
-		for (pos = x; pos < x + dx; pos++)
+		for (pos = x0; pos < x1; pos++)
 			*(fbp + pos) = col;
 		fbp += swidth;
 		line++;

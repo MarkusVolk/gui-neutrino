@@ -106,6 +106,8 @@
 #include <global.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <errno.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <driver/audioplay.h>
 #include <system/set_threadname.h>
@@ -359,7 +361,7 @@ int request_file(URL *url)
 	ptr = strchr(url->file, '\n');
 	if(ptr)
 	{
-		strcpy(url->entity, ptr + 1);
+		STRCPY(url->entity, ptr + 1);
 		*ptr = 0;
 	}
 	switch(url->proto_version)
@@ -564,9 +566,10 @@ int request_file(URL *url)
   char *_ptr; \
   _ptr = strcasestr(header, a); \
   if(_ptr) \
-  { \
     _ptr = strchr(_ptr, ':'); \
-    for(; !isalnum(*_ptr); _ptr++) {}; \
+  if(_ptr) \
+  { \
+    for(; *_ptr && !isalnum(*_ptr); _ptr++) {}; \
     b = atoi(_ptr); \
   } else b = -1; }
 
@@ -574,11 +577,12 @@ int request_file(URL *url)
   char *_ptr; \
   _ptr = strcasestr(header, a); \
   if(_ptr) \
+    _ptr = strchr(_ptr, ':'); \
+  if(_ptr) \
   { \
     unsigned int i; \
-    _ptr = strchr(_ptr, ':'); \
     for(_ptr++; isspace(*_ptr); _ptr++) {}; \
-    for (i=0; (_ptr[i]!='\n') && (_ptr[i]!='\r') && (_ptr[i]!='\0') && (i<sizeof(b)); i++) b[i] = _ptr[i]; \
+    for (i=0; (_ptr[i]!='\n') && (_ptr[i]!='\r') && (_ptr[i]!='\0') && (i<sizeof(b)-1); i++) b[i] = _ptr[i]; \
     b[i] = 0; \
   } }
 
@@ -818,13 +822,13 @@ FILE *f_open(const char *filename, const char *acctype)
 	memset(&url, 0, sizeof(URL));
 	url.proto_version = HTTP11;
 	url.port = 80;
-	strcpy(url.url, filename);
+	STRCPY(url.url, filename);
 
 	/* remove leading spaces */
 	for (ptr = url.url; (ptr != NULL) && ((*ptr == ' ') || (*ptr == '	')); ptr++){} ;
 
 	if(ptr != url.url)
-		strcpy(url.url, ptr);
+		memmove(url.url, ptr, strlen(ptr) + 1);
 
 	/* did we get an URL file as argument ? If so, then open */
 	/* this file, read out the url and open the url instead */
@@ -1716,7 +1720,15 @@ void *CacheFillThread(void *c)
 					chunkSize = 0;
 					char line[32];
 					if(getChunkSizeLine(scache,line,sizeof(line)))
-						chunkSize = strtol(line, NULL, 16);
+					{
+						char *endptr = NULL;
+						errno = 0;
+						long cs = strtol(line, &endptr, 16);
+						/* a malformed or negative chunk size ends the stream like a 0 chunk */
+						if(errno || endptr == line || cs < 0 || cs > INT_MAX)
+							cs = 0;
+						chunkSize = (int)cs;
+					}
 
 					if(!chunkSize)
 					{
@@ -2071,20 +2083,20 @@ void ShoutCAST_MetaFilter(STREAM_FILTER *arg)
 /**************************** utility functions ******************************/
 void parseURL_url(URL& url) {
 	/* now lets see what we have ... */
-	char buffer[2048];
+	char buffer[sizeof(url.host) * 4 / 3 + 8]; /* holds the base64 encoded login part of host */
 //	printf("parseURL_url: %s\n", url.url);
 	char *ptr = strstr(url.url, "://");
 	if (!ptr)
 	{
 		url.access_mode = MODE_FILE;
-		strcpy(url.file, url.url);
+		STRCPY(url.file, url.url);
 		url.host[0] = 0;
 		url.port = 0;
 		url.logindata[0] = 0;
 	}
 	else
 	{
-		strcpy(url.host, ptr + 3);
+		STRCPY(url.host, ptr + 3);
 
 		/* select the appropriate transport modes */
 		transport("http",  MODE_HTTP, HTTP11);
@@ -2108,7 +2120,9 @@ void parseURL_url(URL& url) {
 		/* extract the file path from the url */
 		ptr = strchr(ptr + 3, '/');
 		if(ptr)
-			strcpy(url.file, ptr);
+		{
+			STRCPY(url.file, ptr);
+		}
 		else
 			strcpy(url.file, "/");
 
@@ -2121,7 +2135,7 @@ void parseURL_url(URL& url) {
 		{
 			*ptr = 0;
 			base64_encode(buffer, url.host);
-			strcpy(url.logindata, buffer);
+			STRCPY(url.logindata, buffer);
 
 			strcpy(buffer, ptr + 1);
 			strcpy(url.host, buffer);

@@ -35,7 +35,7 @@ uint64_t time_monotonic_us(void)
 	if (clock_gettime(CLOCK_MONOTONIC, &t))
 	{
 		perror("time_monotonic_us clock_gettime");
-		return -1;
+		return 0; /* not (uint64_t)-1: callers add timeouts to the result */
 	}
 	return ((int64_t)t.tv_sec + (uint64_t)604800) * (uint64_t) 1000000 + (uint64_t) t.tv_nsec / (uint64_t)1000;
 }

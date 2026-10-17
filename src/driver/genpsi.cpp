@@ -150,6 +150,8 @@ void CGenPsi::addPid(uint16_t pid, uint16_t pidtype, short isAC3, const char *da
 			pcrpid=pid;
 			break;
 		case EN_TYPE_AUDIO:
+			if (nba >= (int)(sizeof(apid)/sizeof(apid[0])))
+				break;
 			apid[nba]=pid;
 			atypes[nba]=isAC3;
 			if(data != NULL){
@@ -176,6 +178,8 @@ void CGenPsi::addPid(uint16_t pid, uint16_t pidtype, short isAC3, const char *da
 			}
 			break;
 		case EN_TYPE_DVBSUB:
+			if (nsub >= (int)(sizeof(dvbsubpid)/sizeof(dvbsubpid[0])))
+				break;
 			dvbsubpid[nsub] = pid;
 			if(data != NULL){
 				dvbsublang[nsub][0] = data[0];
@@ -189,6 +193,8 @@ void CGenPsi::addPid(uint16_t pid, uint16_t pidtype, short isAC3, const char *da
 			nsub++;
 			break;
 		case EN_TYPE_AUDIO_EAC3:
+			if (neac3 >= (int)(sizeof(eac3_pid)/sizeof(eac3_pid[0])))
+				break;
 			eac3_pid[neac3] = pid;
 			if(data != NULL){
 				eac3_lang[neac3][0] = data[0];
@@ -202,6 +208,8 @@ void CGenPsi::addPid(uint16_t pid, uint16_t pidtype, short isAC3, const char *da
 			neac3++;
 			break;
 		case EN_TYPE_AUDIO_AAC:
+			if (naac >= (int)(sizeof(aac_pid)/sizeof(aac_pid[0])))
+				break;
 			aac_pid[naac] = pid;
 			if(data != NULL){
 				aac_lang[naac][0] = data[0];
@@ -215,6 +223,8 @@ void CGenPsi::addPid(uint16_t pid, uint16_t pidtype, short isAC3, const char *da
 			naac++;
 			break;
 		case EN_TYPE_AUDIO_AACP:
+			if (naacp >= (int)(sizeof(aacp_pid)/sizeof(aacp_pid[0])))
+				break;
 			aacp_pid[naacp] = pid;
 			if(data != NULL){
 				aacp_lang[naacp][0] = data[0];
@@ -482,6 +492,9 @@ int CGenPsi::genpsi(int fd)
 	nsub = 0;
 	vtxtpid = 0;
 	neac3 = 0;
+	naac = 0;
+	naacp = 0;
+	vtype = 0;
 	fdatasync(fd);
 	return 1;
 

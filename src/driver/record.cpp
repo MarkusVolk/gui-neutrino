@@ -1076,10 +1076,12 @@ void CRecordInstance::MakeExtFileName(CZapitChannel * channel, std::string &File
 		FilenameTemplate = "%C_%T_%d_%t";
 
 	time_t t = time(NULL);
-	strftime(buf,sizeof(buf),"%Y%m%d",localtime(&t));
+	struct tm tm_t;
+	localtime_r(&t, &tm_t);
+	strftime(buf,sizeof(buf),"%Y%m%d",&tm_t);
 	StringReplace(FilenameTemplate,"%d",buf);
 
-	strftime(buf,sizeof(buf),"%H%M%S",localtime(&t));
+	strftime(buf,sizeof(buf),"%H%M%S",&tm_t);
 	StringReplace(FilenameTemplate,"%t",buf);
 
 	std::string channel_name = channel->getName();
@@ -1124,7 +1126,8 @@ void CRecordInstance::GetRecordString(std::string &str, std::string &dur)
 	}
 	char stime[15];
 	int err = GetStatus();
-	strftime(stime, sizeof(stime), "%H:%M:%S ", localtime(&start_time));
+	struct tm tm_start;
+	strftime(stime, sizeof(stime), "%H:%M:%S ", localtime_r(&start_time, &tm_start));
 	time_t duration = (time(0) - start_time) / 60;
 	char dtime[22];
 	int h = duration / 60;
@@ -1899,6 +1902,7 @@ bool CRecordManager::ShowMenu(void)
 		/* choosing it in the menu is the confirmation */
 		StopInstance(inst);
 		mutex.unlock();
+		StopPostProcess();
 		return true;
 	}
 	return false;

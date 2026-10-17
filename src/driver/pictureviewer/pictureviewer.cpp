@@ -71,6 +71,8 @@ void CPictureViewer::add_format (int (*picsize) (const char *, int *, int *, int
 {
   CFormathandler *fhn;
   fhn = (CFormathandler *) malloc (sizeof (CFormathandler));
+  if (fhn == NULL)
+    return;
   fhn->get_size = picsize;
   fhn->get_pic = picread;
   fhn->id_pic = id;
@@ -181,7 +183,6 @@ std::string CPictureViewer::DownloadImage(std::string url)
 				curl_easy_cleanup(ch);
 			}
 			fclose(tmpFile);
-			url = true;
 		}
 		url = tmpname;
 	}
@@ -893,7 +894,9 @@ fb_pixel_t * CPictureViewer::int_getImage(const std::string & name, int *width, 
 		return NULL;
 	}
 
-	size_t bufsize = x * y * 4;
+	if (x > INT_MAX / 4 / y)
+		return NULL;
+	size_t bufsize = (size_t)x * y * 4;
 	if (!checkfreemem(bufsize))
 		return NULL;
 
@@ -931,21 +934,28 @@ fb_pixel_t * CPictureViewer::int_getImage(const std::string & name, int *width, 
 			if ((GetImage) && (x != *width || y != *height))
 			{
 				dprintf(DEBUG_INFO,  "[CPictureViewer] [%s - %d] resize  %s to %d x %d \n", __func__, __LINE__, name.c_str(), *width, *height);
+				unsigned char *resized = buffer;
 				if (bpp == 4)
 #ifdef FBV_SUPPORT_SVG
 					if (name.find(".svg") == (name.length() - 4))
 					{
 						svg_load_resize(name.c_str(), &buffer, &x, &y, *width, *height);
+						resized = buffer;
 						if (x != *width || y != *height)
-							buffer = ResizeA(buffer, x, y, *width, *height);
+							resized = ResizeA(buffer, x, y, *width, *height);
 					}
 					else
 #endif
-					buffer = ResizeA(buffer, x, y, *width, *height);
+					resized = ResizeA(buffer, x, y, *width, *height);
 				else
-					buffer = Resize(buffer, x, y, *width, *height, COLOR);
-				x = *width;
-				y = *height;
+					resized = Resize(buffer, x, y, *width, *height, COLOR);
+				/* int_Resize() returns the original buffer on failure, then x/y must stay */
+				if (resized != buffer)
+				{
+					buffer = resized;
+					x = *width;
+					y = *height;
+				}
 			}
 			if (bpp == 4)
 				ret = (fb_pixel_t *) CFrameBuffer::getInstance()->convertRGBA2FB(buffer, x, y);

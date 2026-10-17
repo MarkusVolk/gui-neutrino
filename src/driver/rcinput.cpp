@@ -556,7 +556,7 @@ int64_t CRCInput::calcTimeoutEnd(const int _timeout_in_seconds)
 
 int64_t CRCInput::calcTimeoutEnd_MS(const int timeout_in_milliseconds)
 {
-	return time_monotonic_us() + (timeout_in_milliseconds * 1000);
+	return time_monotonic_us() + ((int64_t)timeout_in_milliseconds * 1000);
 }
 
 void CRCInput::getMsgAbsoluteTimeout(neutrino_msg_t * msg, neutrino_msg_data_t * data, uint64_t *TimeoutEnd, bool bAllowRepeatLR)
@@ -650,11 +650,13 @@ void CRCInput::getMsg_us(neutrino_msg_t * msg, neutrino_msg_data_t * data, uint6
 
 	while(1) {
 		timer_id = 0;
+		timer_mutex.lock();
 		if ( !timers.empty() )
 		{
 			uint64_t t_n = time_monotonic_us();
 			if ( timers[0].times_out< t_n )
 			{
+				timer_mutex.unlock();
 				timer_id = checkTimers();
 				*msg = NeutrinoMessages::EVT_TIMER;
 				*data = timer_id;
@@ -671,16 +673,19 @@ void CRCInput::getMsg_us(neutrino_msg_t * msg, neutrino_msg_data_t * data, uint6
 		}
 		else
 			targetTimeout= Timeout;
+		timer_mutex.unlock();
 
 		tvselect.tv_sec = targetTimeout/1000000;
 		tvselect.tv_usec = targetTimeout%1000000;
 
 		FD_ZERO(&rfds);
+		mutex.lock();
 		for (unsigned int i = 0; i < indev.size(); i++)
 		{
 			if (indev[i].fd != -1)
 				FD_SET(indev[i].fd, &rfds);
 		}
+		mutex.unlock();
 #ifdef KEYBOARD_INSTEAD_OF_REMOTE_CONTROL
 		if (true)
 #else
@@ -1332,6 +1337,7 @@ void CRCInput::getMsg_us(neutrino_msg_t * msg, neutrino_msg_data_t * data, uint6
 		}
 
 		/* iterate backwards or the vector will be corrupted by the indev.erase(i) */
+		OpenThreads::ScopedLock<OpenThreads::Mutex> indev_lock(mutex);
 		std::vector<in_dev>::iterator i = indev.end();
 		while (i != indev.begin()) {
 			--i;
@@ -1518,7 +1524,11 @@ void CRCInput::getMsg_us(neutrino_msg_t * msg, neutrino_msg_data_t * data, uint6
 				return;
 			}
 			else
+			{
 				Timeout -= diff;
+				/* the elapsed time has been accounted for, start the next interval here */
+				getKeyBegin = getKeyNow;
+			}
 		}
 	}
 }

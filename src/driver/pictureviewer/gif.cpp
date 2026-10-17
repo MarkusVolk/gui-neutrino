@@ -41,22 +41,33 @@ int fh_gif_id(const char *name)
 	return(0);
 }
 
-inline void m_rend_gif_decodecolormap(unsigned char *cmb,unsigned char *rgbb,ColorMapObject *cm,int /*s*/,int l)
+inline void m_rend_gif_decodecolormap(unsigned char *cmb,unsigned char *rgbb,ColorMapObject *cm,int s,int l)
 {
 	GifColorType *cmentry;
 	int i;
 	for(i=0;i<l;i++)
 	{
+		if(cmb[i]>=s)
+		{
+			/* pixel index outside of the colormap: black */
+			*(rgbb++)=0;
+			*(rgbb++)=0;
+			*(rgbb++)=0;
+			continue;
+		}
 		cmentry=&cm->Colors[cmb[i]];
 		*(rgbb++)=cmentry->Red;
 		*(rgbb++)=cmentry->Green;
 		*(rgbb++)=cmentry->Blue;
 	}
 }
-int fh_gif_load(const char *name,unsigned char **buffer,int* /*xp*/,int* /*yp*/)
+int fh_gif_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 {
 	int px,py,i/*,ibxs*/;
 	int j;
+	int frames=0;
+	/* *buffer was allocated by the caller for the size reported by fh_gif_getsize() (first frame) */
+	int maxpixels=(*xp>0 && *yp>0) ? (*xp)*(*yp) : 0;
 	unsigned char *fbptr;
 	unsigned char *lb;
 	unsigned char *slb;
@@ -84,12 +95,21 @@ int fh_gif_load(const char *name,unsigned char **buffer,int* /*xp*/,int* /*yp*/)
 				if(DGifGetImageDesc(gft)==GIF_ERROR) grflush;
 				px=gft->Image.Width;
 				py=gft->Image.Height;
+				if(px<1 || py<1 || px>maxpixels/py)
+				{
+					/* frame larger than the buffer: stop decoding, keep what we have */
+					if(frames==0) grflush;
+					DGIFCLOSEFILE(gft);
+					return(FH_ERROR_OK);
+				}
+				frames++;
 				lb=(unsigned char*)malloc(px*3);
 				slb=(unsigned char*) malloc(px);
 //		printf("reading...\n");
 				if(lb!=NULL && slb!=NULL)
 				{
 					cmap=(gft->Image.ColorMap ? gft->Image.ColorMap : gft->SColorMap);
+					if(cmap==NULL) mgrflush;
 					cmaps=cmap->ColorCount;
 
 //					ibxs=ibxs*3;
@@ -105,11 +125,14 @@ int fh_gif_load(const char *name,unsigned char **buffer,int* /*xp*/,int* /*yp*/)
 					}
 					else
 					{
+						/* interlaced: the 4 passes deliver rows 0,8,16.. 4,12,.. 2,6,.. 1,3,.. */
+						static const int ioffset[4]={0,4,2,1};
+						static const int ijump[4]={8,8,4,2};
 						for(j=0;j<4;j++)
 						{
-							fbptr=*buffer;
-							for(i=0;i<py;i++,fbptr+=px*3)
+							for(i=ioffset[j];i<py;i+=ijump[j])
 							{
+								fbptr=*buffer+i*px*3;
 								if(DGifGetLine(gft,slb,px)==GIF_ERROR)	mgrflush;
 								m_rend_gif_decodecolormap(slb,lb,cmap,cmaps,px);
 								memmove(fbptr,lb,px*3);

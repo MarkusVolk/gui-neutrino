@@ -7,6 +7,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <climits>
 #include <cstring>
 
 #include <sys/types.h>
@@ -201,9 +202,23 @@ int fh_jpeg_load(const char *filename,unsigned char **buffer,int* x,int* y)
 	{
 		// pic act larger, e.g. because of not responding jpeg server
 		free(*buffer);
-		*buffer = (unsigned char*) malloc(px*py*3);
+		*buffer = (px <= INT_MAX / 3 / py) ? (unsigned char*) malloc((size_t)px*py*3) : NULL;
 		*x = px;
 		*y = py;
+		if(*buffer == NULL)
+		{
+			jpeg_destroy_decompress(ciptr);
+			fclose(fh);
+			return(FH_ERROR_FORMAT);
+		}
+	}
+
+	if(c!=3)
+	{
+		/* out_color_space is RGB, anything else does not fit the 24 bit buffer */
+		jpeg_destroy_decompress(ciptr);
+		fclose(fh);
+		return(FH_ERROR_FORMAT);
 	}
 
 	if(c==3)

@@ -328,8 +328,9 @@ void CLCD4l::Init()
 	m_Info1		= "n/a";
 	m_Info2		= "n/a";
 	m_Progress	= -1;
-	for (int i = 0; i < (int)sizeof(m_Duration); i++)
+	for (int i = 0; i < (int)sizeof(m_Duration) - 1; i++)
 		m_Duration[i] = ' ';
+	m_Duration[sizeof(m_Duration) - 1] = 0;
 	m_Start		= "00:00";
 	m_End		= "00:00";
 
@@ -402,6 +403,7 @@ void CLCD4l::ParseInfo(uint64_t parseID, bool newID, bool firstRun)
 	SNeutrinoTheme &t = g_settings.theme;
 
 	std::string EOL = "\n";
+	struct tm tm_buf;
 
 	/* Copied under the lock, because this runs on the display's own thread and
 	   the box's loop assigns to the same members from a screen. */
@@ -1084,7 +1086,7 @@ void CLCD4l::ParseInfo(uint64_t parseID, bool newID, bool firstRun)
 					total);
 			}
 
-			tm_struct = localtime(&cur_start_time);
+			tm_struct = localtime_r(&cur_start_time, &tm_buf);
 			snprintf(Start, sizeof(Start), "%02d:%02d", tm_struct->tm_hour, tm_struct->tm_min);
 		}
 
@@ -1092,7 +1094,7 @@ void CLCD4l::ParseInfo(uint64_t parseID, bool newID, bool firstRun)
 		{
 			Event += EOL + CurrentNext.next_name;
 			time_t next_start_time = CurrentNext.next_zeit.startzeit;
-			tm_struct = localtime(&next_start_time);
+			tm_struct = localtime_r(&next_start_time, &tm_buf);
 			snprintf(End, sizeof(End), "%02d:%02d", tm_struct->tm_hour, tm_struct->tm_min);
 		}
 	}
@@ -1136,7 +1138,7 @@ void CLCD4l::ParseInfo(uint64_t parseID, bool newID, bool firstRun)
 		}
 
 		time_t sTime = time(NULL);
-		tm_struct = localtime(&sTime);
+		tm_struct = localtime_r(&sTime, &tm_buf);
 
 		snprintf(Start, sizeof(Start), "%02d:%02d", tm_struct->tm_hour, tm_struct->tm_min);
 	}
@@ -1181,13 +1183,13 @@ void CLCD4l::ParseInfo(uint64_t parseID, bool newID, bool firstRun)
 
 		time_t sTime = time(NULL);
 		sTime -= (CMoviePlayerGui::getInstance().GetPosition() / 1000);
-		tm_struct = localtime(&sTime);
+		tm_struct = localtime_r(&sTime, &tm_buf);
 
 		snprintf(Start, sizeof(Start), "%02d:%02d", tm_struct->tm_hour, tm_struct->tm_min);
 
 		time_t eTime = time(NULL);
 		eTime += (CMoviePlayerGui::getInstance().GetDuration() / 1000) - (CMoviePlayerGui::getInstance().GetPosition() / 1000);
-		tm_struct = localtime(&eTime);
+		tm_struct = localtime_r(&eTime, &tm_buf);
 
 		snprintf(End, sizeof(End), "%02d:%02d", tm_struct->tm_hour, tm_struct->tm_min);
 	}

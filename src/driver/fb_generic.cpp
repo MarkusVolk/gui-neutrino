@@ -732,10 +732,21 @@ void CFrameBuffer::paintBoxRel(const int x, const int y, const int dx, const int
 			line++;
 		}
 	} else {
-		fb_pixel_t *fbp = getFrameBufferPointer() + (swidth * y);
-		int line = 0;
-		while (line < dy) {
-			for (int pos = x; pos < x + dx; pos++)
+		// clip to visible framebuffer area to avoid out-of-bounds writes
+		int x0 = x, x1 = x + dx;
+		int y0 = y, y1 = y + dy;
+		if (x0 < 0)
+			x0 = 0;
+		if (y0 < 0)
+			y0 = 0;
+		if (x1 > (int)xRes)
+			x1 = (int)xRes;
+		if (y1 > (int)yRes)
+			y1 = (int)yRes;
+		fb_pixel_t *fbp = getFrameBufferPointer() + (swidth * y0);
+		int line = y0;
+		while (line < y1) {
+			for (int pos = x0; pos < x1; pos++)
 				*(fbp + pos) = col;
 
 			fbp += swidth;
@@ -998,6 +1009,8 @@ bool CFrameBuffer::paintIcon(const std::string & filename, const int x, const in
 				tmpIcon.data = data;
 				icon_cache.insert(std::pair <std::string, rawIcon> (filename, tmpIcon));
 				//printf("Cached %s, cache size %d\n", newname.c_str(), cache_size);
+			}else{
+				freeicondata = true;
 			}
 			goto _display;
 		}
@@ -1033,16 +1046,29 @@ bool CFrameBuffer::paintIcon(const std::string & filename, const int x, const in
 			return false;
 		}
 
+		unsigned char pixbuf[768];
+		if ((width >> 1) > (int)sizeof(pixbuf)) {
+			printf("paintIcon: error while loading icon: %s, too wide (%d)\n", newname.c_str(), width);
+			close(lfd);
+			return false;
+		}
+
 		int dsize = width*height*sizeof(fb_pixel_t);
 
 		tmpIcon.data = (fb_pixel_t*) cs_malloc_uncached(dsize);
+		if (!tmpIcon.data) {
+			printf("paintIcon: error while loading icon: %s, cs_malloc_uncached failed\n", newname.c_str());
+			close(lfd);
+			return false;
+		}
 		data = tmpIcon.data;
 
-		unsigned char pixbuf[768];
 		for (int count = 0; count < height; count ++ ) {
 			s = read(lfd, &pixbuf[0], width >> 1 );
-			if(s <= 0)
+			if(s < (width >> 1))
 			{
+				/* short read: do not blit uninitialised memory */
+				memset(data, 0, dsize - (data - tmpIcon.data) * sizeof(fb_pixel_t));
 				break;
 			}
 			unsigned char *pixpos = &pixbuf[0];
@@ -1081,7 +1107,7 @@ bool CFrameBuffer::paintIcon(const std::string & filename, const int x, const in
 _display:
 	if(!paint){
 		if(freeicondata){
-			free(data);
+			cs_free_uncached(data);
 			data = NULL;
 		}
 		return true;
@@ -1094,6 +1120,10 @@ _display:
 		paintBoxRel(x, yy, width, height, colBg);
 	blit2FB(data, width, height, x, yy);
 	checkFbArea(x, yy, width, height, false);
+	if(freeicondata){
+		cs_free_uncached(data);
+		data = NULL;
+	}
 	return true;
 }
 
@@ -1944,13 +1974,13 @@ void CFrameBuffer::fbCopyArea(uint32_t width, uint32_t height, uint32_t dst_x, u
 void CFrameBuffer::blit2FB(void *fbbuff, uint32_t width, uint32_t height, uint32_t xoff, uint32_t yoff, uint32_t xp, uint32_t yp, bool transp)
 {
 	uint32_t xc, yc;
-	xc = (width > xRes) ? xRes + xp : width;
-	yc = (height > yRes) ? yRes + yp: height;
-
-	if (xp >= xc || yp >= yc) {
-		printf(LOGTAG "%s: invalid parameters, xc: %u <= xp: %u or yc: %u <= yp: %u\n", __func__, xc, xp, yc, yp);
+	if (xoff >= xRes || yoff >= yRes || xp >= width || yp >= height) {
+		printf(LOGTAG "%s: invalid parameters, xoff: %u yoff: %u xp: %u yp: %u width: %u height: %u\n", __func__, xoff, yoff, xp, yp, width, height);
 		return;
 	}
+	/* clamp the copied area to what fits into the framebuffer at xoff/yoff */
+	xc = (width - xp > xRes - xoff) ? xRes - xoff + xp : width;
+	yc = (height - yp > yRes - yoff) ? yRes - yoff + yp : height;
 
 	fb_pixel_t*  data = (fb_pixel_t *) fbbuff;
 
@@ -2006,15 +2036,19 @@ void CFrameBuffer::blitBox2FB(const fb_pixel_t* boxBuf, const uint32_t& width, c
 	if(width <1 || height <1 || !boxBuf )
 		return;
 
-	uint32_t xc = (width > xRes) ? (uint32_t)xRes : width;
-	uint32_t yc = (height > yRes) ? (uint32_t)yRes : height;
+	if (xoff >= xRes || yoff >= yRes)
+		return;
+
+	uint32_t xc = (width > xRes - xoff) ? (uint32_t)xRes - xoff : width;
+	uint32_t yc = (height > yRes - yoff) ? (uint32_t)yRes - yoff : height;
 
 	fb_pixel_t *fbp = getFrameBufferPointer() + (swidth * yoff);
 	fb_pixel_t* data = (fb_pixel_t*)boxBuf;
 
 	uint32_t line = 0;
 	while (line < yc) {
-		fb_pixel_t *pixpos = &data[line * xc];
+		/* the source stride is the full buffer width, not the clipped one */
+		fb_pixel_t *pixpos = &data[line * width];
 		for (uint32_t pos = xoff; pos < xoff + xc; pos++) {
 			//don't paint backgroundcolor (*pixpos = 0x00000000)
 			if (*pixpos)

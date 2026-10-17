@@ -92,39 +92,48 @@ bool CScreenShot::Start()
 	if (cmd.empty())
 		return false;
 
-	cmd += " ";
+	/* exec directly, no shell: the filename is built from channel/EPG names */
+	const char *argv[9] = { NULL };
+	int argc = 0;
+	std::string xres_str;
+	argv[argc++] = cmd.c_str();
 
 	if (get_osd && !get_video)
-		cmd += "-o ";
+		argv[argc++] = "-o";
 	else if (!get_osd && get_video)
-		cmd += "-v ";
+		argv[argc++] = "-v";
 
 	switch (format)
 	{
 		case FORMAT_PNG:
-			cmd += "-p ";
+			argv[argc++] = "-p";
 			break;
 		default:
 			/* fall through */
 		case FORMAT_JPG:
-			cmd += "-j 100 ";
+			argv[argc++] = "-j";
+			argv[argc++] = "100";
 			break;
 		case FORMAT_BMP:
 			break;
 	}
 
 	if (!scale_to_video)
-		cmd += "-d ";
+		argv[argc++] = "-d";
 
 	if (xres)
-		cmd += "-w " + to_string(xres) + " ";
+	{
+		xres_str = to_string(xres);
+		argv[argc++] = "-w";
+		argv[argc++] = xres_str.c_str();
+	}
 
-	cmd += "'";
-	cmd += filename;
-	cmd += "'";
+	argv[argc++] = filename.c_str();
 
+	for (int i = 1; i < argc; i++)
+		cmd += std::string(" ") + argv[i];
 	printf("[CScreenShot::%s:%d] Running %s\n", __func__, __LINE__, cmd.c_str());
-	system(cmd.c_str());
+	my_system(argc, argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6], argv[7]);
 
 	return (access(filename.c_str(), F_OK) == 0);
 }
@@ -184,7 +193,7 @@ bool CScreenShot::GetData()
 		_yres = yres = 720;
 		get_osd      = false;
 		extra_osd    = true;
-		screenBuf    = new fb_pixel_t[_xres*_yres*sizeof(fb_pixel_t)];
+		screenBuf    = new fb_pixel_t[_xres*_yres];
 		if (screenBuf == NULL) {
 			printf("[CScreenShot::%s:%d] memory error\n", __func__, __LINE__);
 			return false;
@@ -372,7 +381,20 @@ bool CScreenShot::SavePng()
 	}
 
 	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, (png_voidp)NULL, (png_error_ptr)NULL, (png_error_ptr)NULL);
+	if (!png_ptr) {
+		printf("CScreenShot::SavePng: png_create_write_struct error\n");
+		free(row_pointers);
+		fclose(fd);
+		return false;
+	}
 	info_ptr = png_create_info_struct(png_ptr);
+	if (!info_ptr) {
+		printf("CScreenShot::SavePng: png_create_info_struct error\n");
+		png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
+		free(row_pointers);
+		fclose(fd);
+		return false;
+	}
 	if (setjmp(png_jmpbuf(png_ptr)))
 	{
 		printf("CScreenShot::SavePng: %s save error\n", filename.c_str());

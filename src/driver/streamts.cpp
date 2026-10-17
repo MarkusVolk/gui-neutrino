@@ -748,7 +748,10 @@ void CStreamManager::run()
 					if (pfd[i].revents & (POLLHUP | POLLRDHUP)) {
 						printf("CStreamManager::run(): POLLHUP, fd %d\n", pfd[i].fd);
 						RemoveClient(pfd[i].fd);
-						if (streams.empty()) {
+						mutex.lock();
+						bool no_streams = streams.empty();
+						mutex.unlock();
+						if (no_streams) {
 							poll_timeout = 2000;
 							g_RCInput->postMsg(NeutrinoMessages::EVT_STREAM_STOP, 0);
 						}

@@ -29,6 +29,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <climits>
+#include <vector>
 
 // this method is recommended for FreeType >2.0.x:
 #include <ft2build.h>
@@ -281,11 +283,15 @@ int Font::setSize(int isize)
 return 0;
 #endif
 	// hack begin (this is a hack to get correct font metrics, didn't find any other way which gave correct values)
-	FTC_SBit glyph;
+	FTC_SBit glyph = NULL;
 	int index;
 
 	index=FT_Get_Char_Index(face, 'M'); // "M" gives us ascender
-	getGlyphBitmap(index, &glyph);
+	if (getGlyphBitmap(index, &glyph) || !glyph)
+	{
+		dprintf(DEBUG_NORMAL, "%s:getGlyphBitmap('M') failed\n", __FUNCTION__);
+		return 0;
+	}
 	int tM=glyph->top;
 
 	fontwidth = glyph->width;
@@ -295,10 +301,11 @@ return 0;
 		// walk through all chars to find fontwidth_widest
 		FT_UInt gindex = 0;
 		FT_ULong charcode = FT_Get_First_Char(face, &gindex);
+		fontwidth_widest = fontwidth;
 		while (gindex != 0)
 		{
-			getGlyphBitmap(gindex, &glyph);
-			fontwidth_widest = std::max(fontwidth, (int)glyph->width);
+			if (getGlyphBitmap(gindex, &glyph) == 0 && glyph)
+				fontwidth_widest = std::max(fontwidth_widest, (int)glyph->width);
 			charcode = FT_Get_Next_Char(face, charcode, &gindex);
 		}
 	}
@@ -307,7 +314,11 @@ return 0;
 	//printf("Font::setSize() %s: fontwidth=%d fontwidth_widest=%d\n", face->family_name, fontwidth, fontwidth_widest);
 
 	index=FT_Get_Char_Index(face, 'g'); // "g" gives us descender
-	getGlyphBitmap(index, &glyph);
+	if (getGlyphBitmap(index, &glyph) || !glyph)
+	{
+		dprintf(DEBUG_NORMAL, "%s:getGlyphBitmap('g') failed\n", __FUNCTION__);
+		return 0;
+	}
 	int hg=glyph->height;
 	int tg=glyph->top;
 
@@ -433,9 +444,21 @@ static std::string fribidi_shape_char(const char * text)
 		// tell bidi that we need bidirectional
 		FriBidiCharType fribidi_chartype = FRIBIDI_TYPE_L;
 
-		// our buffer
-		FriBidiChar *logical = (FriBidiChar *)alloca(sizeof(FriBidiChar)*(len + 1));
-		FriBidiChar *visual = (FriBidiChar *)alloca(sizeof(FriBidiChar)*(len + 1));
+		// our buffer (on the stack for the usual short strings, on the heap for long ones)
+		FriBidiChar *logical, *visual;
+		std::vector<FriBidiChar> heapbuf;
+		std::vector<char> heaptext;
+		if (len < 1024)
+		{
+			logical = (FriBidiChar *)alloca(sizeof(FriBidiChar)*(len + 1));
+			visual = (FriBidiChar *)alloca(sizeof(FriBidiChar)*(len + 1));
+		}
+		else
+		{
+			heapbuf.resize(2 * (len + 1));
+			logical = &heapbuf[0];
+			visual = logical + len + 1;
+		}
 
 		// convert from the selected charset to Unicode
 		rtl_len = fribidi_charset_to_unicode(fribidi_charset, const_cast<char *>(text), len, logical);
@@ -447,7 +470,13 @@ static std::string fribidi_shape_char(const char * text)
 			// removes bidirectional marks
 			FriBidiStrIndex __attribute__ ((unused)) idx = fribidi_remove_bidi_marks(visual, rtl_len, NULL, NULL, NULL);
 
-			rtl_text = (char *)alloca(sizeof(char)*(rtl_len * 4 + 1));
+			if (len < 1024)
+				rtl_text = (char *)alloca(sizeof(char)*(rtl_len * 4 + 1));
+			else
+			{
+				heaptext.resize(rtl_len * 4 + 1);
+				rtl_text = &heaptext[0];
+			}
 			fribidi_unicode_to_charset(fribidi_charset, visual, rtl_len, rtl_text);
 
 			return std::string(rtl_text);
@@ -602,9 +631,13 @@ void Font::RenderString(int x, int y, const int width, const char *text, const f
 	   background color or bgcolor will be wrong */
 	if (render_to_fb)
 		frameBuffer->waitForIdle("Font::RenderString 1");
+	/* rows of the target buffer we may write to (unknown for a caller supplied buffer) */
+	int max_y = render_to_fb ? (int)frameBuffer->getScreenHeight(true) : INT_MAX;
+	int buf_width = stride / (int)sizeof(fb_pixel_t);
 	if (!useFullBG) {
 		/* fetch bgcolor from framebuffer, using lower left edge of the font... */
-		bg_color = *(buff + x + y * stride / sizeof(fb_pixel_t));
+		if (x >= 0 && x < buf_width && y < max_y)
+			bg_color = *(buff + x + y * stride / sizeof(fb_pixel_t));
 
 		if (bg_color == (fb_pixel_t)0)
 			bg_color = 0x80808080;
@@ -683,11 +716,14 @@ void Font::RenderString(int x, int y, const int width, const char *text, const f
 		int pitch   = glyph->pitch;
 		if (ap>-1) {
 			for (int ay = 0; ay < h; ay++) {
+				/* vertical clip: do not write below the end of the framebuffer */
+				if (y - glyph->top + ay >= max_y)
+					break;
 				fb_pixel_t * td = (fb_pixel_t *)d;
 				int ax;
 				for (ax = 0; ax < w + spread_by; ax++) {
 					/* width clip */
-					if (xoff  + ax >= left + width)
+					if (xoff  + ax >= left + width || xoff + ax >= buf_width)
 						break;
 					if (stylemodifier != Font::Embolden) {
 						/* do not paint the backgroundcolor (*s = 0) */
