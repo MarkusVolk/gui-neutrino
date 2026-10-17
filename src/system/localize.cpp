@@ -145,7 +145,8 @@ CLocaleManager::loadLocale_ret_t CLocaleManager::loadLocale(const char * const l
 		filename += "/";
 		filename += locale;
 		filename += ".locale";
-		::stat(filename.c_str(), &st);
+		if (::stat(filename.c_str(), &st) != 0)
+			continue;
 		
 		fd = fopen(filename.c_str(), "r");
 		if (fd)
@@ -183,7 +184,7 @@ CLocaleManager::loadLocale_ret_t CLocaleManager::loadLocale(const char * const l
 			char * val    = NULL;
 			char * tmpptr = buf;
 
-			for(; (*tmpptr!=10) && (*tmpptr!=13);tmpptr++)
+			for(; (*tmpptr!=0) && (*tmpptr!=10) && (*tmpptr!=13);tmpptr++)
 			{
 				if ((*tmpptr == ' ') && (val == NULL))
 				{

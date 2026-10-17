@@ -94,7 +94,7 @@ int proc_get(const char *path, char *value, const int len)
 	int pfd = open(path, O_RDONLY);
 	if (pfd < 0)
 		return pfd;
-	ret = read(pfd, value, len);
+	ret = read(pfd, value, len - 1);
 	value[len-1] = '\0'; /* make sure string is terminated */
 	if (ret >= 0)
 	{

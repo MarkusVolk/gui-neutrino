@@ -23,6 +23,8 @@
 
 #include "ping.h"
 #include <pthread.h>
+#include <arpa/inet.h>
+#include <errno.h>
 
 
 #ifndef  EXIT_SUCCESS
@@ -103,7 +105,7 @@ send_ping( const char *host, struct sockaddr_in *taddr )
     return -1;
   }
   
-  if(( hp = gethostbyname( host )) != NULL ){
+  if(( hp = gethostbyname( host )) != NULL && hp->h_addr_list[0] != NULL ){
     memmove( &taddr->sin_addr, hp->h_addr_list[0], sizeof( taddr->sin_addr ));
     taddr->sin_port = 0;
     taddr->sin_family = AF_INET;
@@ -124,6 +126,7 @@ send_ping( const char *host, struct sockaddr_in *taddr )
     return -2;
   }
 
+  memset( buf, 0, sizeof( buf ));
   icp = (struct icmp *)buf;
   icp->icmp_type  = ICMP_ECHO;
   icp->icmp_code  = 0;
@@ -164,8 +167,12 @@ recv_ping( struct sockaddr_in *taddr )
   struct timeval to;
   fd_set readset, writeset;
 
-  to.tv_sec = timo / 100000;
-  to.tv_usec = ( timo - ( to.tv_sec * 100000 ) ) * 10;
+  /* timo is in seconds, rrt the time already spent in ms */
+  int remain_ms = timo * 1000 - rrt;
+  if( remain_ms < 0 )
+    remain_ms = 0;
+  to.tv_sec = remain_ms / 1000;
+  to.tv_usec = ( remain_ms % 1000 ) * 1000;
 
   FD_ZERO( &readset );
   FD_ZERO( &writeset );
@@ -177,7 +184,7 @@ recv_ping( struct sockaddr_in *taddr )
 #ifdef  DEBUG
   perror( "select" );
 #endif/*DEBUG*/
-    exit( EXIT_FAILURE );
+    return ( errno == EINTR ) ? -1 : -2;
   }
   if( nf == 0 ){ 
     return -1; 
@@ -188,7 +195,7 @@ recv_ping( struct sockaddr_in *taddr )
 
   cc = recvfrom( sock, buf, len, 0, (struct sockaddr*)&faddr, &from );
   if( cc < 0 ){ 
-    exit( EXIT_FAILURE );
+    return ( errno == EINTR || errno == EAGAIN ) ? -1 : -2;
   }
 
   //icp = (struct icmp *)(buf + HDRLEN + DATALEN );
@@ -212,9 +219,8 @@ recv_ping( struct sockaddr_in *taddr )
  */
 static int
 elapsed_time( struct timeval *starttime ){
-  struct timeval *newtime;
+  struct timeval _newtime, *newtime = &_newtime;
   int elapsed;
-  newtime = (struct timeval*)malloc( sizeof(struct timeval));
   gettimeofday(newtime,NULL);
   elapsed = 0;
   if(( newtime->tv_usec - starttime->tv_usec) > 0 ){
@@ -227,7 +233,6 @@ elapsed_time( struct timeval *starttime ){
   if(( newtime->tv_sec - starttime->tv_sec ) > 0 ){
     elapsed += 1000 * ( newtime->tv_sec - starttime->tv_sec );
   }
-  free(newtime);
   return( elapsed );
 } 
 
@@ -250,13 +255,20 @@ myping(const std::string &hostname, int t, struct sockaddr_in *sa = NULL)
   if(( err = send_ping( hostname.c_str(), sa )) < 0 ){
     return err;
   }
+  int r;
   do{
     if(( rrt = elapsed_time( &mytime )) > timo * 1000 ){
       close( sock );
       sock = -1;
       return 0;
     }
-  } while( recv_ping(sa));
+    r = recv_ping(sa);
+    if( r == -2 ){ /* socket error (not EINTR): give up */
+      close( sock );
+      sock = -1;
+      return -2;
+    }
+  } while( r );
   close( sock ); 
   sock = -1;
 
@@ -270,7 +282,8 @@ pinghost(const std::string &hostname, std::string *ip)
 	struct sockaddr_in sa;
 	int res = myping( hostname, 0, &sa);
 	if (ip) {
-		char *p = inet_ntoa(sa.sin_addr);
+		char ipbuf[INET_ADDRSTRLEN];
+		const char *p = inet_ntop(AF_INET, &sa.sin_addr, ipbuf, sizeof(ipbuf));
 		*ip = p ? std::string(p) : "";
 	}
 	return res;

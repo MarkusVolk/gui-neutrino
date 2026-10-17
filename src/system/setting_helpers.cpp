@@ -548,7 +548,11 @@ long CNetAdapter::mac_addr_sys(u_char *addr) // only for function getMacAddr()
 
 	ifc.ifc_len = sizeof(buf);
 	ifc.ifc_buf = buf;
-	ioctl(s, SIOCGIFCONF, &ifc);
+	if (ioctl(s, SIOCGIFCONF, &ifc) < 0)
+	{
+		close(s);
+		return -1;
+	}
 	IFR = ifc.ifc_req;
 	for (i = ifc.ifc_len / sizeof(struct ifreq); --i >= 0; IFR++)
 	{

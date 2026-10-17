@@ -154,8 +154,13 @@ bool CFlashTool::readFromMTD( const std::string & filename, int globalProgressEn
 				}
 			}
 		}
-		read(fd, buf, block);
-		write(fd1, buf, block);
+		if (read(fd, buf, block) != (ssize_t)block || write(fd1, buf, block) != (ssize_t)block) {
+			printf("CFlashTool::readFromMTD: read/write error at %x: %s\n", mtdoffset, strerror(errno));
+			ErrorMessage = g_Locale->getText(LOCALE_FLASHUPDATE_READ_VOLUME_ERROR);
+			close(fd);
+			close(fd1);
+			return false;
+		}
 		fsize -= block;
 		mtdoffset += meminfo.writesize;
 		char prog = char(100-(100./filesize*fsize));
@@ -297,9 +302,14 @@ bool CFlashTool::program( const std::string & filename, int globalProgressEndEra
 		if (block > fsize)
 			block = fsize;
 
-		unsigned res = read(fd1, buf, block);
-		if (res != block) {
-			printf("CFlashTool::program: read from %s failed: %d from %d\n", flashfile.c_str(), res, block);
+		ssize_t res = read(fd1, buf, block);
+		if (res != (ssize_t)block) {
+			/* writing a short/garbage block would corrupt the flash: abort */
+			printf("CFlashTool::program: read from %s failed: %d from %d\n", flashfile.c_str(), (int)res, block);
+			ErrorMessage = g_Locale->getText(LOCALE_FLASHUPDATE_CANTOPENFILE);
+			close(fd1);
+			close(fd);
+			return false;
 		}
 		if (isnand) {
 			if (block < (unsigned) meminfo.writesize) {
@@ -325,7 +335,13 @@ bool CFlashTool::program( const std::string & filename, int globalProgressEndEra
 				}
 			}
 		}
-		write(fd, buf, meminfo.writesize);
+		if (write(fd, buf, meminfo.writesize) != (ssize_t)meminfo.writesize) {
+			printf("CFlashTool::program: write to %s at %x failed: %s\n", mtdDevice.c_str(), mtdoffset, strerror(errno));
+			ErrorMessage = g_Locale->getText(LOCALE_FLASHUPDATE_CANTOPENMTD);
+			close(fd1);
+			close(fd);
+			return false;
+		}
 		fsize -= block;
 		mtdoffset += meminfo.writesize;
 		if(statusViewer) {
@@ -695,7 +711,7 @@ void CMTDInfo::getPartitionInfo()
 			int mtdnr=0;
 			int mtdsize=0;
 			int mtderasesize=0;
-			sscanf(buf, "mtd%d: %x %x \"%s\"\n", &mtdnr, &mtdsize, &mtderasesize, mtdname);
+			sscanf(buf, "mtd%d: %x %x \"%49s\"\n", &mtdnr, &mtdsize, &mtderasesize, mtdname);
 			SMTDPartition* tmp = new SMTDPartition;
 				tmp->size = mtdsize;
 				tmp->erasesize = mtderasesize;

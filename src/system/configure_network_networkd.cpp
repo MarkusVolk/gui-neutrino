@@ -178,7 +178,7 @@ static bool write_file(const std::string &file, const std::string &content, mode
 		unlink(tmp.c_str());
 		return false;
 	}
-	return true;
+	return syncDirectoryOf(file);
 }
 
 /* the file networkd configures the interface with, empty when it has none */
@@ -194,7 +194,10 @@ static std::string active_file(const std::string &ifname)
 	std::string line;
 	while (getline(in, line))
 		if (line.compare(0, 13, "NETWORK_FILE=") == 0)
-			return line.substr(13);
+		{
+			std::string value = line.substr(13);
+			return rtrim(value);
+		}
 	return "";
 }
 

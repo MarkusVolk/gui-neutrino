@@ -63,6 +63,8 @@ std::string CMDBTools::getFilename(CZapitChannel *channel, uint64_t id)
 
 	snprintf(fname, sizeof(fname), "%s/", g_settings.network_nfs_recordingdir.c_str());
 	pos = strlen(fname);
+	if (pos + sizeof(".jpg") > sizeof(fname))
+		return ("");
 
 	// %C == channel, %T == title, %I == info1, %d == date, %t == time_t
 	std::string FilenameTemplate = g_settings.recording_filename_template;
@@ -76,7 +78,7 @@ std::string CMDBTools::getFilename(CZapitChannel *channel, uint64_t id)
 	std::string channel_name = channel->getName();
 	if (!(channel_name.empty()))
 	{
-		strcpy(buf, UTF8_TO_FILESYSTEM_ENCODING(channel_name.c_str()));
+		safe_strncpy(buf, UTF8_TO_FILESYSTEM_ENCODING(channel_name.c_str()), sizeof(buf));
 		ZapitTools::replace_char(buf);
 		FilenameTemplate = str_replace("%C", buf, FilenameTemplate);
 	}
@@ -88,7 +90,7 @@ std::string CMDBTools::getFilename(CZapitChannel *channel, uint64_t id)
 	{
 		if (!(epgdata.title.empty()))
 		{
-			strcpy(buf, epgdata.title.c_str());
+			safe_strncpy(buf, epgdata.title.c_str(), sizeof(buf));
 			ZapitTools::replace_char(buf);
 			FilenameTemplate = str_replace("%T", buf, FilenameTemplate);
 		}
@@ -97,7 +99,7 @@ std::string CMDBTools::getFilename(CZapitChannel *channel, uint64_t id)
 
 		if (!(epgdata.info1.empty()))
 		{
-			strcpy(buf, epgdata.info1.c_str());
+			safe_strncpy(buf, epgdata.info1.c_str(), sizeof(buf));
 			ZapitTools::replace_char(buf);
 			FilenameTemplate = str_replace("%I", buf, FilenameTemplate);
 		}
@@ -105,11 +107,12 @@ std::string CMDBTools::getFilename(CZapitChannel *channel, uint64_t id)
 			FilenameTemplate = str_replace("%I", "no_info", FilenameTemplate);
 	}
 
-	strcpy(&(fname[pos]), UTF8_TO_FILESYSTEM_ENCODING(FilenameTemplate.c_str()));
+	/* leave room for the ".jpg" suffix */
+	safe_strncpy(&(fname[pos]), UTF8_TO_FILESYSTEM_ENCODING(FilenameTemplate.c_str()), sizeof(fname) - pos - (sizeof(".jpg") - 1));
 
 	pos = strlen(fname);
 
-	strcpy(&(fname[pos]), ".jpg");
+	safe_strncpy(&(fname[pos]), ".jpg", sizeof(fname) - pos);
 
 	return (fname);
 }

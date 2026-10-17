@@ -45,21 +45,56 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
+#include <vector>
 
 #include <sys/mount.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 pthread_mutex_t g_mut;
 pthread_cond_t g_cond;
 pthread_t g_mnt;
 int g_mntstatus;
+static pid_t g_mntpid;
+static bool g_mntdone;
+static bool g_mntabort;
 
-void *mount_thread(void *cmd)
+/* runs argv directly (no shell, so user supplied fields can't inject commands);
+   the child pid is published under g_mut so a timed out mount can be killed */
+void *mount_thread(void *arg)
 {
-	int ret;
-	ret = system((const char *) cmd);
+	const std::vector<std::string> *args = (const std::vector<std::string> *) arg;
+	std::vector<const char *> argv;
+	for (std::vector<std::string>::const_iterator it = args->begin(); it != args->end(); ++it)
+		argv.push_back(it->c_str());
+	argv.push_back(NULL);
+
+	int ret = -1;
 	pthread_mutex_lock(&g_mut);
+	pid_t pid = g_mntabort ? -1 : fork();
+	if (pid == 0)
+	{
+		int maxfd = getdtablesize();
+		for (int i = 3; i < maxfd; i++)
+			close(i);
+		execvp(argv[0], (char *const *) &argv[0]);
+		_exit(127);
+	}
+	g_mntpid = pid;
+	pthread_mutex_unlock(&g_mut);
+
+	if (pid > 0)
+	{
+		int status = 0;
+		while (waitpid(pid, &status, 0) == -1 && errno == EINTR)
+			;
+		ret = status;
+	}
+	pthread_mutex_lock(&g_mut);
+	g_mntpid = 0;
 	g_mntstatus = ret;
+	g_mntdone = true;
 	pthread_cond_broadcast(&g_cond);
 	pthread_mutex_unlock(&g_mut);
 	pthread_exit(NULL);
@@ -319,66 +354,86 @@ CFSMounter::MountRes CFSMounter::mount(const std::string &ip, const std::string 
 		}
 	}
 
+	/* argv for execvp: the same words the former shell command line had */
+	std::vector<std::string> args;
+	std::string opts;
 	if (fstype == NFS)
 	{
-		cmd = "mount -t nfs ";
-		cmd += getDeviceString(NFS, ip, dir);
-		cmd += ' ';
-		cmd += local_dir;
+		args.push_back("mount");
+		args.push_back("-t");
+		args.push_back("nfs");
+		args.push_back(getDeviceString(NFS, ip, dir));
+		args.push_back(local_dir);
 	}
 	else if (fstype == CIFS)
 	{
-		cmd = "mount -t cifs ";
-		cmd += getDeviceString(CIFS, ip, dir);
-		cmd += ' ';
-		cmd += local_dir;
-		cmd += " -o username=";
-		cmd += username;
-		cmd += ",password=";
-		cmd += password;
+		args.push_back("mount");
+		args.push_back("-t");
+		args.push_back("cifs");
+		args.push_back(getDeviceString(CIFS, ip, dir));
+		args.push_back(local_dir);
+		opts = "username=" + username + ",password=" + password;
 	}
 	else
 	{
-		cmd = "lufsd none ";
-		cmd += local_dir;
-		cmd += " -o fs=ftpfs,username=";
-		cmd += username;
-		cmd += ",password=";
-		cmd += password;
-		cmd += ",host=";
-		cmd += ip;
-		cmd += ",root=/";
-		cmd += dir;
+		args.push_back("lufsd");
+		args.push_back("none");
+		args.push_back(local_dir);
+		opts = "fs=ftpfs,username=" + username + ",password=" + password + ",host=" + ip + ",root=/" + dir;
 	}
 
 	if (!options1.empty())
 	{
-		if (fstype == NFS)
-			cmd += " -o ";
-		else
-			cmd += ',';
-		cmd += options1;
+		if (!opts.empty())
+			opts += ',';
+		opts += options1;
 	}
 
 	if (!options2.empty())
 	{
-		cmd += ',';
-		cmd += options2;
+		opts += ',';
+		opts += options2;
 	}
 
-	pthread_create(&g_mnt, 0, mount_thread, (void *) cmd.c_str());
+	if (!opts.empty())
+	{
+		args.push_back("-o");
+		args.push_back(opts);
+	}
+
+	for (std::vector<std::string>::const_iterator it = args.begin(); it != args.end(); ++it)
+	{
+		if (it != args.begin())
+			cmd += ' ';
+		cmd += *it;
+	}
+
+	pthread_mutex_lock(&g_mut);
+	g_mntpid = 0;
+	g_mntdone = false;
+	g_mntabort = false;
+	g_mntstatus = -1;
+	pthread_mutex_unlock(&g_mut);
+	if (pthread_create(&g_mnt, 0, mount_thread, (void *) &args) != 0)
+	{
+		printf("[CFSMounter] FS mount error: cannot create thread: \"%s\"\n", cmd.c_str());
+		return MRES_UNKNOWN;
+	}
 
 	struct timespec timeout;
-	int retcode;
+	int retcode = 0;
 
 	pthread_mutex_lock(&g_mut);
 	timeout.tv_sec = time(NULL) + 5;
 	timeout.tv_nsec = 0;
-	retcode = pthread_cond_timedwait(&g_cond, &g_mut, &timeout);
-	if (retcode == ETIMEDOUT)
+	while (!g_mntdone && retcode == 0)
+		retcode = pthread_cond_timedwait(&g_cond, &g_mut, &timeout);
+	if (!g_mntdone)
 	{
-		// timeout occurred
-		pthread_cancel(g_mnt);
+		// timeout occurred: kill the mount process (as the cancelled system() did), the thread then ends
+		g_mntabort = true;
+		if (g_mntpid > 0)
+			kill(g_mntpid, SIGKILL);
 	}
 	pthread_mutex_unlock(&g_mut);
 	pthread_join(g_mnt, NULL);

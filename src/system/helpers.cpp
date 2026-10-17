@@ -266,7 +266,7 @@ CAtomicFileWriter::~CAtomicFileWriter()
 /* Syncs the directory a file sits in, so that an entry just made in it - a
    rename into place - survives a power cut. A filesystem that cannot sync a
    directory answers EINVAL, and there is nothing more to wait for there. */
-static bool syncDirectoryOf(const std::string &path)
+bool syncDirectoryOf(const std::string &path)
 {
 	const std::string::size_type slash = path.rfind('/');
 	const std::string dir = slash == std::string::npos ? std::string(".")
@@ -423,10 +423,10 @@ int my_system(int argc, const char *arg, ...)
 
 	pid_t pid;
 	int maxfd = getdtablesize();// sysconf(_SC_OPEN_MAX);
-	switch (pid = vfork())
+	switch (pid = fork())
 	{
-		case -1: /* can't vfork */
-			perror("vfork");
+		case -1: /* can't fork */
+			perror("fork");
 			ret = -errno;
 			break;
 		case 0: /* child process */
@@ -444,8 +444,11 @@ int my_system(int argc, const char *arg, ...)
 			_exit(ret); // terminate c h i l d proces s only
 		default: /* parent returns to calling process */
 			ret = 0;
-			waitpid(pid, &childExit, 0);
-			if (WEXITSTATUS(childExit) != 0)
+			while (waitpid(pid, &childExit, 0) == -1 && errno == EINTR)
+				;
+			if (WIFSIGNALED(childExit))
+				ret = -1;
+			else if (WEXITSTATUS(childExit) != 0)
 				ret = (signed char)WEXITSTATUS(childExit);
 			break;
 	}
@@ -468,9 +471,13 @@ FILE *my_popen(pid_t &pid, const char *cmdstring, const char *type)
 	if (pipe(pfd) < 0)
 		return (NULL);  /* errno set by pipe() */
 
-	if ((pid = vfork()) < 0)
+	if ((pid = fork()) < 0)
 	{
-		return (NULL);  /* errno set by vfork() */
+		int e = errno;
+		close(pfd[0]);
+		close(pfd[1]);
+		errno = e;
+		return (NULL);  /* errno set by fork() */
 	}
 	else if (pid == 0)                               /* child */
 	{
@@ -498,7 +505,7 @@ FILE *my_popen(pid_t &pid, const char *cmdstring, const char *type)
 		if (setsid() == -1)
 			perror("my_popen setsid");
 		execl("/bin/sh", "sh", "-c", cmdstring, (char *)0);
-		exit(0);
+		_exit(0);
 	}
 
 	/* parent continues... */
@@ -506,13 +513,13 @@ FILE *my_popen(pid_t &pid, const char *cmdstring, const char *type)
 	{
 		close(pfd[1]);
 		if ((fp = fdopen(pfd[0], type)) == NULL)
-			return (NULL);
+			close(pfd[0]);
 	}
 	else
 	{
 		close(pfd[0]);
 		if ((fp = fdopen(pfd[1], type)) == NULL)
-			return (NULL);
+			close(pfd[1]);
 	}
 	return (fp);
 }
@@ -528,7 +535,7 @@ int run_pty(pid_t &pid, const char *cmdstring)
 		for (int i = 3; i < maxfd; i++)
 			close(i);
 		execl("/bin/sh", "sh", "-c", cmdstring, (char *)0);
-		exit(0);
+		_exit(0);
 	}
 	return master;
 }
@@ -584,8 +591,8 @@ int safe_mkdir(const char *path)
 {
 	struct statfs s;
 	size_t l = strlen(path);
-	char d[l];
-	safe_strncpy(d, path, l);
+	char d[l + 1];
+	safe_strncpy(d, path, l + 1);
 
 	// skip trailing slashes
 	while (l > 0 && d[l - 1] == '/')
@@ -910,8 +917,10 @@ std::string strftime(const char *format, const struct tm *tm)
 
 std::string strftime(const char *format, time_t when, bool gm)
 {
-	struct tm *t = gm ? gmtime(&when) : localtime(&when);
-	return strftime(format, t);
+	struct tm t;
+	if (!(gm ? gmtime_r(&when, &t) : localtime_r(&when, &t)))
+		return "";
+	return strftime(format, &t);
 }
 
 time_t toEpoch(std::string &date)
@@ -1006,7 +1015,7 @@ const char *cstr_replace(const char *search, const char *replace, const char *te
 		tmp = strncpy(tmp, replace, len_replace) + len_replace;
 		text += len_front + len_search; // move to next "end of search"
 	}
-	safe_strncpy(tmp, text, strlen(text));
+	safe_strncpy(tmp, text, strlen(text) + 1);
 	return result;
 }
 
@@ -1488,16 +1497,16 @@ bool CFileHelpers::removeDir(const char *Dir)
 u_int64_t CFileHelpers::getDirSize(const char *dirname)
 {
 	DIR *dir;
-	char fullDirName[500];
+	std::string fullDirName;
 	struct dirent *dirPnt;
 	struct stat cur_file;
 	uint64_t total_size = 0;
 
 	//open current dir
-	sprintf(fullDirName, "%s/", dirname);
-	if ((dir = opendir(fullDirName)) == NULL)
+	fullDirName = std::string(dirname) + "/";
+	if ((dir = opendir(fullDirName.c_str())) == NULL)
 	{
-		fprintf(stderr, "Couldn't open %s\n", fullDirName);
+		fprintf(stderr, "Couldn't open %s\n", fullDirName.c_str());
 		return 0;
 	}
 
@@ -1508,14 +1517,14 @@ u_int64_t CFileHelpers::getDirSize(const char *dirname)
 			continue;
 
 		//create current filepath
-		sprintf(fullDirName, "%s/%s", dirname, (*dirPnt).d_name);
-		if (stat(fullDirName, &cur_file) == -1)
+		fullDirName = std::string(dirname) + "/" + (*dirPnt).d_name;
+		if (stat(fullDirName.c_str(), &cur_file) == -1)
 			continue;
 
 		if (cur_file.st_mode & S_IFREG) //file...
 			total_size += cur_file.st_size;
 		else if (cur_file.st_mode & S_IFDIR) //dir...
-			total_size += getDirSize(fullDirName);
+			total_size += getDirSize(fullDirName.c_str());
 	}
 	closedir(dir);
 
@@ -1605,8 +1614,11 @@ bool split_config_string(const std::string &str, std::map<std::string, std::stri
 	smap.clear();
 	std::string::size_type start = 0;
 	std::string::size_type end = 0;
-	while ((end = str.find(" ", start)) != std::string::npos)
+	while (start < str.size())
 	{
+		end = str.find(" ", start);
+		if (end == std::string::npos)
+			end = str.size();
 		std::string param = str.substr(start, end - start);
 		std::string::size_type i = param.find("=");
 		if (i != std::string::npos)
@@ -1807,29 +1819,34 @@ int getpidof(const char *process)
 
 	while ((entry = readdir(dp)) != NULL)
 	{
-		// get information about the file/folder
-		lstat(entry->d_name, &statbuf);
 		// files under /proc which start with a digit are processes
-		if (S_ISDIR(statbuf.st_mode) && isdigit(entry->d_name[0]))
+		if (!isdigit(entry->d_name[0]))
+			continue;
+		std::string procpath = std::string("/proc/") + entry->d_name;
+		// get information about the file/folder
+		if (lstat(procpath.c_str(), &statbuf) != 0)
+			continue;
+		if (S_ISDIR(statbuf.st_mode))
 		{
-			// 14 chars for /proc//status + 0
-			char procpath[14 + strlen(entry->d_name)];
 			char procname[50];
 			FILE *file;
 
-			sprintf(procpath, "/proc/%s/status", entry->d_name);
+			procpath += "/status";
 
-			if (!(file = fopen(procpath, "r")))
+			if (!(file = fopen(procpath.c_str(), "r")))
 			{
 				continue;
 			}
 
-			fscanf(file, "%*s %s", procname);
+			int n = fscanf(file, "%*s %49s", procname);
 			fclose(file);
+			if (n != 1)
+				continue;
 
 			// only 15 char available
 			if (strncmp(procname, process, 15) == 0)
 			{
+				closedir(dp);
 				return atoi(entry->d_name);
 			}
 		}
@@ -1905,9 +1922,12 @@ std::string get_path(const char *path)
 string readLink(string lnk)
 {
 	char buf[PATH_MAX];
-	memset(buf, 0, sizeof(buf) - 1);
-	if (readlink(lnk.c_str(), buf, sizeof(buf) - 1) != -1)
+	ssize_t n = readlink(lnk.c_str(), buf, sizeof(buf) - 1);
+	if (n != -1)
+	{
+		buf[n] = '\0';
 		return (string)buf;
+	}
 
 	return "";
 }
@@ -1919,7 +1939,12 @@ string readFile(string file)
 	if (tmpData.is_open())
 	{
 		tmpData.seekg(0, tmpData.end);
-		int length = tmpData.tellg();
+		std::streamoff length = tmpData.tellg();
+		if (length < 0)
+		{
+			cerr << __func__ << ": file " << file << " size unknown" << endl;
+			return "";
+		}
 		if (length > 0xffff)   /* longer than 64k? better read in chunks! */
 		{
 			cerr << __func__ << ": file " << file << " too big (" << length << " bytes)" << endl;
@@ -1933,8 +1958,8 @@ string readFile(string file)
 			return "";
 		}
 		tmpData.read(buffer, length);
+		buffer[tmpData.gcount()] = '\0';
 		tmpData.close();
-		buffer[length] = '\0';
 		ret_s = (string)buffer;
 		delete [] buffer;
 	}
@@ -2037,6 +2062,12 @@ std::string randomString(unsigned int length)
 		"0123456789"
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		"abcdefghijklmnopqrstuvwxyz";
+	static bool seeded = false;
+	if (!seeded)
+	{
+		srand((unsigned int)time(NULL) ^ (unsigned int)getpid());
+		seeded = true;
+	}
 	unsigned int i;
 	for (i = 0; i < length; ++i)
 		random += alphanum[rand() % (sizeof(alphanum) - 1)];
