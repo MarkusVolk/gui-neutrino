@@ -238,8 +238,13 @@ static void load()
 	}
 }
 
-/* the lock is held */
-static void save()
+static std::mutex save_lock;		/* serializes the writers of the file */
+static unsigned save_generation = 0;	/* under lock: the snapshots taken */
+static unsigned saved_generation = 0;	/* under save_lock: the one in the file */
+
+/* the lock is held: the state as the file is to hold it, numbered so that
+ * store() cannot put an older snapshot over a newer one */
+static std::string snapshot(unsigned &generation)
 {
 	Json::Value root(Json::objectValue);
 	root["clients"] = Json::Value(Json::objectValue);
@@ -259,15 +264,25 @@ static void save()
 		root["refresh_tokens"][it->first]["client"] = it->second.client;
 		root["refresh_tokens"][it->first]["expires"] = (Json::Int64) it->second.expires;
 	}
+	generation = ++save_generation;
+	return json_compact(root);
+}
+
+/* without the lock: writes a snapshot to the file, unless a newer one is
+ * there already */
+static void store(const std::string &text, unsigned generation)
+{
+	std::lock_guard<std::mutex> l(save_lock);
+	if (generation <= saved_generation)
+		return;
 	std::string tmp = std::string(OAUTH_FILE) + ".tmp";
 	int fd = open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
 	if (fd < 0)
 		return;
-	std::string text = json_compact(root);
 	bool ok = write(fd, text.data(), text.size()) == (ssize_t) text.size();
 	ok = close(fd) == 0 && ok;
-	if (ok)
-		rename(tmp.c_str(), OAUTH_FILE);
+	if (ok && rename(tmp.c_str(), OAUTH_FILE) == 0)
+		saved_generation = generation;
 	else
 		unlink(tmp.c_str());
 }
@@ -408,13 +423,18 @@ bool mcp_oauth::validAccessToken(const std::string &token)
 
 void mcp_oauth::revokeAll()
 {
+	std::string text;
+	unsigned generation;
+	{
 	std::lock_guard<std::mutex> l(lock);
 	load();
 	clients.clear();
 	refreshes.clear();
 	accesses.clear();
 	codes.clear();
-	save();
+	text = snapshot(generation);
+	}
+	store(text, generation);
 }
 
 static void metadata(CyhookHandler *hh, bool resource)
@@ -480,6 +500,9 @@ static void do_register(CyhookHandler *hh)
 		json_error(hh, "server_error", "no random numbers for a client id", HTTP_INTERNAL_SERVER_ERROR);
 		return;
 	}
+	std::string text;
+	unsigned generation;
+	{
 	std::lock_guard<std::mutex> l(lock);
 	load();
 	if (clients.size() >= MAX_CLIENTS)
@@ -503,7 +526,9 @@ static void do_register(CyhookHandler *hh)
 		clients.erase(oldest);
 	}
 	clients[id] = cl;
-	save();
+	text = snapshot(generation);
+	}
+	store(text, generation);
 
 	Json::Value out(Json::objectValue);
 	out["client_id"] = id;
@@ -653,9 +678,9 @@ static void do_wait(CyhookHandler *hh)
 		redirect(hh, with_params(c.redirect, "error=access_denied" + back_state));
 }
 
-static void issue(CyhookHandler *hh, const std::string &client_id)
+static void issue(CyhookHandler *hh, const std::string &client_id, std::string &text, unsigned &generation)
 {
-	/* the lock is held */
+	/* the lock is held; the caller stores the snapshot once it is released */
 	time_t now = time(NULL);
 	std::string access = random_token(), refresh = random_token();
 	if (access.empty() || refresh.empty())
@@ -674,7 +699,7 @@ static void issue(CyhookHandler *hh, const std::string &client_id)
 		else
 			++it;
 	}
-	save();
+	text = snapshot(generation);
 	Json::Value out(Json::objectValue);
 	out["access_token"] = access;
 	out["token_type"] = "Bearer";
@@ -693,6 +718,9 @@ static void do_token(CyhookHandler *hh)
 	}
 	std::string type = hh->ParamList["grant_type"];
 	std::string client_id = hh->ParamList["client_id"];
+	std::string text;
+	unsigned generation = 0;
+	{
 	std::lock_guard<std::mutex> l(lock);
 	load();
 	if (type == "authorization_code")
@@ -711,7 +739,7 @@ static void do_token(CyhookHandler *hh)
 			json_error(hh, "invalid_grant", "the code does not match");
 			return;
 		}
-		issue(hh, client_id);
+		issue(hh, client_id, text, generation);
 	}
 	else if (type == "refresh_token")
 	{
@@ -724,10 +752,13 @@ static void do_token(CyhookHandler *hh)
 		}
 		/* a refresh token is used once, the answer brings the next */
 		refreshes.erase(it);
-		issue(hh, client_id);
+		issue(hh, client_id, text, generation);
 	}
 	else
 		json_error(hh, "unsupported_grant_type", type);
+	}
+	if (generation)
+		store(text, generation);
 }
 
 void mcp_oauth::respond(CyhookHandler *hh)

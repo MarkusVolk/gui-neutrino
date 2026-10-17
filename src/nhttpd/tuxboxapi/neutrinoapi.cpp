@@ -243,6 +243,7 @@ t_channel_id CNeutrinoAPI::ChannelNameToChannelId(std::string search_channel_nam
 	t_channel_id channel_id = (t_channel_id)-1;
 	CStringArray channel_names = ySplitStringVector(search_channel_name, ",");
 
+	CServiceManager::ChannelGuard guard;
 	for(unsigned int j=0;j<channel_names.size();j++) {
 		CZapitChannel * channel = CServiceManager::getInstance()->FindChannelByName(channel_names[j]);
 		if(channel) {
@@ -317,19 +318,22 @@ void CNeutrinoAPI::GetChannelEvent(t_channel_id channel_id, CChannelEvent &event
 	event.eventID = 0;
 
 	t_channel_id epg_id = channel_id;
+	{
+	CServiceManager::ChannelGuard guard;
 	CZapitChannel * ch = CServiceManager::getInstance()->FindChannel(channel_id);
 	if (ch)
 		epg_id = ch->getEpgID();
+	}
 
 	CChannelEvent * evt = ChannelListEvents[epg_id];
 	if (evt)
 		event = *evt;
 }
 
-void CNeutrinoAPI::GetChannelsWithEvent(std::set<unsigned> &epg_ids)
+void CNeutrinoAPI::GetChannelsWithEvent(std::set<t_channel_id> &epg_ids)
 {
 	OpenThreads::ScopedPointerLock<OpenThreads::Mutex> lock(pmutex);
-	for (std::map<unsigned, CChannelEvent *>::const_iterator it = ChannelListEvents.begin(); it != ChannelListEvents.end(); ++it)
+	for (std::map<t_channel_id, CChannelEvent *>::const_iterator it = ChannelListEvents.begin(); it != ChannelListEvents.end(); ++it)
 		if (it->second && it->second->eventID != 0)
 			epg_ids.insert(it->first);
 }
@@ -557,6 +561,7 @@ std::string CNeutrinoAPI::getCryptInfoAsString(void)
 	int caids[] =		{ 0x600, 0x1700, 0x0100, 0x0500, 0x1800, 0xB00, 0xD00, 0x900, 0x2600, 0x4a00, 0x0E00, 0x1000, 0x5600 };
 
 	OpenThreads::ScopedPointerLock<OpenThreads::Mutex> lock(pmutex);
+	CServiceManager::ChannelGuard guard;
 	CZapitChannel * channel = CZapit::getInstance()->GetCurrentChannel();
 	if(channel) {
 		for (unsigned short i = 0; i < NUM_CAIDS; i++) {

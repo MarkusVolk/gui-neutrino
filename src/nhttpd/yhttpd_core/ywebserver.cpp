@@ -38,6 +38,9 @@ bool CWebserver::is_threading = true;
 
 namespace {
 
+// the one server, for the request handling to read its settings
+CWebserver *server = NULL;
+
 struct TRequest
 {
 	std::string	raw_uri;
@@ -295,6 +298,18 @@ void add_headers(struct MHD_Response *response, const std::string &header_block)
 	}
 }
 
+/* queues the response and closes the connection after it for a client
+ * that server.no_keep-alive_ips names */
+MHD_Result queue(struct MHD_Connection *connection, unsigned int status, struct MHD_Response *response)
+{
+	if (server && !server->conf_no_keep_alive_ips.empty()
+			&& !server->CheckKeepAliveAllowedByIP(client_address(connection)))
+		MHD_add_response_header(response, MHD_HTTP_HEADER_CONNECTION, "close");
+	MHD_Result ret = MHD_queue_response(connection, status, response);
+	MHD_destroy_response(response);
+	return ret;
+}
+
 MHD_Result queue_buffer(struct MHD_Connection *connection, int status, const std::string &header_block,
 		const std::string &body)
 {
@@ -315,9 +330,7 @@ MHD_Result queue_buffer(struct MHD_Connection *connection, int status, const std
 		return MHD_NO;
 	}
 	add_headers(response, header_block);
-	MHD_Result ret = MHD_queue_response(connection, status, response);
-	MHD_destroy_response(response);
-	return ret;
+	return queue(connection, status, response);
 }
 
 MHD_Result queue_error(struct MHD_Connection *connection, CyhookHandler &hh, HttpResponseType status)
@@ -355,9 +368,7 @@ MHD_Result queue_file(struct MHD_Connection *connection, CyhookHandler &hh)
 		return MHD_NO;
 	}
 	add_headers(response, hh.BuildHeader(!hh.cached));
-	MHD_Result ret = MHD_queue_response(connection, hh.httpStatus, response);
-	MHD_destroy_response(response);
-	return ret;
+	return queue(connection, hh.httpStatus, response);
 }
 
 // The order the old server ran the hooks in: prepare (auth, cache,
@@ -440,9 +451,7 @@ MHD_Result run_api(struct MHD_Connection *connection, const char *method, TReque
 	MHD_add_response_header(response, MHD_HTTP_HEADER_SERVER, WEBSERVERNAME);
 	for (size_t i = 0; i < out.headers.size(); i++)
 		MHD_add_response_header(response, out.headers[i].first.c_str(), out.headers[i].second.c_str());
-	MHD_Result ret = MHD_queue_response(connection, out.status, response);
-	MHD_destroy_response(response);
-	return ret;
+	return queue(connection, out.status, response);
 }
 
 MHD_Result access_handler(void *, struct MHD_Connection *connection, const char *, const char *method,
@@ -554,6 +563,7 @@ CWebserver::~CWebserver() {
 }
 //-----------------------------------------------------------------------------
 bool CWebserver::start(unsigned int _port) {
+	server = this;
 	unsigned int flags = MHD_USE_ERROR_LOG;
 	if (is_threading)
 		flags |= MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD;

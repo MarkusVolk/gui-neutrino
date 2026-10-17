@@ -12,6 +12,15 @@
 	- a caller has one of the levels public < read < write < system: from a
 	  bearer token of api.tokens in nhttpd.conf ("level:token,..."), from a
 	  session opened with POST /api/v1/login, or from the network it is in
+	- a bouquet is numbered from 1 in the order of the box's bouquet list
+	  and has the kind "dvb"; the web channels form one bouquet per kind
+	  after those: "webtv" with the number count+1 and "webradio" with
+	  count+2, each listed when the box keeps that list and it has channels.
+	  ?bouquet= takes the number or the name "webtv"/"webradio"; a web
+	  bouquet of the other kind than the mode asked for, or one the box
+	  does not keep, is 404 no-such-bouquet like a number past the end.
+	  Paged with limit or cursor, the channels of a web bouquet come in
+	  channel-number order; unpaged, those with a running event come first
 
 	Without authentication in nhttpd.conf the web interface is open to the
 	home network, and so is this API: a caller with a private address gets
@@ -600,16 +609,19 @@ void channels_with_epg(std::set<t_channel_id> &ids)
 		ids.insert(events[i].get_channel_id());
 }
 
-/* "webtv" and "webradio" name every web channel in one list, the ones with
- * EPG first when with_epg is given; the caller holds the channel lock */
-bool web_list(const std::string &id, ZapitChannelList &list, const std::set<t_channel_id> *with_epg = NULL,
+/* The web channels of one kind as a bouquet of their own, the ones with
+ * EPG first when with_epg is given: all of them when the box keeps that
+ * list and it has channels; the caller holds the channel lock */
+bool web_list(bool radio, ZapitChannelList &list, const std::set<t_channel_id> *with_epg = NULL,
 		bool sorted = true)
 {
-	if (id == "webtv")
-		CServiceManager::getInstance()->GetAllWebTVChannels(list);
-	else if (id == "webradio")
+	if (!(radio ? g_settings.make_webradio_list : g_settings.make_webtv_list))
+		return false;
+	if (radio)
 		CServiceManager::getInstance()->GetAllWebRadioChannels(list);
 	else
+		CServiceManager::getInstance()->GetAllWebTVChannels(list);
+	if (list.empty())
 		return false;
 	if (sorted)
 		std::sort(list.begin(), list.end(), by_number);
@@ -617,6 +629,58 @@ bool web_list(const std::string &id, ZapitChannelList &list, const std::set<t_ch
 		std::stable_partition(list.begin(), list.end(), [with_epg](CZapitChannel *ch) {
 			return with_epg->count(ch->getEpgID()) != 0;
 		});
+	return true;
+}
+
+/* Which web bouquet a bouquet parameter names, by the number after the
+ * count of real bouquets or by its name: 0 webtv, 1 webradio, -1 none */
+int web_kind(const std::string &arg, size_t count)
+{
+	uint64_t nr;
+	if (arg == "webtv" || (parse_uint(arg, nr) && nr == count + 1))
+		return 0;
+	if (arg == "webradio" || (parse_uint(arg, nr) && nr == count + 2))
+		return 1;
+	return -1;
+}
+
+enum ListKind { LIST_TV, LIST_RADIO, LIST_BOTH };
+
+/* The channels the bouquet parameter names, under the channel lock: those
+ * of the kind asked for in the real bouquet at that position, or the web
+ * channels of one kind, see web_kind; a web bouquet of the other kind is
+ * none of the mode. Answers the problem itself when there is no list */
+bool bouquet_arg(Call &c, ListKind kind, ZapitChannelList &list, const std::set<t_channel_id> *with_epg = NULL)
+{
+	const std::string arg = c.q("bouquet");
+	size_t count = g_bouquetManager ? g_bouquetManager->Bouquets.size() : 0;
+	uint64_t nr = 0;
+	int web = web_kind(arg, count);
+	if (web < 0 && (!parse_uint(arg, nr) || nr < 1 || nr > 2147483647)) {
+		problem(c.out, 400, "bad-int", "bouquet is a number from 1, webtv or webradio");
+		return false;
+	}
+	if (web >= 0) {
+		bool radio = web == 1;
+		if (kind == (radio ? LIST_TV : LIST_RADIO)) {
+			problem(c.out, 404, "no-such-bouquet", "no web bouquet of that kind in this mode");
+			return false;
+		}
+		if (!web_list(radio, list, with_epg)) {
+			problem(c.out, 404, "no-such-bouquet", "the box keeps no such list of web channels");
+			return false;
+		}
+		return true;
+	}
+	if (nr > count) {
+		problem(c.out, 404, "no-such-bouquet", "no bouquet at that position");
+		return false;
+	}
+	CZapitBouquet *b = g_bouquetManager->Bouquets[nr - 1];
+	if (kind != LIST_RADIO)
+		list = b->tvChannels;
+	if (kind != LIST_TV)
+		list.insert(list.end(), b->radioChannels.begin(), b->radioChannels.end());
 	return true;
 }
 
@@ -656,27 +720,28 @@ void ep_channels(Call &c)
 		problem(c.out, 400, "bad-int", "limit is a number from 1 to 500");
 		return;
 	}
+	/* a page keeps the channel-number order, so the pages of one list
+	 * neither skip nor repeat a channel when the guide changes */
+	bool paged = c.has("limit") || c.has("cursor");
 	std::set<t_channel_id> with_epg;
-	if (c.has("bouquet") && (c.q("bouquet") == "webtv" || c.q("bouquet") == "webradio"))
-		channels_with_epg(with_epg);
+	if (c.has("bouquet") && !paged) {
+		size_t count;
+		{
+		CServiceManager::ChannelGuard guard;
+		count = g_bouquetManager ? g_bouquetManager->Bouquets.size() : 0;
+		}
+		if (web_kind(c.q("bouquet"), count) >= 0)
+			channels_with_epg(with_epg);
+	}
 	Json::Value v(Json::objectValue);
 	v["items"] = Json::Value(Json::arrayValue);
 	{
 	CServiceManager::ChannelGuard guard;
 	ZapitChannelList list;
-	if (c.has("bouquet") && !web_list(c.q("bouquet"), list, &with_epg)) {
-		uint64_t nr;
-		if (!parse_uint(c.q("bouquet"), nr) || nr < 1 || nr > 2147483647) {
-			problem(c.out, 400, "bad-int", "bouquet is a number from 1");
+	if (c.has("bouquet")) {
+		if (!bouquet_arg(c, radio ? LIST_RADIO : LIST_TV, list, paged ? NULL : &with_epg))
 			return;
-		}
-		if (!g_bouquetManager || nr > g_bouquetManager->Bouquets.size()) {
-			problem(c.out, 404, "no-such-bouquet", "no bouquet at that position");
-			return;
-		}
-		CZapitBouquet *b = g_bouquetManager->Bouquets[nr - 1];
-		list = radio ? b->radioChannels : b->tvChannels;
-	} else if (!c.has("bouquet")) {
+	} else {
 		if (radio)
 			CServiceManager::getInstance()->GetAllRadioChannels(list);
 		else
@@ -830,40 +895,44 @@ void ep_bouquets(Call &c)
 	}
 	Json::Value v(Json::objectValue);
 	v["items"] = Json::Value(Json::arrayValue);
-	static const struct { const char *id; neutrino_locale_t name; bool radio; } web[] = {
-		{ "webtv", LOCALE_BOUQUETNAME_WEBTV, false },
-		{ "webradio", LOCALE_BOUQUETNAME_WEBRADIO, true },
-	};
 	CServiceManager::ChannelGuard guard;
-	for (size_t w = 0; w < sizeof(web) / sizeof(web[0]); w++) {
-		ZapitChannelList list;
-		// only the size and the holds test are needed, not the order
-		if (!(web[w].radio ? g_settings.make_webradio_list : g_settings.make_webtv_list) || !web_list(web[w].id, list, NULL, false) || list.empty())
-			continue;
-		if (holds && std::none_of(list.begin(), list.end(), [holds](CZapitChannel *ch) { return ch->getChannelID() == holds; }))
-			continue;
-		Json::Value bv(Json::objectValue);
-		bv["id"] = web[w].id;
-		bv["name"] = g_Locale->getText(web[w].name);
-		bv["hidden"] = false;
-		bv["locked"] = false;
-		bv["user_bouquet"] = false;
-		bv["tv_count"] = (Json::UInt) (web[w].radio ? 0 : list.size());
-		bv["radio_count"] = (Json::UInt) (web[w].radio ? list.size() : 0);
-		v["items"].append(bv);
-	}
-	for (size_t i = 0; g_bouquetManager && i < g_bouquetManager->Bouquets.size(); i++) {
+	size_t count = g_bouquetManager ? g_bouquetManager->Bouquets.size() : 0;
+	for (size_t i = 0; i < count; i++) {
 		CZapitBouquet *b = g_bouquetManager->Bouquets[i];
 		if (holds && !g_bouquetManager->existsChannelInBouquet(i, holds))
 			continue;
 		Json::Value bv(Json::objectValue);
 		bv["id"] = (Json::UInt) (i + 1);
+		bv["kind"] = "dvb";
 		bv["name"] = b->bName.empty() ? b->Name : b->bName;
 		bv["hidden"] = b->bHidden;
 		bv["locked"] = b->bLocked;
 		bv["user_bouquet"] = b->bUser;
 		bv["tv_count"] = (Json::UInt) b->tvChannels.size();
 		bv["radio_count"] = (Json::UInt) b->radioChannels.size();
+		v["items"].append(bv);
+	}
+	/* the web bouquets take the numbers after the real ones, see web_kind */
+	static const struct { const char *kind; neutrino_locale_t name; bool radio; } web[] = {
+		{ "webtv", LOCALE_BOUQUETNAME_WEBTV, false },
+		{ "webradio", LOCALE_BOUQUETNAME_WEBRADIO, true },
+	};
+	for (size_t w = 0; w < sizeof(web) / sizeof(web[0]); w++) {
+		ZapitChannelList list;
+		// only the size and the holds test are needed, not the order
+		if (!web_list(web[w].radio, list, NULL, false))
+			continue;
+		if (holds && std::none_of(list.begin(), list.end(), [holds](CZapitChannel *ch) { return ch->getChannelID() == holds; }))
+			continue;
+		Json::Value bv(Json::objectValue);
+		bv["id"] = (Json::UInt) (count + 1 + w);
+		bv["kind"] = web[w].kind;
+		bv["name"] = g_Locale->getText(web[w].name);
+		bv["hidden"] = false;
+		bv["locked"] = false;
+		bv["user_bouquet"] = false;
+		bv["tv_count"] = (Json::UInt) (web[w].radio ? 0 : list.size());
+		bv["radio_count"] = (Json::UInt) (web[w].radio ? list.size() : 0);
 		v["items"].append(bv);
 	}
 	send_json(c.out, 200, v);
@@ -1142,20 +1211,10 @@ void ep_epg_grid(Call &c)
 	{
 	CServiceManager::ChannelGuard guard;
 	ZapitChannelList list;
-	if (c.has("bouquet") && !web_list(c.q("bouquet"), list)) {
-		uint64_t nr;
-		if (!parse_uint(c.q("bouquet"), nr) || nr < 1) {
-			problem(c.out, 400, "bad-int", "bouquet is a number from 1");
+	if (c.has("bouquet")) {
+		if (!bouquet_arg(c, LIST_BOTH, list))
 			return;
-		}
-		if (!g_bouquetManager || nr > g_bouquetManager->Bouquets.size()) {
-			problem(c.out, 404, "no-such-bouquet", "no bouquet at that position");
-			return;
-		}
-		CZapitBouquet *b = g_bouquetManager->Bouquets[nr - 1];
-		list = b->tvChannels;
-		list.insert(list.end(), b->radioChannels.begin(), b->radioChannels.end());
-	} else if (!c.has("bouquet")) {
+	} else {
 		std::string rest = c.q("channels"), part;
 		while (!rest.empty()) {
 			ySplitStringExact(rest, ",", part, rest);

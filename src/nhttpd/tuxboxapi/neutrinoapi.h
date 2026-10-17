@@ -28,7 +28,7 @@ class CNeutrinoAPI
 private:
 	CChannelEventList	eList;
 	OpenThreads::Mutex	*pmutex;
-	std::map<unsigned, CChannelEvent *> ChannelListEvents;
+	std::map<t_channel_id, CChannelEvent *> ChannelListEvents;
 
 	// complete channellists
 	//CZapitClient::BouquetChannelList RadioChannelList,TVChannelList;
@@ -96,7 +96,7 @@ public:
 	void Unlock() { pmutex->unlock(); }
 	void GetChannelEvent(t_channel_id channel_id, CChannelEvent &event);
 	// the keys of the events GetChannelEvents found, as GetChannelEvent looks them up
-	void GetChannelsWithEvent(std::set<unsigned> &epg_ids);
+	void GetChannelsWithEvent(std::set<t_channel_id> &epg_ids);
 
 	//friend class CNeutrinoYParser; // Backreference
 	//friend class CControlAPI;
