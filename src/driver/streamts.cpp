@@ -454,17 +454,29 @@ bool CStreamManager::Parse(int fd, stream_pids_t &pids, t_channel_id &chid, CFro
 	cbuf[0] = 0;
 	bp = &cbuf[0];
 
-	/* read one line */
+	/* read one line: peek at what is available and consume only up to and
+	 * including the newline, so the socket is left exactly as a byte-wise
+	 * read would leave it */
 	while (bp - &cbuf[0] < (int) sizeof(cbuf) - 1) {
-		unsigned char c;
-		int res = read(fd, &c, 1);
+		int room = (int) sizeof(cbuf) - 1 - (int)(bp - &cbuf[0]);
+		int res = recv(fd, bp, room, MSG_PEEK);
 		if (res == 0)
 			break;
 		if (res < 0) {
 			perror("read");
 			return false;
 		}
-		if ((*bp++ = c) == '\n')
+		char *nl = (char *) memchr(bp, '\n', res);
+		int take = nl ? (int)(nl - bp) + 1 : res;
+		res = read(fd, bp, take);
+		if (res == 0)
+			break;
+		if (res < 0) {
+			perror("read");
+			return false;
+		}
+		bp += res;
+		if (nl && res == take)
 			break;
 	}
 	*bp = 0;

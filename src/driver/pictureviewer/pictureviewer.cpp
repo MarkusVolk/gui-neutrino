@@ -17,6 +17,8 @@
 #include <errno.h>
 #include <cs_api.h>
 #include <sys/sysinfo.h>
+#include <mutex>
+#include <driver/abstime.h>
 
 #ifdef FBV_SUPPORT_GIF
 extern int fh_gif_getsize (const char *, int *, int *, int, int);
@@ -1130,11 +1132,25 @@ static size_t getCachedMemSize(void)
 
 bool CPictureViewer::checkfreemem(size_t bufsize)
 {
-	struct sysinfo info;
-	sysinfo( &info );
-	size_t cached = getCachedMemSize();
-	if(bufsize + sysconf(_SC_PAGESIZE) > (size_t)info.freeram + (size_t)info.freeswap + (size_t)info.bufferram + cached){
-		dprintf(DEBUG_NORMAL,  "[CPictureViewer] [%s - %d] Error: Out of memory: need %zu > free %zu\n", __func__, __LINE__,bufsize,(size_t)info.freeram + (size_t)info.freeswap + (size_t)info.bufferram + cached);
+	/* sysinfo() and /proc/meminfo are re-read at most once per second */
+	static std::mutex freemem_mutex;
+	static int64_t freemem_time = 0;
+	static size_t freemem_avail = 0;
+	size_t avail;
+	{
+		std::lock_guard<std::mutex> lock(freemem_mutex);
+		int64_t now = time_monotonic_ms();
+		if (freemem_time == 0 || now - freemem_time >= 1000) {
+			struct sysinfo info;
+			sysinfo( &info );
+			size_t cached = getCachedMemSize();
+			freemem_avail = (size_t)info.freeram + (size_t)info.freeswap + (size_t)info.bufferram + cached;
+			freemem_time = now;
+		}
+		avail = freemem_avail;
+	}
+	if(bufsize + sysconf(_SC_PAGESIZE) > avail){
+		dprintf(DEBUG_NORMAL,  "[CPictureViewer] [%s - %d] Error: Out of memory: need %zu > free %zu\n", __func__, __LINE__,bufsize,avail);
 		return false;
 	}
 	return true;

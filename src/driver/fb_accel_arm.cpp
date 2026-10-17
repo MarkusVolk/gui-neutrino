@@ -506,15 +506,17 @@ void CFbAccelARM::paintRect(const int x, const int y, const int dx, const int dy
 		x1 = (int)xRes;
 	if (y1 > (int)yRes)
 		y1 = (int)yRes;
-	int line = y0;
-	fb_pixel_t *fbp = getFrameBufferPointer() + (swidth * y0);
-	int pos;
-	while (line < y1)
+	if (x0 < x1 && y0 < y1)
 	{
-		for (pos = x0; pos < x1; pos++)
+		/* fill the first line, then replicate it */
+		fb_pixel_t *fbp = getFrameBufferPointer() + (swidth * y0);
+		fb_pixel_t *first = fbp + x0;
+		size_t len = (x1 - x0) * sizeof(fb_pixel_t);
+		for (int pos = x0; pos < x1; pos++)
 			*(fbp + pos) = col;
 		fbp += swidth;
-		line++;
+		for (int line = y0 + 1; line < y1; line++, fbp += swidth)
+			memcpy(fbp + x0, first, len);
 	}
 	mark(x, y, x+dx, y+dy);
 }

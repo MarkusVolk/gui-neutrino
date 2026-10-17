@@ -595,12 +595,11 @@ fb_pixel_t* CFrameBuffer::paintBoxRel2Buf(const int dx, const int dy, const int 
 		}
 	} else {
 		fb_pixel_t *bp = pixBuf;
-		int line = 0;
-		while (line < dy) {
-			for (int pos = offs_align; pos < dx+offs_align; pos++)
-				*(bp + pos) = col;
+		for (int pos = offs_align; pos < dx+offs_align; pos++)
+			*(bp + pos) = col;
+		for (int line = 1; line < dy; line++) {
 			bp += w_align;
-			line++;
+			memcpy(bp + offs_align, pixBuf + offs_align, dx * sizeof(fb_pixel_t));
 		}
 	}
 	return pixBuf;
@@ -743,14 +742,16 @@ void CFrameBuffer::paintBoxRel(const int x, const int y, const int dx, const int
 			x1 = (int)xRes;
 		if (y1 > (int)yRes)
 			y1 = (int)yRes;
-		fb_pixel_t *fbp = getFrameBufferPointer() + (swidth * y0);
-		int line = y0;
-		while (line < y1) {
+		if (x0 < x1 && y0 < y1) {
+			/* fill the first line, then replicate it */
+			fb_pixel_t *fbp = getFrameBufferPointer() + (swidth * y0);
+			fb_pixel_t *first = fbp + x0;
+			size_t len = (x1 - x0) * sizeof(fb_pixel_t);
 			for (int pos = x0; pos < x1; pos++)
 				*(fbp + pos) = col;
-
 			fbp += swidth;
-			line++;
+			for (int line = y0 + 1; line < y1; line++, fbp += swidth)
+				memcpy(fbp + x0, first, len);
 		}
 	}
 	checkFbArea(x, y, dx, dy, false);
@@ -1361,6 +1362,7 @@ void CFrameBuffer::paintLine(int xa, int ya, int xb, int yb, const fb_pixel_t co
 	if (!getActive())
 		return;
 
+	fb_pixel_t * const fbp = getFrameBufferPointer();
 	int dx = abs (xa - xb);
 	int dy = abs (ya - yb);
 	int x;
@@ -1389,7 +1391,7 @@ void CFrameBuffer::paintLine(int xa, int ya, int xb, int yb, const fb_pixel_t co
 			step = yb < ya ? -1 : 1;
 		}
 
-		paintPixel (x, y, col);
+		*(fbp + swidth * y + x) = col;
 
 		while( x < End )
 		{
@@ -1401,7 +1403,7 @@ void CFrameBuffer::paintLine(int xa, int ya, int xb, int yb, const fb_pixel_t co
 				y += step;
 				p += twoDyDx;
 			}
-			paintPixel (x, y, col);
+			*(fbp + swidth * y + x) = col;
 		}
 	}
 	else
@@ -1425,7 +1427,7 @@ void CFrameBuffer::paintLine(int xa, int ya, int xb, int yb, const fb_pixel_t co
 			step = xb < xa ? -1 : 1;
 		}
 
-		paintPixel (x, y, col);
+		*(fbp + swidth * y + x) = col;
 
 		while( y < End )
 		{
@@ -1437,7 +1439,7 @@ void CFrameBuffer::paintLine(int xa, int ya, int xb, int yb, const fb_pixel_t co
 				x += step;
 				p += twoDxDy;
 			}
-			paintPixel (x, y, col);
+			*(fbp + swidth * y + x) = col;
 		}
 	}
 	mark(xa, ya, xb, yb);
@@ -1689,29 +1691,18 @@ void CFrameBuffer::SaveScreen(int x, int y, int dx, int dy, fb_pixel_t * const m
 		return;
 
 	checkFbArea(x, y, dx, dy, true);
-	fb_pixel_t * pos = getFrameBufferPointer() + x + swidth * y;
-	fb_pixel_t * bkpos = memp;
-	for (int count = 0; count < dy; count++) {
-		fb_pixel_t * dest = (fb_pixel_t *)pos;
-		for (int i = 0; i < dx; i++)
-			//*(dest++) = col;
-			*(bkpos++) = *(dest++);
-		pos += swidth;
-	}
-#if 0 //FIXME test to flush cache
-	if (ioctl(fd, 1, FB_BLANK_UNBLANK) < 0);
-#endif
-	//RestoreScreen(x, y, dx, dy, memp); //FIXME
-#if 0
 	fb_pixel_t * fbpos = getFrameBufferPointer() + x + swidth * y;
 	fb_pixel_t * bkpos = memp;
-	for (int count = 0; count < dy; count++)
+	for (int count = 0; dx > 0 && count < dy; count++)
 	{
 		memmove(bkpos, fbpos, dx * sizeof(fb_pixel_t));
 		fbpos += swidth;
 		bkpos += dx;
 	}
+#if 0 //FIXME test to flush cache
+	if (ioctl(fd, 1, FB_BLANK_UNBLANK) < 0);
 #endif
+	//RestoreScreen(x, y, dx, dy, memp); //FIXME
 	checkFbArea(x, y, dx, dy, false);
 
 }

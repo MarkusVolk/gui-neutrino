@@ -251,6 +251,8 @@ Font::Font(FBFontRenderClass *render, FTC_FaceID faceid, const int isize, const 
 	setSize(isize);
 	fg_red = 0, fg_green = 0, fg_blue = 0;
 	memset((void*)colors, '\0', sizeof(colors));
+	colors_bg = colors_fg = 0;
+	colors_valid = false;
 	useFullBG = false;
 }
 
@@ -427,9 +429,21 @@ int UTF8ToUnicode(const char * &text, const bool utf8_encoded) // returns -1 on 
 }
 
 #ifdef ENABLE_FRIBIDI
+/* printable ASCII, TAB, LF and CR are left untouched by the bidi algorithm
+   (all left-to-right or neutral, nothing to mirror or remove) */
+static bool fribidi_needed(const char * text)
+{
+	for (const unsigned char *p = (const unsigned char *)text; *p; p++)
+	{
+		if ((*p < 0x20 || *p >= 0x7F) && *p != '\t' && *p != '\n' && *p != '\r')
+			return true;
+	}
+	return false;
+}
+
 static std::string fribidi_shape_char(const char * text)
 {
-	if(text && *text)
+	if(text && *text && fribidi_needed(text))
 	{
 		int len = strlen(text);
 		char * rtl_text = NULL;
@@ -642,15 +656,20 @@ void Font::RenderString(int x, int y, const int width, const char *text, const f
 		if (bg_color == (fb_pixel_t)0)
 			bg_color = 0x80808080;
 
-		uint8_t bg_trans = (bg_color & 0xFF000000) >> 24;
-		uint8_t bg_red   = (bg_color & 0x00FF0000) >> 16;
-		uint8_t bg_green = (bg_color & 0x0000FF00) >>  8;
-		uint8_t bg_blue  =  bg_color & 0x000000FF;
-		for (int i = 0; i < 256; i++) {
-			colors[i] = (((int_min(0xFF, bg_trans + i))           << 24) & 0xFF000000) |
-				    (((bg_red  +((fg_red  -bg_red)  * i)/256) << 16) & 0x00FF0000) |
-				    (((bg_green+((fg_green-bg_green)* i)/256) <<  8) & 0x0000FF00) |
-				     ((bg_blue +((fg_blue -bg_blue) * i)/256)        & 0x000000FF);
+		if (!colors_valid || colors_bg != bg_color || colors_fg != color) {
+			uint8_t bg_trans = (bg_color & 0xFF000000) >> 24;
+			uint8_t bg_red   = (bg_color & 0x00FF0000) >> 16;
+			uint8_t bg_green = (bg_color & 0x0000FF00) >>  8;
+			uint8_t bg_blue  =  bg_color & 0x000000FF;
+			for (int i = 0; i < 256; i++) {
+				colors[i] = (((int_min(0xFF, bg_trans + i))           << 24) & 0xFF000000) |
+					    (((bg_red  +((fg_red  -bg_red)  * i)/256) << 16) & 0x00FF0000) |
+					    (((bg_green+((fg_green-bg_green)* i)/256) <<  8) & 0x0000FF00) |
+					     ((bg_blue +((fg_blue -bg_blue) * i)/256)        & 0x000000FF);
+			}
+			colors_bg = bg_color;
+			colors_fg = color;
+			colors_valid = true;
 		}
 	}
 
@@ -721,6 +740,19 @@ void Font::RenderString(int x, int y, const int width, const char *text, const f
 					break;
 				fb_pixel_t * td = (fb_pixel_t *)d;
 				int ax;
+				if (!useFullBG && stylemodifier != Font::Embolden) {
+					/* common case: plain LUT blend, spread_by == 0 */
+					for (ax = 0; ax < w; ax++) {
+						/* width clip */
+						if (xoff  + ax >= left + width || xoff + ax >= buf_width)
+							break;
+						/* do not paint the backgroundcolor (*s = 0) */
+						if (*s != 0)
+							*td = colors[*s];
+						td++; s++;
+					}
+				}
+				else
 				for (ax = 0; ax < w + spread_by; ax++) {
 					/* width clip */
 					if (xoff  + ax >= left + width || xoff + ax >= buf_width)

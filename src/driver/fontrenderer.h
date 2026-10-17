@@ -58,6 +58,8 @@ class Font
 	int maxdigitwidth;
 	uint8_t fg_red, fg_green, fg_blue;
 	fb_pixel_t colors[256];
+	fb_pixel_t colors_bg, colors_fg; /* (background, foreground) the LUT was built for */
+	bool colors_valid;
 	bool useFullBG;
 
 	inline int int_min(int a, int b) { return (a < b) ? a : b; }

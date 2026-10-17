@@ -161,8 +161,13 @@ bool CRCInput::checkdev()
 	/* stat()ing the directory is fast and cheap. If a device gets added or
 	 * removed, the mtime of /dev/input/ will change, which in turn
 	 * warrants a more thorough investigation */
+	static int64_t last_check = 0;
+	int64_t now = time_monotonic_ms();
+	if (last_check != 0 && now - last_check < 1000)
+		return false; /* checked less than a second ago */
 	struct stat st;
 	if (stat("/dev/input/", &st) == 0) {
+		last_check = now;
 		if (st.st_mtim.tv_sec != devinput_mtime.tv_sec ||
 		    st.st_mtim.tv_nsec != devinput_mtime.tv_nsec) {
 			devinput_mtime.tv_sec  = st.st_mtim.tv_sec;
