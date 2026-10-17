@@ -30,6 +30,8 @@
 #include "mcpapi.h"
 #include "mcpoauth.h"
 
+#include <helper.h>
+
 #include <global.h>
 #include <gui/assistant_tools.h>
 #include <system/llm_client.h>
@@ -72,19 +74,10 @@ bool CMcpAPI::enabled(std::string &token)
 	return g_settings.assistant_box_server;
 }
 
-/* the same time for every wrong token, whatever part of it matches */
-static bool equal_secret(const std::string &a, const std::string &b)
-{
-	unsigned char diff = a.size() != b.size();
-	for (size_t i = 0; i < a.size(); i++)
-		diff |= (unsigned char) a[i] ^ (unsigned char) (i < b.size() ? b[i] : 0);
-	return diff == 0;
-}
-
 bool CMcpAPI::authorized(CyhookHandler *hh, const std::string &token)
 {
 	const std::string &given = hh->HeaderList["Authorization"];
-	if (given.compare(0, 7, "Bearer ") != 0)
+	if (given.size() <= 7 || strncasecmp(given.c_str(), "bearer ", 7) != 0)
 		return false;
 	std::string bearer = given.substr(7);
 	/* the token of the settings, or one a client got by signing in */

@@ -34,6 +34,9 @@ bool ySplitStringExact(std::string str, std::string delimiter, std::string& left
 bool ySplitStringLast(std::string str, std::string delimiter, std::string& left, std::string& right);
 CStringArray ySplitStringVector(std::string str, std::string delimiter);
 bool nocase_compare (char c1, char c2);
+/* true when a and b are the same; takes the same time for every wrong
+ * secret, whatever part of it matches */
+bool equal_secret(const std::string &a, const std::string &b);
 std::string timeString(time_t time);
 bool write_to_file(std::string filename, std::string content, bool append=false);
 

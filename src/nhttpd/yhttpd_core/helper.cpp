@@ -191,6 +191,15 @@ bool nocase_compare(char c1, char c2) {
 	return toupper(c1) == toupper(c2);
 }
 //-----------------------------------------------------------------------------
+// Compare two secrets in a time that does not depend on where they differ
+//-----------------------------------------------------------------------------
+bool equal_secret(const std::string &a, const std::string &b) {
+	unsigned char diff = a.size() != b.size();
+	for (size_t i = 0; i < a.size(); i++)
+		diff |= (unsigned char) a[i] ^ (unsigned char) (i < b.size() ? b[i] : 0);
+	return diff == 0;
+}
+//-----------------------------------------------------------------------------
 // Decode URLEncoded std::string
 //-----------------------------------------------------------------------------
 std::string decodeString(std::string encodedString) {

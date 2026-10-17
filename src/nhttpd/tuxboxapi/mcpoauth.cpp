@@ -59,6 +59,8 @@
 #define REFRESH_LIFETIME	(90 * 24 * 3600)
 #define CODE_LIFETIME		600
 #define CONSENT_TIMEOUT		120
+#define CONSENT_INTERVAL	30	/* seconds between two questions for one client */
+#define CONSENT_COOLDOWN	60	/* seconds without a question after a no or a timeout */
 
 namespace
 {
@@ -93,6 +95,11 @@ namespace
 	std::map<std::string, grant> accesses;	/* by SHA-256 of the token */
 	std::map<std::string, code> codes;
 	std::map<std::string, consent> consents;
+	/* /oauth/authorize needs no sign-in, so what it may put on the TV is
+	 * rationed: one question at a time, one per client and interval, none
+	 * for a while after the viewer said no or did not answer */
+	std::map<std::string, time_t> last_asked;	/* by client */
+	time_t consent_quiet_until = 0;
 }
 
 static bool starts_with(const std::string &text, const char *prefix)
@@ -271,12 +278,13 @@ static void json_reply(CyhookHandler *hh, HttpResponseType status, const Json::V
 	hh->addResult(json_compact(body));
 }
 
-static void json_error(CyhookHandler *hh, const std::string &error, const std::string &description)
+static void json_error(CyhookHandler *hh, const std::string &error, const std::string &description,
+		       HttpResponseType status = HTTP_BAD_REQUEST)
 {
 	Json::Value body(Json::objectValue);
 	body["error"] = error;
 	body["error_description"] = description;
-	json_reply(hh, HTTP_BAD_REQUEST, body);
+	json_reply(hh, status, body);
 }
 
 static void redirect(CyhookHandler *hh, const std::string &url)
@@ -459,15 +467,21 @@ static void do_register(CyhookHandler *hh)
 	cl.created = time(NULL);
 
 	std::string id = random_token();
+	if (id.empty())
+	{
+		json_error(hh, "server_error", "no random numbers for a client id", HTTP_INTERNAL_SERVER_ERROR);
+		return;
+	}
 	std::lock_guard<std::mutex> l(lock);
 	load();
 	if (clients.size() >= MAX_CLIENTS)
 	{
-		/* the client that came first and holds no token makes room */
+		/* the client that came first, holds no token and is past the time a
+		 * sign-in takes makes room; a flood of registrations gets the error */
 		std::map<std::string, client>::iterator oldest = clients.end();
 		for (std::map<std::string, client>::iterator it = clients.begin(); it != clients.end(); ++it)
 		{
-			bool used = false;
+			bool used = cl.created - it->second.created < CODE_LIFETIME + CONSENT_TIMEOUT;
 			for (std::map<std::string, grant>::iterator r = refreshes.begin(); r != refreshes.end() && !used; ++r)
 				used = r->second.client == it->first;
 			if (!used && (oldest == clients.end() || it->second.created < oldest->second.created))
@@ -475,7 +489,7 @@ static void do_register(CyhookHandler *hh)
 		}
 		if (oldest == clients.end())
 		{
-			json_error(hh, "invalid_client_metadata", "too many clients are signed in");
+			json_error(hh, "invalid_client_metadata", "too many clients are registered");
 			return;
 		}
 		clients.erase(oldest);
@@ -510,6 +524,8 @@ static void ask_on_tv(const std::string &id, const std::string &name, const std:
 	std::map<std::string, consent>::iterator it = consents.find(id);
 	if (it != consents.end() && it->second.answer == PENDING)
 		it->second.answer = res == CMsgBox::mbrYes ? ALLOWED : DENIED;
+	if (res != CMsgBox::mbrYes)
+		consent_quiet_until = time(NULL) + CONSENT_COOLDOWN;
 }
 
 static void do_authorize(CyhookHandler *hh)
@@ -546,22 +562,38 @@ static void do_authorize(CyhookHandler *hh)
 	}
 
 	std::string id = random_token();
+	if (id.empty())
+	{
+		redirect(hh, with_params(uri, "error=server_error" + back_state));
+		return;
+	}
 	{
 		std::lock_guard<std::mutex> l(lock);
 		time_t now = time(NULL);
 		for (std::map<std::string, consent>::iterator it = consents.begin(); it != consents.end();)
 		{
-			if (now - it->second.started > CONSENT_TIMEOUT + 60)
+			/* a question nobody answered is over once the dialog has gone */
+			if (now - it->second.started > CONSENT_TIMEOUT + (it->second.answer == PENDING ? 30 : 60))
 				consents.erase(it++);
 			else
 				++it;
 		}
+		for (std::map<std::string, time_t>::iterator it = last_asked.begin(); it != last_asked.end();)
+		{
+			if (now - it->second > CONSENT_INTERVAL)
+				last_asked.erase(it++);
+			else
+				++it;
+		}
+		bool busy = now < consent_quiet_until || last_asked.count(client_id);
 		for (std::map<std::string, consent>::iterator it = consents.begin(); it != consents.end(); ++it)
-			if (it->second.answer == PENDING)
-			{
-				page(hh, HTTP_SERVICE_UNAVAILABLE, g_Locale->getText(LOCALE_ASSISTANT_CONSENT_BUSY));
-				return;
-			}
+			busy |= it->second.answer == PENDING;
+		if (busy)
+		{
+			page(hh, HTTP_SERVICE_UNAVAILABLE, g_Locale->getText(LOCALE_ASSISTANT_CONSENT_BUSY));
+			return;
+		}
+		last_asked[client_id] = now;
 		consent c = { client_id, uri, state, hh->ParamList["code_challenge"], PENDING, now };
 		consents[id] = c;
 	}
@@ -597,13 +629,16 @@ static void do_wait(CyhookHandler *hh)
 		{
 			code cd = { c.client, c.redirect, c.challenge, time(NULL) + CODE_LIFETIME };
 			std::string value = random_token();
-			codes[value] = cd;
+			if (!value.empty())
+				codes[value] = cd;
 			id = value;
 		}
 	}
 	std::string back_state = c.state.empty() ? "" : "&state=" + url_encode(c.state);
 	if (c.answer == PENDING)
 		page(hh, HTTP_OK, g_Locale->getText(LOCALE_ASSISTANT_CONSENT_WAIT), "/oauth/wait?id=" + id);
+	else if (c.answer == ALLOWED && id.empty())
+		redirect(hh, with_params(c.redirect, "error=server_error" + back_state));
 	else if (c.answer == ALLOWED)
 		redirect(hh, with_params(c.redirect, "code=" + url_encode(id) + back_state));
 	else
@@ -615,6 +650,11 @@ static void issue(CyhookHandler *hh, const std::string &client_id)
 	/* the lock is held */
 	time_t now = time(NULL);
 	std::string access = random_token(), refresh = random_token();
+	if (access.empty() || refresh.empty())
+	{
+		json_error(hh, "server_error", "no random numbers for a token", HTTP_INTERNAL_SERVER_ERROR);
+		return;
+	}
 	grant a = { client_id, now + ACCESS_LIFETIME };
 	grant r = { client_id, now + REFRESH_LIFETIME };
 	accesses[sha256_b64url(access)] = a;

@@ -14,10 +14,12 @@
 	  session opened with POST /api/v1/login, or from the network it is in
 
 	Without authentication in nhttpd.conf the web interface is open to the
-	home network, and so is this API: a caller there gets the system level.
-	With authentication it gets read in the private address ranges, and
-	everything else needs a token or a session. A request that came through
-	a tunnel or proxy is never taken for one from the home network.
+	home network, and so is this API: a caller with a private address gets
+	the system level, any other address is public. With authentication the
+	private address ranges get read, localhost and no_auth_client system,
+	and everything else needs a token or a session. A request that came
+	through a tunnel or proxy is never taken for one from the home network.
+	Signing in with the password needs authentication to be on.
 
 	License: GPL
 
@@ -58,6 +60,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <set>
 
 #include <json/json.h>
 
@@ -70,6 +73,7 @@
 #include <eitd/sectionsd.h>
 #include <driver/screenshot.h>
 #include <hardware/video.h>
+#include <system/main_call.h>
 #include <src/tools/rcsim.h>
 
 #include <yhttpd.h>
@@ -381,6 +385,8 @@ pthread_mutex_t session_mutex = PTHREAD_MUTEX_INITIALIZER;
 std::map<std::string, Session> sessions;
 struct Attempts { int failed; time_t last; time_t blocked_until; };
 std::map<std::string, Attempts> attempts;
+const size_t kMaxAttemptEntries = 512;
+const time_t kAttemptsLifetime = 600;
 
 std::string random_hex(size_t bytes)
 {
@@ -398,15 +404,6 @@ std::string random_hex(size_t bytes)
 	for (size_t i = 0; i < bytes; i++)
 		out += string_printf("%02x", buf[i]);
 	return out;
-}
-
-/* the same time for every wrong secret, whatever part of it matches */
-bool equal_secret(const std::string &a, const std::string &b)
-{
-	unsigned char diff = a.size() != b.size();
-	for (size_t i = 0; i < a.size(); i++)
-		diff |= (unsigned char) a[i] ^ (unsigned char) (i < b.size() ? b[i] : 0);
-	return diff == 0;
 }
 
 std::string config(const char *key)
@@ -524,15 +521,21 @@ bool private_address(const std::string &a)
 	return false;
 }
 
+/* What the network alone grants: public to a request that came through a
+ * proxy or tunnel, whatever address it shows, and to any address outside
+ * the private ranges; system to localhost and no_auth_client; and to the
+ * private ranges system without authentication, as the web interface lets
+ * them in without a password then, read with it. */
 Level network_level(const yapi::Request &in)
 {
 	if (from_internet(in))
 		return L_PUBLIC;
-	if (config("mod_auth.authenticate") != "true")
-		return L_SYSTEM;
 	// the addresses the web interface lets in without a password
-	if (in.client == "127.0.0.1" || in.client == "::1"
-			|| (!config("mod_auth.no_auth_client").empty() && in.client == config("mod_auth.no_auth_client")))
+	bool trusted = in.client == "127.0.0.1" || in.client == "::1"
+			|| (!config("mod_auth.no_auth_client").empty() && in.client == config("mod_auth.no_auth_client"));
+	if (config("mod_auth.authenticate") != "true")
+		return trusted || private_address(in.client) ? L_SYSTEM : L_PUBLIC;
+	if (trusted)
 		return L_SYSTEM;
 	return private_address(in.client) ? L_READ : L_PUBLIC;
 }
@@ -593,8 +596,19 @@ bool by_number(CZapitChannel *a, CZapitChannel *b)
 	return a->number < b->number;
 }
 
-/* "webtv" and "webradio" name every web channel in one list, the ones with EPG first */
-bool web_list(const std::string &id, ZapitChannelList &list, bool epg_first = false)
+/* The channels the guide has a running event for, by EPG id; asked before
+ * the channel lock is taken, as the lock order puts the guide's first */
+void channels_with_epg(std::set<t_channel_id> &ids)
+{
+	CChannelEventList events;
+	CEitManager::getInstance()->getChannelEvents(events);
+	for (size_t i = 0; i < events.size(); i++)
+		ids.insert(events[i].get_channel_id());
+}
+
+/* "webtv" and "webradio" name every web channel in one list, the ones with
+ * EPG first when with_epg is given; the caller holds the channel lock */
+bool web_list(const std::string &id, ZapitChannelList &list, const std::set<t_channel_id> *with_epg = NULL)
 {
 	if (id == "webtv")
 		CServiceManager::getInstance()->GetAllWebTVChannels(list);
@@ -603,17 +617,15 @@ bool web_list(const std::string &id, ZapitChannelList &list, bool epg_first = fa
 	else
 		return false;
 	std::sort(list.begin(), list.end(), by_number);
-	if (!epg_first)
-		return true;
-	neutrino_api->GetChannelEvents();
-	std::stable_partition(list.begin(), list.end(), [](CZapitChannel *ch) {
-		CChannelEvent event;
-		neutrino_api->GetChannelEvent(ch->getChannelID(), event);
-		return event.eventID != 0;
-	});
+	if (with_epg)
+		std::stable_partition(list.begin(), list.end(), [with_epg](CZapitChannel *ch) {
+			return with_epg->count(ch->getEpgID()) != 0;
+		});
 	return true;
 }
 
+/* the caller holds the channel lock, which a reload of the channels takes
+ * before it frees them, for as long as it uses the channel */
 CZapitChannel *channel_arg(Call &c, const std::string &arg)
 {
 	uint64_t id;
@@ -648,8 +660,15 @@ void ep_channels(Call &c)
 		problem(c.out, 400, "bad-int", "limit is a number from 1 to 500");
 		return;
 	}
+	std::set<t_channel_id> with_epg;
+	if (c.has("bouquet") && (c.q("bouquet") == "webtv" || c.q("bouquet") == "webradio"))
+		channels_with_epg(with_epg);
+	Json::Value v(Json::objectValue);
+	v["items"] = Json::Value(Json::arrayValue);
+	{
+	CServiceManager::ChannelGuard guard;
 	ZapitChannelList list;
-	if (c.has("bouquet") && !web_list(c.q("bouquet"), list, true)) {
+	if (c.has("bouquet") && !web_list(c.q("bouquet"), list, &with_epg)) {
 		uint64_t nr;
 		if (!parse_uint(c.q("bouquet"), nr) || nr < 1 || nr > 2147483647) {
 			problem(c.out, 400, "bad-int", "bouquet is a number from 1");
@@ -681,13 +700,12 @@ void ep_channels(Call &c)
 		}
 		start = i + 1;
 	}
-	Json::Value v(Json::objectValue);
-	v["items"] = Json::Value(Json::arrayValue);
 	size_t end = std::min(list.size(), start + (size_t) limit);
 	for (size_t i = start; i < end; i++)
 		v["items"].append(channel_json(list[i]));
 	if (end < list.size() && end > start)
 		v["next_cursor"] = hex_id(list[end - 1]->getChannelID());
+	}
 	send_json(c.out, 200, v);
 }
 
@@ -721,6 +739,7 @@ const char *video_codec(CZapitChannel *ch)
 
 void ep_channel_current(Call &c)
 {
+	CServiceManager::ChannelGuard guard;
 	CZapitChannel *ch = CZapit::getInstance()->GetCurrentChannel();
 	if (!ch || box_mode() == NeutrinoModes::mode_standby || box_mode() == NeutrinoModes::mode_ts) {
 		problem(c.out, 404, "no-running-channel", "no channel is running");
@@ -750,6 +769,7 @@ void ep_channel_current(Call &c)
 
 void ep_channel(Call &c)
 {
+	CServiceManager::ChannelGuard guard;
 	CZapitChannel *ch = channel_arg(c, c.args[0]);
 	if (ch)
 		send_json(c.out, 200, channel_json(ch));
@@ -791,10 +811,16 @@ bool send_file(Call &c, const std::string &file, const std::string &mime, bool r
 
 void ep_channel_logo(Call &c)
 {
-	CZapitChannel *ch = channel_arg(c, c.args[0]);
-	if (!ch)
-		return;
-	std::string file = neutrino_api->getLogoFile(ch->getChannelID());
+	t_channel_id id;
+	{
+		CServiceManager::ChannelGuard guard;
+		CZapitChannel *ch = channel_arg(c, c.args[0]);
+		if (!ch)
+			return;
+		id = ch->getChannelID();
+	}
+	// takes the channel lock itself
+	std::string file = neutrino_api->getLogoFile(id);
 	if (file.empty() || !send_file(c, file, mime_of(file), false))
 		problem(c.out, 404, "no-such-logo", "this channel has no logo");
 }
@@ -812,6 +838,7 @@ void ep_bouquets(Call &c)
 		{ "webtv", LOCALE_BOUQUETNAME_WEBTV, false },
 		{ "webradio", LOCALE_BOUQUETNAME_WEBRADIO, true },
 	};
+	CServiceManager::ChannelGuard guard;
 	for (size_t w = 0; w < sizeof(web) / sizeof(web[0]); w++) {
 		ZapitChannelList list;
 		if (!(web[w].radio ? g_settings.make_webradio_list : g_settings.make_webtv_list) || !web_list(web[w].id, list) || list.empty())
@@ -854,9 +881,12 @@ void ep_zap(Call &c)
 			|| !body_bool(c, "wake", false, false, wake)
 			|| !body_bool(c, "stop_playback", false, false, stop_playback))
 		return;
-	if (!CServiceManager::getInstance()->FindChannel(id)) {
-		problem(c.out, 404, "no-such-channel", "no channel with that id");
-		return;
+	{
+		CServiceManager::ChannelGuard guard;
+		if (!CServiceManager::getInstance()->FindChannel(id)) {
+			problem(c.out, 404, "no-such-channel", "no channel with that id");
+			return;
+		}
 	}
 	if (box_mode() == NeutrinoModes::mode_ts && !stop_playback) {
 		problem(c.out, 409, "playback-running", "a recording or file is playing; send stop_playback to end it");
@@ -1043,10 +1073,14 @@ void ep_screenshot(Call &c)
 		return;
 	}
 	std::string file = string_printf("/tmp/yapi-screenshot-%d.%s", (int) getpid(), jpeg ? "jpg" : "png");
-	CScreenShot shot(file, jpeg ? CScreenShot::FORMAT_JPG : CScreenShot::FORMAT_PNG);
-	shot.EnableOSD(osd);
-	shot.EnableVideo(video);
-	bool ok = shot.StartSync() && send_file(c, file, jpeg ? "image/jpeg" : "image/png", true);
+	std::shared_ptr<CScreenShot> shot(new CScreenShot(file, jpeg ? CScreenShot::FORMAT_JPG : CScreenShot::FORMAT_PNG));
+	shot->EnableOSD(osd);
+	shot->EnableVideo(video);
+	/* the capture reads the frame buffer and the decoder, which belong to
+	 * the main loop; the job keeps the shot in case the loop is late */
+	std::shared_ptr<bool> taken(new bool(false));
+	bool ok = main_call::run([shot, taken] { *taken = shot->StartSync(); }, 30000) && *taken
+		&& send_file(c, file, jpeg ? "image/jpeg" : "image/png", true);
 	unlink(file.c_str());
 	pthread_mutex_unlock(&screenshot_mutex);
 	if (!ok)
@@ -1062,17 +1096,23 @@ void ep_epg_current(Call &c)
 		problem(c.out, 400, "missing-parameter", "parameter channel is needed");
 		return;
 	}
-	CZapitChannel *ch = channel_arg(c, c.q("channel"));
-	if (!ch)
-		return;
+	t_channel_id id, epg_id;
+	{
+		CServiceManager::ChannelGuard guard;
+		CZapitChannel *ch = channel_arg(c, c.q("channel"));
+		if (!ch)
+			return;
+		id = ch->getChannelID();
+		epg_id = ch->getEpgID();
+	}
 	CEPGData epg;
-	if (!CEitManager::getInstance()->getActualEPGServiceKey(ch->getEpgID(), &epg) || !epg.eventID) {
+	if (!CEitManager::getInstance()->getActualEPGServiceKey(epg_id, &epg) || !epg.eventID) {
 		problem(c.out, 404, "no-current-event", "the guide has nothing on this channel now");
 		return;
 	}
 	Json::Value v(Json::objectValue);
 	v["id"] = hex_id(epg.eventID);
-	v["channel_id"] = hex_id(ch->getChannelID());
+	v["channel_id"] = hex_id(id);
 	v["title"] = epg.title;
 	v["description"] = epg.info1;
 	v["start"] = (Json::Int64) epg.epg_times.startzeit;
@@ -1097,6 +1137,13 @@ void ep_epg_grid(Call &c)
 		problem(c.out, 400, "missing-parameter", "name either a bouquet or channels");
 		return;
 	}
+	/* what the page needs of each channel, taken under the channel lock */
+	struct Row { t_channel_id id, epg_id; };
+	std::vector<Row> rows;
+	t_channel_id next = 0;
+	bool more = false;
+	{
+	CServiceManager::ChannelGuard guard;
 	ZapitChannelList list;
 	if (c.has("bouquet") && !web_list(c.q("bouquet"), list)) {
 		uint64_t nr;
@@ -1138,15 +1185,23 @@ void ep_epg_grid(Call &c)
 		}
 		start = i + 1;
 	}
-	Json::Value v(Json::objectValue);
-	v["items"] = Json::Value(Json::arrayValue);
 	size_t end = std::min(list.size(), start + (size_t) limit);
 	for (size_t i = start; i < end; i++) {
-		CZapitChannel *ch = list[i];
+		Row r = { list[i]->getChannelID(), list[i]->getEpgID() };
+		rows.push_back(r);
+	}
+	if (end < list.size() && end > start) {
+		more = true;
+		next = list[end - 1]->getChannelID();
+	}
+	}
+	Json::Value v(Json::objectValue);
+	v["items"] = Json::Value(Json::arrayValue);
+	for (size_t i = 0; i < rows.size(); i++) {
 		CChannelEventList events;
-		CEitManager::getInstance()->getEventsServiceKey(ch->getEpgID(), events);
+		CEitManager::getInstance()->getEventsServiceKey(rows[i].epg_id, events);
 		Json::Value row(Json::objectValue);
-		row["channel_id"] = hex_id(ch->getChannelID());
+		row["channel_id"] = hex_id(rows[i].id);
 		row["events"] = Json::Value(Json::arrayValue);
 		for (size_t e = 0; e < events.size(); e++) {
 			const CChannelEvent &ev = events[e];
@@ -1154,7 +1209,7 @@ void ep_epg_grid(Call &c)
 				continue;
 			Json::Value ej(Json::objectValue);
 			ej["id"] = hex_id(ev.eventID);
-			ej["channel_id"] = hex_id(ch->getChannelID());
+			ej["channel_id"] = hex_id(rows[i].id);
 			ej["title"] = ev.description;
 			ej["description"] = ev.text;
 			ej["start"] = (Json::Int64) ev.startTime;
@@ -1164,8 +1219,8 @@ void ep_epg_grid(Call &c)
 		row["truncated"] = false;
 		v["items"].append(row);
 	}
-	if (end < list.size() && end > start)
-		v["next_cursor"] = hex_id(list[end - 1]->getChannelID());
+	if (more)
+		v["next_cursor"] = hex_id(next);
 	send_json(c.out, 200, v);
 }
 
@@ -1270,9 +1325,12 @@ void ep_timer_new(Call &c)
 		problem(c.out, 400, "timer-without-channel", "this kind of timer needs channel_id");
 		return;
 	}
-	if (channel && !CServiceManager::getInstance()->FindChannel(channel)) {
-		problem(c.out, 404, "no-such-channel", "no channel with that id");
-		return;
+	if (channel) {
+		CServiceManager::ChannelGuard guard;
+		if (!CServiceManager::getInstance()->FindChannel(channel)) {
+			problem(c.out, 404, "no-such-channel", "no channel with that id");
+			return;
+		}
 	}
 	if (recording && stop <= start) {
 		problem(c.out, 400, "recording-without-duration", "a recording needs a stop after its start");
@@ -1370,9 +1428,17 @@ void ep_timer_delete(Call &c)
 //-----------------------------------------------------------------------------
 void ep_stream(Call &c)
 {
-	CZapitChannel *ch = channel_arg(c, c.args[0]);
-	if (!ch)
-		return;
+	t_channel_id id;
+	std::string url, name;
+	{
+		CServiceManager::ChannelGuard guard;
+		CZapitChannel *ch = channel_arg(c, c.args[0]);
+		if (!ch)
+			return;
+		id = ch->getChannelID();
+		url = ch->getUrl();
+		name = ch->getName();
+	}
 	CStringList::const_iterator it = c.in.headers.find("Host");
 	if (it == c.in.headers.end() || it->second.empty()) {
 		problem(c.out, 400, "no-authority", "the request names no host");
@@ -1385,11 +1451,11 @@ void ep_stream(Call &c)
 		host = host.substr(0, host.find(':'));
 	Json::Value v(Json::objectValue);
 	/* a web channel plays from its own source, the box streams only what it receives */
-	if (IS_WEBCHAN(ch->getChannelID()) && !ch->getUrl().empty())
-		v["url"] = ch->getUrl();
+	if (IS_WEBCHAN(id) && !url.empty())
+		v["url"] = url;
 	else
-		v["url"] = "http://" + host + ":" + std::to_string(g_settings.streaming_port) + "/id=" + hex_id(ch->getChannelID());
-	v["name"] = ch->getName();
+		v["url"] = "http://" + host + ":" + std::to_string(g_settings.streaming_port) + "/id=" + hex_id(id);
+	v["name"] = name;
 	v["port"] = g_settings.streaming_port;
 	send_json(c.out, 200, v);
 }
@@ -1411,6 +1477,12 @@ Json::Value session_state(Call &c, const Session *s)
 
 void ep_login(Call &c)
 {
+	/* the name and the password of nhttpd.conf are only a secret once
+	 * authentication is on; before that they are the shipped defaults */
+	if (config("mod_auth.authenticate") != "true") {
+		problem(c.out, 401, "authentication-off", "signing in needs mod_auth.authenticate in nhttpd.conf; the API is open to the home network");
+		return;
+	}
 	static const char *members[] = { "user", "password", NULL };
 	std::string user, password;
 	if (!read_body(c, members) || !body_string(c, "user", true, 256, user)
@@ -1418,8 +1490,21 @@ void ep_login(Call &c)
 		return;
 	time_t now = time(NULL);
 	pthread_mutex_lock(&session_mutex);
+	/* forgotten addresses go, and the map stays small whatever comes in */
+	for (std::map<std::string, Attempts>::iterator it = attempts.begin(); it != attempts.end();)
+		if (now - it->second.last > kAttemptsLifetime && it->second.blocked_until <= now)
+			attempts.erase(it++);
+		else
+			++it;
+	while (attempts.size() >= kMaxAttemptEntries && !attempts.count(c.in.client)) {
+		std::map<std::string, Attempts>::iterator oldest = attempts.begin();
+		for (std::map<std::string, Attempts>::iterator it = attempts.begin(); it != attempts.end(); ++it)
+			if (it->second.last < oldest->second.last)
+				oldest = it;
+		attempts.erase(oldest);
+	}
 	Attempts &a = attempts[c.in.client];
-	if (now - a.last > 600)
+	if (now - a.last > kAttemptsLifetime)
 		a.failed = 0, a.blocked_until = 0;
 	bool blocked = a.blocked_until > now;
 	time_t wait = a.blocked_until - now;
