@@ -102,6 +102,16 @@ extern bool epg_filter_except_current_next;
 static bool xml_epg_filter;
 
 static bool messaging_zap_detected = false;
+
+/* the first bytes of a UTF-8 text, not cut inside a character */
+static std::string utf8_head(const std::string &str, size_t len)
+{
+	if (str.size() <= len)
+		return str;
+	while (len > 0 && (str[len] & 0xc0) == 0x80)
+		len--;
+	return str.substr(0, len);
+}
 /*static*/ bool dvb_time_update = false;
 
 //NTP-Config
@@ -2633,7 +2643,7 @@ void CEitManager::getEventsServiceKey(t_channel_id serviceUniqueKey, CChannelEve
 					aEvent.duration = t->dauer;
 					aEvent.description = (*e)->getName();
 					if (((*e)->getText()).empty())
-						aEvent.text = (*e)->getExtendedText().substr(0, 120);
+						aEvent.text = utf8_head((*e)->getExtendedText(), 120);
 					else
 						aEvent.text = (*e)->getText();
 					if(all_chann)//hack for all channel search
@@ -3061,7 +3071,7 @@ void CEitManager::getChannelEvents(CChannelEventList &eList, t_channel_id *chidl
 					aEvent.duration = t->dauer;
 					aEvent.description = (*e)->getName();
 					if (((*e)->getText()).empty())
-						aEvent.text = (*e)->getExtendedText().substr(0, 120);
+						aEvent.text = utf8_head((*e)->getExtendedText(), 120);
 					else
 						aEvent.text = (*e)->getText();
 					eList.push_back(aEvent);
