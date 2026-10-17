@@ -107,21 +107,49 @@ bool CConfigFile::saveConfig(const char *const filename, char _delimiter)
 		}
 
 		configFile.flush();
+		bool ok = configFile.good();
 		configFile.close();
+		ok = ok && !configFile.fail();
 		{
 			int syncfd = ::open(tmpname.c_str(), O_RDWR);
 			if (syncfd >= 0) {
-				::fdatasync(syncfd);
+				if (::fdatasync(syncfd) != 0)
+					ok = false;
 				::close(syncfd);
 			}
+			else
+				ok = false;
+		}
+		if (!ok)
+		{
+			std::cerr << "[ConfigFile] Unable to write file " << tmpname << ": " << strerror(errno) << std::endl;
+			unlink(tmpname.c_str());
+			return false;
 		}
 
 		chmod(tmpname.c_str(), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 		/* TODO: check available space? */
-		rename(tmpname.c_str(), filename);
+		if (rename(tmpname.c_str(), filename) != 0)
+		{
+			std::cerr << "[ConfigFile] Unable to rename " << tmpname << " to " << filename << ": " << strerror(errno) << std::endl;
+			unlink(tmpname.c_str());
+			return false;
+		}
+		/* sync the directory so the renamed entry survives a power cut */
+		{
+			std::string dir(filename);
+			std::string::size_type slash = dir.rfind('/');
+			dir = (slash == std::string::npos) ? std::string(".") : (slash == 0) ? std::string("/") : dir.substr(0, slash);
+			int dirfd = ::open(dir.c_str(), O_RDONLY | O_DIRECTORY);
+			if (dirfd >= 0) {
+				if (::fsync(dirfd) != 0 && errno != EINVAL)
+					ok = false;
+				::close(dirfd);
+			}
+		}
 
 		modifiedFlag = false;
-		return true;
+		return ok;
 	}
 	else
 	{
@@ -274,11 +302,12 @@ std::string CConfigFile::getString(const std::string &key, const std::string &de
 
 std::vector <int32_t> CConfigFile::getInt32Vector(const std::string &key)
 {
-	std::string val = configData[key];
+	ConfigDataMap::const_iterator kit = configData.find(key);
+	std::string val = (kit != configData.end()) ? kit->second : std::string();
 	std::vector <int32_t> vec;
-	uint16_t length = 0;
-	uint16_t pos = 0;
-	uint16_t i;
+	size_t length = 0;
+	size_t pos = 0;
+	size_t i;
 
 	for (i = 0; i < val.length(); i++)
 	{
@@ -304,11 +333,12 @@ std::vector <int32_t> CConfigFile::getInt32Vector(const std::string &key)
 
 std::vector <std::string> CConfigFile::getStringVector(const std::string &key)
 {
-	std::string val = configData[key];
+	ConfigDataMap::const_iterator kit = configData.find(key);
+	std::string val = (kit != configData.end()) ? kit->second : std::string();
 	std::vector <std::string> vec;
-	uint16_t length = 0;
-	uint16_t pos = 0;
-	uint16_t i;
+	size_t length = 0;
+	size_t pos = 0;
+	size_t i;
 
 	for (i = 0; i < val.length(); i++)
 	{

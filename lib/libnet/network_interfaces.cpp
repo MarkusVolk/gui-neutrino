@@ -25,6 +25,7 @@
 #include <string>
 #include <sstream>
 #include <unistd.h>
+#include <fcntl.h>
 
 /*
  * Known bugs:
@@ -52,7 +53,11 @@ bool read_file(const std::string &filename, std::list<std::string> &line)
 
 bool write_file(const std::string &filename, const std::list<std::string> &line)
 {
-	std::ofstream out(filename.c_str());
+	/* write a side file and rename it into place, so a power cut leaves
+	   either the old or the new file, never a truncated one */
+	std::string tmpname = filename + ".tmp";
+	unlink(tmpname.c_str());
+	std::ofstream out(tmpname.c_str());
 
 	if (!out.is_open())
 		return false;
@@ -62,7 +67,34 @@ bool write_file(const std::string &filename, const std::list<std::string> &line)
 
 	/* a full disk shows only now */
 	out.close();
-	return !out.fail();
+	bool ok = !out.fail();
+	if (ok)
+	{
+		int fd = open(tmpname.c_str(), O_RDONLY);
+		if (fd >= 0)
+		{
+			ok = (fsync(fd) == 0);
+			close(fd);
+		}
+		else
+			ok = false;
+	}
+	if (ok)
+		ok = (rename(tmpname.c_str(), filename.c_str()) == 0);
+	if (!ok)
+	{
+		unlink(tmpname.c_str());
+		return false;
+	}
+	std::string::size_type slash = filename.rfind('/');
+	std::string dir = (slash == std::string::npos) ? std::string(".") : (slash == 0) ? std::string("/") : filename.substr(0, slash);
+	int dirfd = open(dir.c_str(), O_RDONLY | O_DIRECTORY);
+	if (dirfd >= 0)
+	{
+		fsync(dirfd);
+		close(dirfd);
+	}
+	return true;
 }
 
 std::list<std::string>::iterator add_attributes(const std::map<std::string, std::string> &attribute, std::list<std::string> &line, std::list<std::string>::iterator here)

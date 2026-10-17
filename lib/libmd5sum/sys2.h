@@ -18,9 +18,7 @@
 #    include <malloc.h>
 #    include <io.h>
 #   else
-#    ifndef alloca
-char *alloca ();
-#    endif
+#    include <alloca.h>
 #   endif
 #  endif
 # endif

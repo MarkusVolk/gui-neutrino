@@ -94,7 +94,13 @@ int main(int argc, char **argv)
 	if (size)
 		result = (char *) malloc(size);
 
-	if (result && !client.Recv(result, size))
+	if (!result)
+	{
+		fun = size ? "out of memory" : "empty result";
+		goto fail;
+	}
+
+	if (!client.Recv(result, size))
 	{
 		fun = "Recv (2) failed";
 		goto fail;

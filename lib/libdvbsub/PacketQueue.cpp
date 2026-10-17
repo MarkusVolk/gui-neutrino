@@ -12,7 +12,7 @@ PacketQueue::PacketQueue()
 PacketQueue::~PacketQueue()
 {
 	while (queue.begin() != queue.end()) {
-		delete[] queue.front();
+		free(queue.front());
 		queue.pop_front();
 	}
 }
@@ -42,6 +42,9 @@ uint8_t* PacketQueue::pop()
 
 size_t PacketQueue::size()
 {
-	return queue.size();
+	pthread_mutex_lock(&mutex);
+	size_t retval = queue.size();
+	pthread_mutex_unlock(&mutex);
+	return retval;
 }
 

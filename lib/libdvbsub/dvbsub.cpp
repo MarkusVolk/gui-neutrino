@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include <cerrno>
 
@@ -256,7 +257,9 @@ static void* reader_thread(void * /*arg*/)
 			pthread_mutex_unlock(&packetMutex);
 
 			pthread_mutex_lock(&readerMutex );
-			int ret = pthread_cond_wait(&readerCond, &readerMutex);
+			int ret = 0;
+			while (dvbsub_stopped && reader_running && ret == 0)
+				ret = pthread_cond_wait(&readerCond, &readerMutex);
 			pthread_mutex_unlock(&readerMutex);
 			if (ret) {
 				sub_debug.print(Debug::VERBOSE, "pthread_cond_timedwait fails with %d\n", ret);
@@ -276,8 +279,11 @@ static void* reader_thread(void * /*arg*/)
 		}
 
 		len = dmx->Read(tmp, 6, 1000);
-		if(len <= 0)
+		if(len <= 0) {
+			if (len < 0)
+				usleep(10000); /* demux error: don't spin */
 			continue;
+		}
 
 		if(memcmp(tmp, "\x00\x00\x01\xbd", 4)) {
 			if (!bad_startcode) {
@@ -292,20 +298,29 @@ static void* reader_thread(void * /*arg*/)
 		packlen =  getbits(tmp, 4*8, 16) + 6;
 
 		buf = (uint8_t*) malloc(packlen);
+		if (!buf)
+			continue;
 
 		memmove(buf, tmp, 6);
 		/* read rest of the packet */
+		bool read_error = false;
 		while((count < packlen) && !dvbsub_stopped) {
 			len = dmx->Read(buf+count, packlen-count, 1000);
 			if (len < 0) {
-				continue;
+				read_error = true;
+				break;
 			} else {
 				count += len;
 			}
 		}
+		if (read_error) {
+			free(buf);
+			usleep(10000); /* demux error: drop packet, don't spin */
+			continue;
+		}
 
 		if(!dvbsub_stopped /*!dvbsub_paused*/) {
-			sub_debug.print(Debug::VERBOSE, "[subtitles] *** new packet, len %d buf 0x%x pts-stc diff %lld ***\n", count, buf, get_pts_stc_delta(get_pts(buf)));
+			sub_debug.print(Debug::VERBOSE, "[subtitles] *** new packet, len %d buf 0x%x pts-stc diff %lld ***\n", count, buf, get_pts_stc_delta(count >= 14 ? get_pts(buf) : 0));
 			/* Packet now in memory */
 			packet_queue.push(buf);
 			/* TODO: allocation exception */
@@ -377,9 +392,18 @@ static void* dvbsub_thread(void* /*arg*/)
 		}
 		packlen = (packet[4] << 8 | packet[5]) + 6;
 
+		if (packlen < 14) { /* PES header incl. PTS */
+			sub_debug.print(Debug::INFO, "Packet too short, discard\n");
+			goto next_round;
+		}
+
 		pts = get_pts(packet);
 
 		dataoffset = packet[8] + 8 + 1;
+		if (packlen <= dataoffset + 3) {
+			sub_debug.print(Debug::INFO, "Packet too short, discard\n");
+			goto next_round;
+		}
 		if (packet[dataoffset] != 0x20) {
 			sub_debug.print(Debug::VERBOSE, "Not a dvb subtitle packet, discard it (len %d)\n", packlen);
 			goto next_round;
@@ -388,11 +412,6 @@ static void* dvbsub_thread(void* /*arg*/)
 		sub_debug.print(Debug::VERBOSE, "PES packet: len %d data len %d PTS=%Ld (%02d:%02d:%02d.%d) diff %lld\n",
 				packlen, packlen - (dataoffset + 2), pts, (int)(pts/324000000), (int)((pts/5400000)%60),
 				(int)((pts/90000)%60), (int)(pts%90000), get_pts_stc_delta(pts));
-
-		if (packlen <= dataoffset + 3) {
-			sub_debug.print(Debug::INFO, "Packet too short, discard\n");
-			goto next_round;
-		}
 
 		if (packet[dataoffset + 2] == 0x0f) {
 			dvbSubtitleConverter->Convert(&packet[dataoffset + 2],
@@ -407,6 +426,7 @@ next_round:
 	}
 
 	delete dvbSubtitleConverter;
+	dvbSubtitleConverter = NULL;
 
 	sub_debug.print(Debug::VERBOSE, "%s shutdown\n", __FUNCTION__);
 	pthread_exit(NULL);

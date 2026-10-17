@@ -613,7 +613,10 @@ void *tuxtxt_CacheThread(void * /*arg*/)
 		pthread_testcancel();
 
 		if (!tuxtxt_cache.receiving)
+		{
+			usleep(10000); /* don't spin while not receiving */
 			continue;
+		}
 
 		/* read packet */
 		ssize_t readcnt = 0;

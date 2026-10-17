@@ -70,7 +70,7 @@ void CUPnPSocket::SetTTL(int ttl)
 	int result;
 
 	result = setsockopt(m_socket, IPPROTO_IP, IP_TTL, (char *)&ttl, sizeof(ttl));
-	if (!result)
+	if (result < 0)
 		throw std::runtime_error(std::string("set ttl"));
 }
 
@@ -116,7 +116,7 @@ std::vector<CUPnPDevice> CUPnPSocket::Discover(std::string service)
 		if (result == 0)
 			return devices;
 
-		result = recv(m_socket, bufr, sizeof(bufr), 0);
+		result = recv(m_socket, bufr, sizeof(bufr) - 1, 0);
 		if (result < 0)
 			throw std::runtime_error(std::string("recv"));
 
