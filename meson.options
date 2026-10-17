@@ -1,4 +1,4 @@
-option('boxtype', type : 'combo', choices : ['generic', 'coolstream', 'armbox', 'mipsbox'], value : 'generic',
+option('boxtype', type : 'combo', choices : ['generic'], value : 'generic',
 	description : 'Hardware neutrino is built for')
 option('stb-hal-includes', type : 'string', value : '',
 	description : 'Path to the libstb-hal headers, default includedir/libstb-hal')

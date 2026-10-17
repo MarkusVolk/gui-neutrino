@@ -442,8 +442,8 @@ static bool yRunNoShell(const std::string &file, const std::string &dir,
 			close(fd[1]);
 		}
 		// Do not leak the listening socket, open client connections or
-		// driver handles into the script; ysocket.cpp creates them without
-		// SOCK_CLOEXEC, so O_CLOEXEC on our own pipe does not cover them.
+		// driver handles into the script; libmicrohttpd creates its sockets
+		// without SOCK_CLOEXEC, so O_CLOEXEC on our own pipe does not cover them.
 		// close_range() does this in one call - the fallback loop costs a
 		// syscall per possible descriptor, which is tens of milliseconds
 		// per script once RLIMIT_NOFILE is large (524288 on a PC build).

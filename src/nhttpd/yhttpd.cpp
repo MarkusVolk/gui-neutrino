@@ -432,16 +432,6 @@ void Cyhttpd::ReadConfig(void) {
 	}
 	ConfigList["Tuxbox.LogosURL"] = Config->getString("Tuxbox.LogosURL", "");
 
-#ifdef Y_CONFIG_USE_OPEN_SSL
-	ConfigList["SSL"] = Config->getString("WebsiteMain.ssl", "false");
-	ConfigList["SSL_pemfile"] = Config->getString("WebsiteMain.ssl_pemfile", SSL_PEMFILE);
-	ConfigList["SSL_CA_file"] = Config->getString("WebsiteMain.ssl_ca_file", SSL_CA_FILE);
-
-	CySocket::SSL_pemfile = ConfigList["SSL_pemfile"];
-	CySocket::SSL_CA_file = ConfigList["SSL_CA_file"];
-	if(ConfigList["SSL"] == "true")
-	CySocket::initSSL();
-#endif
 	ConfigList["server.user_name"] = Config->getString("server.user_name", "");
 	ConfigList["server.group_name"] = Config->getString("server.group_name", "");
 	ConfigList["server.chroot"] = Config->getString("server.chroot", "");

@@ -22,3 +22,8 @@ noinst_LIBRARIES = libyapi.a
 
 libyapi_a_SOURCES = \
 	apiserver.cpp
+
+# apiserver.cpp includes the generated src/tools/rcsim.h
+apiserver.$(OBJEXT): $(top_builddir)/src/tools/rcsim.h
+$(top_builddir)/src/tools/rcsim.h:
+	$(MAKE) -C $(top_builddir)/src/tools rcsim.h

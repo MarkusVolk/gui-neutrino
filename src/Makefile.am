@@ -100,10 +100,10 @@ neutrino_LDADD = \
 	timerd/libtimerd.a \
 	zapit/libzapit.a \
 	nhttpd/libnhttpd.a \
+	nhttpd/api/libyapi.a \
 	nhttpd/tuxboxapi/libnhttpd_tuxboxapi.a \
 	nhttpd/yhttpd_mods/libyhttpdmods.a \
 	nhttpd/yhttpd_core/libyhttpd.a \
-	nhttpd/api/libyapi.a \
 	system/libneutrino_system.a \
 	$(top_builddir)/lib/sectionsdclient/libsectionsdclient.a \
 	$(top_builddir)/lib/timerdclient/libtimerdclient.a \
