@@ -59,6 +59,8 @@ DMX::DMX(const unsigned short p, const unsigned short bufferSizeInKB, const bool
 	pID = p;
 	cache = c;
 	init();
+	eit_version = 0;
+	dmx = 0;
 }
 
 DMX::DMX()

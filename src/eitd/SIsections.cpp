@@ -175,7 +175,10 @@ void SIsectionTIME::parse(uint8_t *buf)
 		if(tdt.getSectionLength() < 5)
 			return;
 		dvbtime = parseDVBtime(tdt.getUtcTimeMjd(), tdt.getUtcTimeBcd());
-		char *ct = ctime(&dvbtime);
+		char ctbuf[32];
+		char *ct = ctime_r(&dvbtime, ctbuf);
+		if (!ct)
+			ct = strcpy(ctbuf, "?");
 		/* ctime() appends a useless \n... */
 		ct[strlen(ct) - 1] = 0;
 		/* ...and debug_colored adds another \n... */
@@ -184,7 +187,10 @@ void SIsectionTIME::parse(uint8_t *buf)
 	} else {
 		TimeOffsetSection tot(buf);
 		dvbtime = parseDVBtime(tot.getUtcTimeMjd(), tot.getUtcTimeBcd());
-		char *ct = ctime(&dvbtime);
+		char ctbuf[32];
+		char *ct = ctime_r(&dvbtime, ctbuf);
+		if (!ct)
+			ct = strcpy(ctbuf, "?");
 		ct[strlen(ct) - 1] = 0;
 		debug_colored(DEBUG_ERROR, "SIsectionTIME::parse: TOT time: %s", ct);
 		const DescriptorList &dlist = *tot.getDescriptors();

@@ -70,7 +70,34 @@
 //#define DEBUG_SECTION_THREADS
 //#define DEBUG_CN_THREAD
 
-/*static*/ bool reader_ready = true;
+/* XML/XMLTV reader threads: count of active readers; reader_ready stays false
+ * (STARTUP_WAIT) until the first reader has finished. Both under reader_lock. */
+static pthread_mutex_t reader_lock = PTHREAD_MUTEX_INITIALIZER;
+static int readers_active = 0;
+static bool reader_ready = true;
+
+void readerStarted(void)
+{
+	pthread_mutex_lock(&reader_lock);
+	readers_active++;
+	pthread_mutex_unlock(&reader_lock);
+}
+
+void readerFinished(void)
+{
+	pthread_mutex_lock(&reader_lock);
+	readers_active--;
+	reader_ready = true;
+	pthread_mutex_unlock(&reader_lock);
+}
+
+static bool readersBusy(void)
+{
+	pthread_mutex_lock(&reader_lock);
+	bool busy = readers_active > 0 || !reader_ready;
+	pthread_mutex_unlock(&reader_lock);
+	return busy;
+}
 static unsigned int max_events;
 static bool notify_complete = false;
 
@@ -85,6 +112,8 @@ static bool notify_complete = false;
 
 // Timeout bei tcp/ip connections in ms
 #define READ_TIMEOUT_IN_SECONDS  2
+/* upper bound for the payload of one IPC command (strings/paths/URLs only) */
+#define MAX_IPC_DATA_LENGTH  65536
 #define WRITE_TIMEOUT_IN_SECONDS 2
 
 // Time in seconds we are waiting for an EIT version number
@@ -124,7 +153,8 @@ static std::string utf8_head(const std::string &str, size_t len)
    it, never rewriting the main config or restarting chronyd. */
 #define CHRONY_SOURCES_FILE "/etc/chrony/sources.d/neutrino.sources"
 
-std::string ntpserver;
+std::string ntpserver; /* written by the connection thread, read by the time thread: ntpserver_lock */
+static pthread_mutex_t ntpserver_lock = PTHREAD_MUTEX_INITIALIZER;
 int ntprefresh;
 int ntpenable;
 static std::string chrony_applied_server;
@@ -178,7 +208,7 @@ CSdtThread threadSDT;
 static int64_t lockstart = 0;
 #endif
 
-static int sectionsd_stop = 0;
+int sectionsd_stop = 0; /* also read by the XMLTV reader (xmlutil.cpp) */
 
 static bool slow_addevent = true;
 
@@ -281,6 +311,8 @@ static bool deleteEvent(const t_event_id uniqueKey)
 /* if cn == true (if called by cnThread), then myCurrentEvent and myNextEvent is updated, too */
 /*static*/ void addEvent(const SIevent &evt, const time_t zeit, bool cn = false)
 {
+	if (evt.times.empty())
+		return;
 	filter_mutex.lock();
 	bool EPG_filtered = checkEPGFilter(evt.original_network_id, evt.transport_stream_id, evt.service_id);
 	filter_mutex.unlock();
@@ -1062,6 +1094,9 @@ static void commandDumpStatusInformation(int /*connfd*/, char* /*data*/, const u
 	//  getrusage(RUSAGE_CHILDREN, &resourceUsage);
 	//  getrusage(RUSAGE_SELF, &resourceUsage);
 	time_t zeit = time(NULL);
+	char ctbuf[32];
+	if (!ctime_r(&zeit, ctbuf))
+		strcpy(ctbuf, "?\n");
 
 #define MAX_SIZE_STATI	2024
 	char stati[MAX_SIZE_STATI];
@@ -1083,7 +1118,7 @@ static void commandDumpStatusInformation(int /*connfd*/, char* /*data*/, const u
 #else
 		 ""
 #endif
-		 ,ctime(&zeit),
+		 ,ctbuf,
 		 secondsToCache / (60*60L), secondsExtendedTextCache / (60*60L), max_events, oldEventsAre / 60, anzServices, anzNVODservices, anzEvents, anzNVODevents, anzMetaServices
 		 //    resourceUsage.ru_maxrss, resourceUsage.ru_ixrss, resourceUsage.ru_idrss, resourceUsage.ru_isrss,
 		);
@@ -1130,13 +1165,25 @@ static void commandUnRegisterEventClient(int /*connfd*/, char *data, const unsig
 		eventServer->unRegisterEvent2(((CEventServer::commandUnRegisterEvent*)data)->eventID, ((CEventServer::commandUnRegisterEvent*)data)->clientID);
 }
 
-static void commandSetConfig(int connfd, char *data, const unsigned /*dataLength*/)
+static void commandSetConfig(int connfd, char *data, const unsigned dataLength)
 {
 	sendEmptyResponse(connfd, NULL, 0);
+
+	if (dataLength < sizeof(struct sectionsd::commandSetConfig))
+		return;
 
 	struct sectionsd::commandSetConfig *pmsg;
 
 	pmsg = (struct sectionsd::commandSetConfig *)data;
+
+	/* two NUL terminated strings follow the struct: ntpserver, epg_dir (data[dataLength] is NUL) */
+	const char *strdata = &data[sizeof(struct sectionsd::commandSetConfig)];
+	size_t strspace = dataLength - sizeof(struct sectionsd::commandSetConfig);
+	std::string new_ntpserver(strdata, strnlen(strdata, strspace));
+	std::string new_epg_dir;
+	if (new_ntpserver.length() + 1 < strspace)
+		new_epg_dir = std::string(strdata + new_ntpserver.length() + 1,
+				strnlen(strdata + new_ntpserver.length() + 1, strspace - new_ntpserver.length() - 1));
 
 	/* writeLockEvents not needed because write lock will block if read lock active */
 	readLockEvents();
@@ -1150,9 +1197,11 @@ static void commandSetConfig(int connfd, char *data, const unsigned /*dataLength
 	unlockEvents();
 
 	bool time_wakeup = false;
-	if (ntpserver.compare((std::string)&data[sizeof(struct sectionsd::commandSetConfig)])) {
+	pthread_mutex_lock(&ntpserver_lock);
+	if (ntpserver.compare(new_ntpserver)) {
 		time_wakeup = true;
 	}
+	pthread_mutex_unlock(&ntpserver_lock);
 	if (ntprefresh != pmsg->network_ntprefresh) {
 		debug(DEBUG_INFO, "new network_ntprefresh = %d", pmsg->network_ntprefresh);
 		time_wakeup = true;
@@ -1164,8 +1213,10 @@ static void commandSetConfig(int connfd, char *data, const unsigned /*dataLength
 
 	if (time_wakeup) {
 		const bool old_ntpenable = ntpenable;
-		ntpserver = (std::string)&data[sizeof(struct sectionsd::commandSetConfig)];
-		debug(DEBUG_INFO, "new network_ntpserver = %s", ntpserver.c_str());
+		pthread_mutex_lock(&ntpserver_lock);
+		ntpserver = new_ntpserver;
+		pthread_mutex_unlock(&ntpserver_lock);
+		debug(DEBUG_INFO, "new network_ntpserver = %s", new_ntpserver.c_str());
 		ntprefresh = pmsg->network_ntprefresh;
 		ntpenable = (pmsg->network_ntpenable == 1);
 		if (old_ntpenable && !ntpenable)
@@ -1174,7 +1225,7 @@ static void commandSetConfig(int connfd, char *data, const unsigned /*dataLength
 			threadTIME.change(1);
 	}
 
-	epg_dir= (std::string)&data[sizeof(struct sectionsd::commandSetConfig) + strlen(&data[sizeof(struct sectionsd::commandSetConfig)]) + 1];
+	epg_dir= new_epg_dir;
 }
 
 static void deleteSIexceptEPG()
@@ -1229,31 +1280,36 @@ static void commandFreeMemory(int connfd, char * /*data*/, const unsigned /*data
 	FreeMemory();
 }
 
-static void commandReadSIfromXML(int connfd, char *data, const unsigned dataLength)
+/* the detached reader thread gets its own copy of the directory name and frees it */
+static void startXMLReader(const std::string &epgdir)
 {
 	pthread_t thrInsertXML;
 
-	sendEmptyResponse(connfd, NULL, 0);
-
-	if (dataLength > 100)
+	char *dir = strdup(epgdir.c_str());
+	if (dir == NULL)
 		return ;
-	static std::string epg_dir_tmp = "";
-	writeLockMessaging();
-	data[dataLength] = '\0';
-	epg_dir_tmp = (std::string)data + "/";
-	unlockMessaging();
-
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
-	if (pthread_create (&thrInsertXML, &attr, insertEventsfromFile, (void *)epg_dir_tmp.c_str() ))
+	if (pthread_create (&thrInsertXML, &attr, insertEventsfromFile, (void *)dir ))
 	{
 		perror("sectionsd: pthread_create()");
+		free(dir);
 	}
 
 	pthread_attr_destroy(&attr);
+}
+
+static void commandReadSIfromXML(int connfd, char *data, const unsigned dataLength)
+{
+	sendEmptyResponse(connfd, NULL, 0);
+
+	if (dataLength > 100)
+		return ;
+	data[dataLength] = '\0';
+	startXMLReader((std::string)data + "/");
 }
 
 /*
@@ -1318,7 +1374,7 @@ static void commandReadSIfromXMLTV(int connfd, char *data, const unsigned dataLe
 static void commandWriteSI2XML(int connfd, char *data, const unsigned dataLength)
 {
 	sendEmptyResponse(connfd, NULL, 0);
-	if (mySIeventsOrderUniqueKey.empty() || (!reader_ready) || (dataLength > 100)){
+	if (mySIeventsOrderUniqueKey.empty() || readersBusy() || (dataLength > 100)){
 		eventServer->sendEvent(CSectionsdClient::EVT_WRITE_SI_FINISHED, CEventServer::INITID_SECTIONSD);
 		return;
 	}
@@ -1370,6 +1426,11 @@ bool sectionsd_parse_command(CBasicMessage::Header &rmsg, int connfd)
 		if (header.command < sectionsd::numberOfCommands)
 		{
 			debug(DEBUG_INFO, "data length: %hd", header.dataLength);
+			if (header.dataLength > MAX_IPC_DATA_LENGTH)
+			{
+				debug(DEBUG_ERROR, "sectionsd_parse_command: data length %u too large, command %d ignored", header.dataLength, header.command);
+				return true;
+			}
 			char *data = new char[header.dataLength + 1];
 
 			if (!data)
@@ -1380,6 +1441,7 @@ bool sectionsd_parse_command(CBasicMessage::Header &rmsg, int connfd)
 
 				if (header.dataLength)
 					rc = readNbytes(connfd, data, header.dataLength, READ_TIMEOUT_IN_SECONDS);
+				data[header.dataLength] = '\0';
 
 				if (rc == true)
 				{
@@ -1466,9 +1528,10 @@ bool CTimeThread::setSystemTime(time_t tim, bool force)
 	timediff = int64_t(tim * 1000000 - (tv.tv_usec + tv.tv_sec * 1000000));
 	localtime_r(&tv.tv_sec, &t);
 
+	char ctbuf[32];
 	debug(DEBUG_ERROR, "%s: timediff %" PRId64 ", current: %02d.%02d.%04d %02d:%02d:%02d, dvb: %s",
 		name.c_str(), timediff,
-		t.tm_mday, t.tm_mon+1, t.tm_year+1900, t.tm_hour, t.tm_min, t.tm_sec, ctime(&tim));
+		t.tm_mday, t.tm_mon+1, t.tm_year+1900, t.tm_hour, t.tm_min, t.tm_sec, ctime_r(&tim, ctbuf) ? ctbuf : "?");
 #if 0
 	/* if new time less than current for less than 1 second, ignore */
 	if(timediff < 0 && timediff > (int64_t) -1000000) {
@@ -1581,6 +1644,9 @@ static void clearManagedChronySource(const std::string &chronyc,
    sync; false lets the caller fall back to DVB time. */
 static bool doNtpTimeSync(void)
 {
+	pthread_mutex_lock(&ntpserver_lock);
+	const std::string ntpserver = ::ntpserver;
+	pthread_mutex_unlock(&ntpserver_lock);
 	const bool server_ok = ntpServerValid(ntpserver);
 
 	/* 1) chrony owns time on Tuxbox-OS: prefer it whenever chronyd is reachable */
@@ -1718,7 +1784,7 @@ void CTimeThread::run()
 #endif
 				debug(DEBUG_ERROR, "%s: get DVB time ch 0x%012" PRIx64 " rc: %d neutrino_sets_time %d",
 					name.c_str(), current_service, rc, messaging_neutrino_sets_time);
-				if (rc > 3) {
+				if (rc > 3 && rc >= (((static_buf[1] & 0x0f) << 8) | static_buf[2]) + 3) {
 					SIsectionTIME st(static_buf);
 					if (st.is_parsed()) {
 						dvb_time = st.getTime();
@@ -1763,7 +1829,6 @@ void CTimeThread::run()
 		}
 		sendToSleepNow = true;
 	}
-	delete[] static_buf;
 	debug(DEBUG_NORMAL, "timeThread stopped");
 }
 
@@ -1812,7 +1877,8 @@ void CSectionThread::run()
 	if (wait_for_time) {
 		threadTIME.waitForTimeset();
 		time_t now = time(NULL);
-		debug(DEBUG_ERROR, "%s::run:: time set: %s", name.c_str(), ctime(&now));
+		char ctbuf[32];
+		debug(DEBUG_ERROR, "%s::run:: time set: %s", name.c_str(), ctime_r(&now, ctbuf) ? ctbuf : "?");
 	}
 	real_pauseCounter = 0;
 
@@ -1879,7 +1945,6 @@ void CSectionThread::run()
 			unlockMessaging();
 		}
 	} // while running
-	delete[] static_buf;
 	cleanup();
 	debug(DEBUG_NORMAL, "%s stopped", name.c_str());
 }
@@ -2333,7 +2398,7 @@ static void *houseKeepingThread(void *)
 	set_threadname("sd:housekeeping");
 
 	debug(DEBUG_INFO, "housekeeping-thread started.");
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, 0);
+	pthread_setcanceltype (PTHREAD_CANCEL_DEFERRED, 0);
 
 	while (!sectionsd_stop)
 	{
@@ -2345,10 +2410,13 @@ static void *houseKeepingThread(void *)
 
 		int i = HOUSEKEEPING_SLEEP;
 
+		/* asynchronous cancel only while sleeping: the rest of the loop holds mutexes */
+		pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, 0);
 		while (i > 0 && !sectionsd_stop) {
 			sleep(1);
 			i--;
 		}
+		pthread_setcanceltype (PTHREAD_CANCEL_DEFERRED, 0);
 		if (sectionsd_stop)
 			break;
 
@@ -2387,19 +2455,11 @@ static void *houseKeepingThread(void *)
 			}
 			if (epg_read_frequently > 0)
 			{
-				pthread_t thrInsert;
-				pthread_attr_t attr;
-				pthread_attr_init(&attr);
-				pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-				static std::string d = epg_dir + "/";
+				std::string d = epg_dir + "/";
 
 				debug(DEBUG_NORMAL, "[%s]: %s",__func__,d.c_str());
 
-				if (pthread_create (&thrInsert, &attr, insertEventsfromFile, (void *)d.c_str() ))
-					{
-					perror("sectionsd: pthread_create()");
-					}
-				pthread_attr_destroy(&attr);
+				startXMLReader(d);
 			}
 			ecount = 0;
 		}
@@ -2448,7 +2508,9 @@ bool CEitManager::Start()
 	if(running)
 		return false;
 
+	pthread_mutex_lock(&ntpserver_lock);
 	ntpserver = config.network_ntpserver;
+	pthread_mutex_unlock(&ntpserver_lock);
 	ntprefresh = config.network_ntprefresh;
 	ntpenable = config.network_ntpenable;
 
@@ -2508,8 +2570,10 @@ debug(DEBUG_NORMAL, "SIevent size: %d", (int)sizeof(SIevent));
 	/* for debugging / benchmarking, "export STARTUP_WAIT=true" to wait with startup for
 	 * the EPG loading to finish
 	 * this wil fail badly if no EPG saving / loading is configured! */
+	pthread_mutex_lock(&reader_lock);
 	reader_ready = (getenv("STARTUP_WAIT") == NULL);
-	if (!reader_ready)
+	pthread_mutex_unlock(&reader_lock);
+	if (getenv("STARTUP_WAIT") != NULL)
 		debug(DEBUG_NORMAL, "====> sectionsd waiting with startup until saved EPG is read <===");
 
 	SIlanguage::loadLanguages();

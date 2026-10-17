@@ -164,6 +164,7 @@ class CSectionThread : public OpenThreads::Thread, public DMX
 
 		~CSectionThread()
 		{
+			delete[] static_buf;
 		}
 
 		bool Start()

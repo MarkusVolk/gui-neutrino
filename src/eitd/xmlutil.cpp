@@ -54,7 +54,9 @@
 
 void addEvent(const SIevent &evt, const time_t zeit, bool cn = false);
 extern MySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey mySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey;
-extern bool reader_ready;
+void readerStarted(void);
+void readerFinished(void);
+extern int sectionsd_stop;
 extern pthread_rwlock_t eventsLock;
 extern bool dvb_time_update;
 extern CBouquetManager *g_bouquetManager;
@@ -663,17 +665,18 @@ bool readEventsFromDir(std::string &epgdir, int &ev_count)
 void *insertEventsfromFile(void * data)
 {
 	set_threadname(__func__);
-	reader_ready=false;
+	readerStarted();
 	std::string indexname;
 	std::string filename;
 	std::string epgname;
 	xmlNodePtr eventfile;
 	int ev_count = 0;
 	if (!data) {
-		reader_ready = true;
+		readerFinished();
 		pthread_exit(NULL);
 	}
 	std::string epg_dir = (char *) data;
+	free(data); /* heap copy made by the caller (sectionsd.cpp startXMLReader) */
 	indexname = epg_dir + "index.xml";
 
 	int64_t now = time_monotonic_ms();
@@ -683,7 +686,7 @@ void *insertEventsfromFile(void * data)
 		readEventsFromDir(epg_dir, ev_count);
 		debug(DEBUG_NORMAL, "Reading data finished after %" PRId64 " ms (%d events) from %s",
 				time_monotonic_ms()-now, ev_count, epg_dir.c_str());
-		reader_ready = true;
+		readerFinished();
 		pthread_exit(NULL);
 	}
 	debug(DEBUG_NORMAL, "Reading data from file: %s", indexname.c_str());
@@ -707,7 +710,7 @@ void *insertEventsfromFile(void * data)
 
 	xmlFreeDoc(index_parser);
 
-	reader_ready = true;
+	readerFinished();
 
 	pthread_exit(NULL);
 }
@@ -802,7 +805,13 @@ static bool waitForXMLTVNameServer(const std::string &url)
 	if (begin == std::string::npos)
 		return false;
 	begin += 3;
-	std::string host = url.substr(begin, url.find_first_of(":/?#", begin) - begin);
+	std::string host = url.substr(begin, url.find_first_of("/?#", begin) - begin);
+	std::string::size_type at = host.rfind('@'); /* user:pass@host */
+	if (at != std::string::npos)
+		host.erase(0, at + 1);
+	std::string::size_type colon = host.find(':');
+	if (colon != std::string::npos)
+		host.erase(colon);
 	if (host.empty() || host[0] == '[')
 		return false;
 
@@ -811,6 +820,7 @@ static bool waitForXMLTVNameServer(const std::string &url)
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	const int64_t start = time_monotonic_ms();
+	bool waited_for_ns = false; /* true only if the name server was not there at first */
 	for (;;)
 	{
 		struct addrinfo *result = NULL;
@@ -822,13 +832,17 @@ static bool waitForXMLTVNameServer(const std::string &url)
 		{
 			if (waited > 0)
 				debug(DEBUG_NORMAL, "Waited %d s for a name server for %s", waited, host.c_str());
-			return ret == 0;
+			/* a download that failed although the name resolved at once is not retried */
+			return ret == 0 && waited_for_ns;
 		}
+		waited_for_ns = true;
 		if (waited >= XMLTV_NAME_SERVER_WAIT_S)
 		{
 			debug(DEBUG_NORMAL, "No name server for %s after %d s", host.c_str(), waited);
 			return false;
 		}
+		if (sectionsd_stop)
+			return false;
 		sleep(1);
 	}
 }
@@ -836,11 +850,11 @@ static bool waitForXMLTVNameServer(const std::string &url)
 void *insertEventsfromXMLTV(void * data)
 {
 	set_threadname(__func__);
-	reader_ready=false;
+	readerStarted();
 	int ev_count = 0;
 	if (!data)
 	{
-		reader_ready = true;
+		readerFinished();
 		pthread_exit(NULL);
 	}
 	std::string url = (std::string)(char *) data;
@@ -876,7 +890,7 @@ void *insertEventsfromXMLTV(void * data)
 		    !(waitForXMLTVNameServer(url) && ::downloadUrl(url, tmp_name)))
 		{
 			unlink(tmp_name.c_str());
-			reader_ready = true;
+			readerFinished();
 			pthread_exit(NULL);
 		}
 		if (!access(tmp_name.c_str(), R_OK))
@@ -896,7 +910,7 @@ void *insertEventsfromXMLTV(void * data)
 	debug(DEBUG_NORMAL, "Reading data finished after %" PRId64 " ms (%d events) from %s",
 	       time_monotonic_ms()-now, ev_count, url.c_str());
 
-	reader_ready = true;
+	readerFinished();
 
 	pthread_exit(NULL);
 }

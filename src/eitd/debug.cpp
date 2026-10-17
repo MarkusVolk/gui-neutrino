@@ -33,7 +33,10 @@ void printdate_ms(FILE *f)
 {
 	timeval now;
 	gettimeofday(&now, NULL);
-	struct tm *tm = localtime(&now.tv_sec);
+	struct tm tm_buf;
+	struct tm *tm = localtime_r(&now.tv_sec, &tm_buf);
+	if (!tm)
+		return;
 	/* use strftime for that? */
 	fprintf(f, "%04d-%02d-%02d %02d:%02d:%02d.%03" PRId64 " ", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int64_t)(now.tv_usec / 1000));
 }

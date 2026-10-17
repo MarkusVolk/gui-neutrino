@@ -301,7 +301,8 @@ void SIevent::parse(Event &event)
 			l.originalNetworkId = d->getOriginalNetworkId();
 			l.serviceId = d->getServiceId();
 			const PrivateDataByteVector *privateData = d->getPrivateDataBytes();
-			l.name = convertDVBUTF8((const char*)&((*privateData)[0]), privateData->size(), 1, tsidonid);
+			if (!privateData->empty())
+				l.name = convertDVBUTF8((const char*)&((*privateData)[0]), privateData->size(), 1, tsidonid);
 			linkage_descs.insert(linkage_descs.end(), l);
 			break;
 		}
@@ -368,12 +369,19 @@ void SIevent::parseShortEventDescriptor(const uint8_t *buf, unsigned maxlen)
 	int table = getCountryCodeDefaultMapping(language);
 	unsigned int _language = getLangIndex(language);
 
+        const uint8_t *end=buf+sizeof(descr_generic_header)+evt->descriptor_length;
         buf+=sizeof(struct descr_short_event_header);
+        if(buf+evt->event_name_length > end)
+                return;
         if(evt->event_name_length)
                 setName(_language, convertDVBUTF8((const char*) buf, evt->event_name_length, table, tsidonid));
 
         buf+=evt->event_name_length;
+        if(buf >= end)
+                return;
         unsigned char textlength=*((unsigned char *)buf);
+        if(textlength > end-(buf+1))
+                textlength=end-(buf+1);
         if(textlength > 2)
                 setText(_language, convertDVBUTF8((const char*) (++buf), textlength, table, tsidonid));
 }
@@ -396,25 +404,33 @@ void SIevent::parseExtendedEventDescriptor(const uint8_t *buf, unsigned maxlen)
 	int table = getCountryCodeDefaultMapping(language);
 	unsigned int _language = getLangIndex(language);
 
+        const unsigned char *end=(const unsigned char *)buf+sizeof(descr_generic_header)+evt->descriptor_length;
         unsigned char *items=(unsigned char *)(buf+sizeof(struct descr_extended_event_header));
-        while(items < (unsigned char *)(buf + sizeof(struct descr_extended_event_header) + evt->length_of_items)) {
+        const unsigned char *items_end=items+evt->length_of_items;
+        if(items_end > end)
+                items_end=end;
+        while(items < items_end) {
+                if(items+1+*items > end)
+                        return;
 #ifdef USE_ITEM_DESCRIPTION
                 if(*items) {
-                        itemDescription.append(convertDVBUTF8((const char *)(items+1), min(maxlen-(items+1-buf), *items), table, tsidonid));
+                        itemDescription.append(convertDVBUTF8((const char *)(items+1), *items, table, tsidonid));
                         itemDescription.append("\n");
                 }
 #endif
                 items+=1+*items;
+                if(items >= end || items+1+*items > end)
+                        return;
 #ifdef USE_ITEM_DESCRIPTION
                 if(*items) {
-                        item.append(convertDVBUTF8((const char *)(items+1), min(maxlen-(items+1-buf), *items), table, tsidonid));
+                        item.append(convertDVBUTF8((const char *)(items+1), *items, table, tsidonid));
                         item.append("\n");
                 }
 #endif
                 items+=1+*items;
         }
-        if(*items) 
-                appendExtendedText(_language, convertDVBUTF8((const char *)(items+1), min(maxlen-(items+1-buf), (*items)), table, tsidonid));
+        if(items < end && *items)
+                appendExtendedText(_language, convertDVBUTF8((const char *)(items+1), min((unsigned)(end-(items+1)), (unsigned)(*items)), table, tsidonid));
 }
 
 void SIevent::parseContentDescriptor(const uint8_t *buf, unsigned maxlen)
@@ -436,7 +452,8 @@ void SIevent::parseContentDescriptor(const uint8_t *buf, unsigned maxlen)
 
 void SIevent::parseComponentDescriptor(const uint8_t *buf, unsigned maxlen)
 {
-	if(maxlen>=sizeof(struct descr_component_header))
+	if(maxlen>=sizeof(struct descr_component_header) &&
+			((struct descr_generic_header *)buf)->descriptor_length+sizeof(struct descr_generic_header)<=maxlen)
 		components.push_back(SIcomponent((const struct descr_component_header *)buf));
 		//components.insert(SIcomponent((const struct descr_component_header *)buf));
 }
@@ -447,7 +464,7 @@ void SIevent::parseParentalRatingDescriptor(const uint8_t *buf, unsigned maxlen)
         if(cont->descriptor_length+sizeof(struct descr_generic_header)>maxlen)
                 return;
         const uint8_t *s=buf+sizeof(struct descr_generic_header);
-        while(s<buf+sizeof(struct descr_generic_header)+cont->descriptor_length-4) {
+        while(s+4<=buf+sizeof(struct descr_generic_header)+cont->descriptor_length) {
                 //ratings.insert(SIparentalRating(std::string((const char *)s, 3), *(s+3)));
                 ratings.push_back(SIparentalRating(std::string((const char *)s, 3), *(s+3)));
                 s+=4;
@@ -456,7 +473,8 @@ void SIevent::parseParentalRatingDescriptor(const uint8_t *buf, unsigned maxlen)
 
 void SIevent::parseLinkageDescriptor(const uint8_t *buf, unsigned maxlen)
 {
-	if(maxlen>=sizeof(struct descr_linkage_header)) {
+	if(maxlen>=sizeof(struct descr_linkage_header) &&
+			((struct descr_generic_header *)buf)->descriptor_length+sizeof(struct descr_generic_header)<=maxlen) {
 		SIlinkage l((const struct descr_linkage_header *)buf);
 		linkage_descs.insert(linkage_descs.end(), l);
 	}
