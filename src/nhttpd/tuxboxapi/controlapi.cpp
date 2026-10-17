@@ -1912,6 +1912,10 @@ void CControlAPI::epgDetailList(CyhookHandler *hh)
 	else if (!(hh->ParamList["bouquetnr"].empty())) {
 		bouquetnr = atoi(hh->ParamList["bouquetnr"].c_str());
 		bouquetnr--;
+		if (bouquetnr >= (int) g_bouquetManager->Bouquets.size()) {
+			hh->SendError();
+			return;
+		}
 	}
 
 	// fallback

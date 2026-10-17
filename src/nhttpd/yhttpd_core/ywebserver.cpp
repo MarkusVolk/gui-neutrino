@@ -56,18 +56,27 @@ struct TRequest
 	std::string	field_name;
 	std::string	field_value;
 	CyhookHandler	*hh;
+	bool		upload_locked;
 
 	TRequest() : started(false), method(M_UNKNOWN), too_large(false), is_api(false),
-		pp(NULL), upload_fd(-1), upload_seen(false), hh(NULL) {}
-	~TRequest()
-	{
-		if (pp)
-			MHD_destroy_post_processor(pp);
-		if (upload_fd >= 0)
-			close(upload_fd);
-		delete hh;
-	}
+		pp(NULL), upload_fd(-1), upload_seen(false), hh(NULL), upload_locked(false) {}
+	~TRequest();
 };
+
+// One upload at a time: every upload goes to UPLOAD_TMP_FILE, which the
+// scripts of the web interface read while the request is still running
+pthread_mutex_t upload_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+TRequest::~TRequest()
+{
+	if (pp)
+		MHD_destroy_post_processor(pp);
+	if (upload_fd >= 0)
+		close(upload_fd);
+	delete hh;
+	if (upload_locked)
+		pthread_mutex_unlock(&upload_mutex);
+}
 
 // Header names are case-insensitive (RFC 9110); they are kept as
 // Content-Type, If-None-Match, ... whatever case a client sent them in
@@ -221,7 +230,17 @@ MHD_Result post_iterator(void *cls, enum MHD_ValueKind, const char *key, const c
 			req->ParameterList[name] = trim(filename);
 			req->ParameterList[name + "_mime"] = content_type ? trim(content_type) : "";
 			req->ParameterList[name + "_upload_filename"] = UPLOAD_TMP_FILE;
-			req->upload_fd = open(UPLOAD_TMP_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+			if (!req->upload_locked) {
+				// one thread serves every connection when threading is off, so it must not wait for itself
+				if (CWebserver::is_threading)
+					pthread_mutex_lock(&upload_mutex);
+				else if (pthread_mutex_trylock(&upload_mutex) != 0) {
+					aprintf("another upload to %s is still running\n", UPLOAD_TMP_FILE);
+					return MHD_NO;
+				}
+				req->upload_locked = true;
+			}
+			req->upload_fd = open(UPLOAD_TMP_FILE, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0644);
 			if (req->upload_fd < 0) {
 				aprintf("cannot open file %s: %s\n", UPLOAD_TMP_FILE, strerror(errno));
 				return MHD_NO;
@@ -309,10 +328,16 @@ MHD_Result queue_file(struct MHD_Connection *connection, CyhookHandler &hh)
 			close(fd);
 		return queue_error(connection, hh, HTTP_NOT_FOUND);
 	}
+	if (!S_ISREG(st.st_mode)) {
+		close(fd);
+		return queue_error(connection, hh, HTTP_NOT_FOUND);
+	}
 	off_t start = hh.RangeStart;
-	off_t len = (hh.RangeStart == 0 && hh.RangeEnd == -1) ? st.st_size - start : hh.RangeEnd - hh.RangeStart + 1;
+	if (start < 0)
+		start = 0;
 	if (start > st.st_size)
 		start = st.st_size;
+	off_t len = (hh.RangeStart == 0 && hh.RangeEnd == -1) ? st.st_size - start : hh.RangeEnd - start + 1;
 	if (len < 0 || start + len > st.st_size)
 		len = st.st_size - start;
 	struct MHD_Response *response = MHD_create_response_from_fd_at_offset64(len, fd, start);
@@ -328,12 +353,19 @@ MHD_Result queue_file(struct MHD_Connection *connection, CyhookHandler &hh)
 
 // The order the old server ran the hooks in: prepare (auth, cache,
 // static files, rewrites), then produce, then a file if one was named
+CyhookHandler &handler_of(TRequest *req)
+{
+	if (!req->hh) {
+		req->hh = new CyhookHandler;
+		req->hh->session_init(req->ParameterList, req->UrlData, req->HeaderList, Cyhttpd::ConfigList,
+				req->method, true, req->Body);
+	}
+	return *req->hh;
+}
+
 MHD_Result run_hooks(struct MHD_Connection *connection, TRequest *req)
 {
-	req->hh = new CyhookHandler;
-	CyhookHandler &hh = *req->hh;
-	hh.session_init(req->ParameterList, req->UrlData, req->HeaderList, Cyhttpd::ConfigList,
-			req->method, true, req->Body);
+	CyhookHandler &hh = handler_of(req);
 
 	CStringList discarded;
 	do {
@@ -389,8 +421,11 @@ MHD_Result run_api(struct MHD_Connection *connection, const char *method, TReque
 		response = MHD_create_response_from_fd_at_offset64(out.length, out.fd, out.offset);
 	else
 		response = MHD_create_response_from_buffer_copy(out.body.size(), out.body.data());
-	if (!response)
+	if (!response) {
+		if (out.fd >= 0)
+			close(out.fd);
 		return MHD_NO;
+	}
 	if (!out.content_type.empty())
 		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, out.content_type.c_str());
 	MHD_add_response_header(response, MHD_HTTP_HEADER_SERVER, WEBSERVERNAME);
@@ -456,21 +491,18 @@ MHD_Result access_handler(void *, struct MHD_Connection *connection, const char 
 			close(req->upload_fd);
 			req->upload_fd = -1;
 		}
-		if (req->upload_seen) {
-			CyhookHandler hh;
-			hh.Hooks_UploadReady(UPLOAD_TMP_FILE);
-		}
+		if (req->upload_seen)
+			handler_of(req).Hooks_UploadReady(UPLOAD_TMP_FILE);
+	} else if (req->too_large) {
+		CyhookHandler hh;
+		hh.Method = req->method;
+		return queue_error(connection, hh, HTTP_REQUEST_ENTITY_TOO_LARGE);
 	} else if (req->method == M_POST) {
-		if (req->content_type == "application/x-www-form-urlencoded") {
+		// the type may carry parameters: "...; charset=UTF-8"
+		if (req->content_type.compare(0, 33, "application/x-www-form-urlencoded") == 0) {
 			parse_params(req->Body, req->ParameterList);
 			req->Body.clear();
-		} else if (req->content_type.compare(0, 16, "application/json") == 0) {
-			if (req->too_large) {
-				CyhookHandler hh;
-				hh.Method = req->method;
-				return queue_error(connection, hh, HTTP_REQUEST_ENTITY_TOO_LARGE);
-			}
-		} else
+		} else if (req->content_type.compare(0, 16, "application/json") != 0)
 			req->Body.clear();
 	}
 

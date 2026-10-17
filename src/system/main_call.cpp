@@ -27,6 +27,8 @@
 #include <global.h>
 #include <neutrinoMessages.h>
 
+#include <pthread.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <memory>
@@ -41,10 +43,27 @@ namespace
 		std::condition_variable cond;
 		bool done = false;
 	};
+
+	/* the thread that runs the main loop: the process starts it, so the
+	 * static initialisation already names it; handle() renews it */
+	pthread_t main_thread = pthread_self();
 }
 
+/*
+ * The main loop takes the message in CNeutrinoApp::handleMsg, which every
+ * nested loop (a menu, a message box) hands unknown messages to; so a caller
+ * on another thread gets its answer while a dialog is open, but not while
+ * the main loop is in code that reads no messages at all. A call from the
+ * main thread itself would wait for a message the waiting thread can never
+ * take, so it runs inline.
+ */
 bool main_call::run(const std::function<void()> &fn, int timeout_ms)
 {
+	if (pthread_equal(pthread_self(), main_thread))
+	{
+		fn();
+		return true;
+	}
 	std::shared_ptr<job> j = std::make_shared<job>();
 	j->fn = fn;
 	/* the message carries a reference of its own, so a caller that gave
@@ -74,6 +93,7 @@ bool main_call::post(const std::function<void()> &fn)
 
 void main_call::handle(neutrino_msg_data_t data)
 {
+	main_thread = pthread_self();
 	std::shared_ptr<job> *ref = (std::shared_ptr<job> *) data;
 	std::shared_ptr<job> j = *ref;
 	delete ref;

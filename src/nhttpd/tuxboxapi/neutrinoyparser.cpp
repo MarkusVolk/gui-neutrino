@@ -228,6 +228,21 @@ std::string  CNeutrinoYParser::func_get_channellists_as_template(CyhookHandler *
 {
 	std::string all_name, ytemplate;
 	ySplitString(para, "~", all_name, ytemplate);
+	/* the template is a printf format from the skin; both fields are strings
+	 * here, an older skin that still names the first one %u gets the shipped one */
+	int fields = 0;
+	for (size_t i = 0; i < ytemplate.size() && fields >= 0; i++) {
+		if (ytemplate[i] != '%')
+			continue;
+		if (i + 1 < ytemplate.size() && ytemplate[i + 1] == '%')
+			i++;
+		else if (i + 1 < ytemplate.size() && ytemplate[i + 1] == 's')
+			fields++;
+		else
+			fields = -1;
+	}
+	if (fields != 2)
+		ytemplate = "<tr class=\"blist\"><td><a href=\"Y_Boxcontrol_Channellist.yhtm?bouquet=%s#akt\" target=\"content\">%s</a></td></tr>";
 	bool radio = NeutrinoAPI->Zapit->getMode() == CZapitClient::MODE_RADIO;
 
 	ZapitChannelList web;

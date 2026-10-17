@@ -801,8 +801,8 @@ static bool plugin_start(const Json::Value &input, std::string &result)
 		return false;
 	}
 	/* started from the main loop, so the answer does not wait until the plugin is left */
-	char *data = new char[file.size() + 1];
-	strcpy(data, file.c_str());
+	unsigned char *data = new unsigned char[file.size() + 1];
+	strcpy((char *) data, file.c_str());
 	if (!g_RCInput->postMsg(NeutrinoMessages::EVT_START_PLUGIN, (neutrino_msg_data_t)data, false))
 	{
 		delete[] data;
