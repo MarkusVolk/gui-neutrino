@@ -326,6 +326,14 @@ void CNeutrinoAPI::GetChannelEvent(t_channel_id channel_id, CChannelEvent &event
 		event = *evt;
 }
 
+void CNeutrinoAPI::GetChannelsWithEvent(std::set<unsigned> &epg_ids)
+{
+	OpenThreads::ScopedPointerLock<OpenThreads::Mutex> lock(pmutex);
+	for (std::map<unsigned, CChannelEvent *>::const_iterator it = ChannelListEvents.begin(); it != ChannelListEvents.end(); ++it)
+		if (it->second && it->second->eventID != 0)
+			epg_ids.insert(it->first);
+}
+
 //-------------------------------------------------------------------------
 
 std::string CNeutrinoAPI::GetServiceName(t_channel_id channel_id)

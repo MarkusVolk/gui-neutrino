@@ -47,6 +47,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <map>
+#include <tuple>
 #include <system/helpers.h>
 // yhttpd
 #include <yconfig.h>
@@ -79,6 +81,43 @@ static std::string ContentTag(int fd, off_t size)
 	if (n < 0 || pos != size)
 		return "";
 	return string_printf("\"%llx-%016llx\"", (unsigned long long) size, (unsigned long long) hash);
+}
+
+/* the tags of the files sent lately, by what identifies a file's content;
+ * the map is cleared when full, which only costs the next hashes */
+#define ETAG_CACHE_SIZE 256
+struct TagKey {
+	dev_t dev;
+	ino_t ino;
+	off_t size;
+	time_t mtime;
+	long mtime_nsec;
+	bool operator<(const TagKey &o) const
+	{
+		return std::tie(dev, ino, size, mtime, mtime_nsec) < std::tie(o.dev, o.ino, o.size, o.mtime, o.mtime_nsec);
+	}
+};
+static std::map<TagKey, std::string> tag_cache;
+static pthread_mutex_t tag_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static std::string CachedContentTag(int fd, const struct stat &st)
+{
+	TagKey key = { st.st_dev, st.st_ino, st.st_size, st.st_mtime, st.st_mtim.tv_nsec };
+	pthread_mutex_lock(&tag_mutex);
+	std::map<TagKey, std::string>::const_iterator it = tag_cache.find(key);
+	std::string tag = it == tag_cache.end() ? "" : it->second;
+	pthread_mutex_unlock(&tag_mutex);
+	if (it != tag_cache.end())
+		return tag;
+	tag = ContentTag(fd, st.st_size);
+	if (tag.empty()) /* a read error is not kept */
+		return tag;
+	pthread_mutex_lock(&tag_mutex);
+	if (tag_cache.size() >= ETAG_CACHE_SIZE)
+		tag_cache.clear();
+	tag_cache[key] = tag;
+	pthread_mutex_unlock(&tag_mutex);
+	return tag;
 }
 
 static bool EtagMatches(const std::string &header, const std::string &tag)
@@ -136,7 +175,7 @@ THandleStatus CmodSendfile::Hook_PrepareResponse(CyhookHandler *hh) {
 				hh->LastModified = statbuf.st_mtime;
 			}
 			if (S_ISREG(statbuf.st_mode) && statbuf.st_size <= ETAG_MAX_SIZE)
-				hh->ETag = ContentTag(filed, statbuf.st_size);
+				hh->ETag = CachedContentTag(filed, statbuf);
 			close(filed);
 
 			// check If-Modified-Since

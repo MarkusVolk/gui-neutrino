@@ -112,13 +112,15 @@ bool ySplitString(std::string str, std::string delimiter, std::string& left,
 // ySplitString: spit string "str" in two strings "left" and "right" at
 //	one of the chars in "delimiter" returns true if delimiter found
 //-------------------------------------------------------------------------
-bool ySplitStringExact(std::string str, std::string delimiter,
+bool ySplitStringExact(const std::string& str, const std::string& delimiter,
 		std::string& left, std::string& right) {
 	std::string::size_type pos;
 	if ((pos = str.find(delimiter)) != std::string::npos) {
-		left = str.substr(0, pos);
-		right = str.substr(pos + delimiter.length(), str.length() - (pos
+		// callers pass the same string as str and right: take the right part before str changes
+		std::string rest = str.substr(pos + delimiter.length(), str.length() - (pos
 				+ delimiter.length()));
+		left = str.substr(0, pos);
+		right.swap(rest);
 	} else {
 		left = str; //default if not found
 		right = "";

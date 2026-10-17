@@ -40,6 +40,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #define BACKEND_OPTION_COUNT 2
@@ -203,9 +205,20 @@ static std::string box_server_address()
 	netGetIP(g_settings.ifname, ip, mask, broadcast);
 	if (ip.empty())
 		return "-";
-	CConfigFile config(',');
-	config.loadConfig(HTTPD_CONFIGFILE);
-	int port = config.getInt32("WebsiteMain.port", HTTPD_STANDARD_PORT);
+	/* nhttpd.conf is parsed again only after it changed on disk, as saving
+	 * it from the nhttpd setup does; this runs on the GUI thread only */
+	static int configured_port = -1;
+	static struct stat seen;
+	struct stat st;
+	if (stat(HTTPD_CONFIGFILE, &st) != 0)
+		memset(&st, 0, sizeof(st));
+	if (configured_port < 0 || st.st_ino != seen.st_ino || st.st_size != seen.st_size || st.st_mtime != seen.st_mtime) {
+		CConfigFile config(',');
+		config.loadConfig(HTTPD_CONFIGFILE);
+		configured_port = config.getInt32("WebsiteMain.port", HTTPD_STANDARD_PORT);
+		seen = st;
+	}
+	int port = configured_port;
 	/* without root nhttpd falls back from port 80 */
 	if (port == HTTPD_STANDARD_PORT && geteuid() != 0)
 		port = HTTPD_FALLBACK_PORT;

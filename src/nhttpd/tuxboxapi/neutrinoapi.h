@@ -3,6 +3,7 @@
 
 // c++
 #include <map>
+#include <set>
 #include <string>
 
 // tuxbox
@@ -94,6 +95,8 @@ public:
 	void Lock() { pmutex->lock(); }
 	void Unlock() { pmutex->unlock(); }
 	void GetChannelEvent(t_channel_id channel_id, CChannelEvent &event);
+	// the keys of the events GetChannelEvents found, as GetChannelEvent looks them up
+	void GetChannelsWithEvent(std::set<unsigned> &epg_ids);
 
 	//friend class CNeutrinoYParser; // Backreference
 	//friend class CControlAPI;

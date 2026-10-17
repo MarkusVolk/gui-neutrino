@@ -411,30 +411,26 @@ std::string config(const char *key)
 	return Cyhttpd::ConfigList[key];
 }
 
+// api.tokens as parsed by yapi::read_config()
+struct Token {
+	Level		level;
+	std::string	secret;
+};
+std::vector<Token> tokens;
+pthread_mutex_t token_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// every token is compared, so the time taken does not tell which one matched
 bool token_level(const std::string &token, Level &level)
 {
-	std::string list = config("api.tokens"), entry;
 	bool found = false;
-	while (!list.empty()) {
-		ySplitStringExact(list, ",", entry, list);
-		entry = trim(entry);
-		std::string name, secret;
-		if (!ySplitStringExact(entry, ":", name, secret) || secret.size() < 32)
-			continue;
-		Level l;
-		if (name == "read")
-			l = L_READ;
-		else if (name == "write")
-			l = L_WRITE;
-		else if (name == "system")
-			l = L_SYSTEM;
-		else
-			continue;
-		if (equal_secret(token, secret) && !found) {
-			level = l;
+	pthread_mutex_lock(&token_mutex);
+	for (size_t i = 0; i < tokens.size(); i++) {
+		if (equal_secret(token, tokens[i].secret) && !found) {
+			level = tokens[i].level;
 			found = true;
 		}
 	}
+	pthread_mutex_unlock(&token_mutex);
 	return found;
 }
 
@@ -499,9 +495,7 @@ bool from_internet(const yapi::Request &in)
 			return true;
 	}
 #ifdef ENABLE_ASSISTANT
-	CyhookHandler hh;
-	hh.HeaderList = in.headers;
-	if (mcp_oauth::viaPublicAddress(&hh))
+	if (mcp_oauth::viaPublicAddress(in.headers))
 		return true;
 #endif
 	return false;
@@ -608,7 +602,8 @@ void channels_with_epg(std::set<t_channel_id> &ids)
 
 /* "webtv" and "webradio" name every web channel in one list, the ones with
  * EPG first when with_epg is given; the caller holds the channel lock */
-bool web_list(const std::string &id, ZapitChannelList &list, const std::set<t_channel_id> *with_epg = NULL)
+bool web_list(const std::string &id, ZapitChannelList &list, const std::set<t_channel_id> *with_epg = NULL,
+		bool sorted = true)
 {
 	if (id == "webtv")
 		CServiceManager::getInstance()->GetAllWebTVChannels(list);
@@ -616,7 +611,8 @@ bool web_list(const std::string &id, ZapitChannelList &list, const std::set<t_ch
 		CServiceManager::getInstance()->GetAllWebRadioChannels(list);
 	else
 		return false;
-	std::sort(list.begin(), list.end(), by_number);
+	if (sorted)
+		std::sort(list.begin(), list.end(), by_number);
 	if (with_epg)
 		std::stable_partition(list.begin(), list.end(), [with_epg](CZapitChannel *ch) {
 			return with_epg->count(ch->getEpgID()) != 0;
@@ -841,7 +837,8 @@ void ep_bouquets(Call &c)
 	CServiceManager::ChannelGuard guard;
 	for (size_t w = 0; w < sizeof(web) / sizeof(web[0]); w++) {
 		ZapitChannelList list;
-		if (!(web[w].radio ? g_settings.make_webradio_list : g_settings.make_webtv_list) || !web_list(web[w].id, list) || list.empty())
+		// only the size and the holds test are needed, not the order
+		if (!(web[w].radio ? g_settings.make_webradio_list : g_settings.make_webtv_list) || !web_list(web[w].id, list, NULL, false) || list.empty())
 			continue;
 		if (holds && std::none_of(list.begin(), list.end(), [holds](CZapitChannel *ch) { return ch->getChannelID() == holds; }))
 			continue;
@@ -1615,9 +1612,16 @@ std::vector<std::string> segments(const std::string &path)
 	return out;
 }
 
-bool match(const char *pattern, const std::vector<std::string> &path, std::vector<std::string> &args)
+std::vector<std::vector<std::string> > split_routes()
 {
-	std::vector<std::string> p = segments(pattern);
+	std::vector<std::vector<std::string> > out;
+	for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++)
+		out.push_back(segments(routes[i].pattern));
+	return out;
+}
+
+bool match(const std::vector<std::string> &p, const std::vector<std::string> &path, std::vector<std::string> &args)
+{
 	if (p.size() != path.size())
 		return false;
 	std::vector<std::string> a;
@@ -1635,12 +1639,14 @@ bool match(const char *pattern, const std::vector<std::string> &path, std::vecto
 const Route *find_route(const std::string &method, const std::vector<std::string> &path,
 		std::vector<std::string> &args, bool &path_known)
 {
+	// the patterns of routes[], split once
+	static const std::vector<std::vector<std::string> > patterns = split_routes();
 	path_known = false;
 	const Route *best = NULL;
 	size_t best_args = 0;
 	for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++) {
 		std::vector<std::string> a;
-		if (!match(routes[i].pattern, path, a))
+		if (!match(patterns[i], path, a))
 			continue;
 		path_known = true;
 		bool same = method == routes[i].method || (method == "HEAD" && !strcmp(routes[i].method, "GET"));
@@ -1658,6 +1664,32 @@ const Route *find_route(const std::string &method, const std::vector<std::string
 void yapi::init(CNeutrinoAPI *api)
 {
 	neutrino_api = api;
+}
+
+void yapi::read_config()
+{
+	std::vector<Token> parsed;
+	std::string list = config("api.tokens"), entry;
+	while (!list.empty()) {
+		ySplitStringExact(list, ",", entry, list);
+		entry = trim(entry);
+		Token t;
+		std::string name;
+		if (!ySplitStringExact(entry, ":", name, t.secret) || t.secret.size() < 32)
+			continue;
+		if (name == "read")
+			t.level = L_READ;
+		else if (name == "write")
+			t.level = L_WRITE;
+		else if (name == "system")
+			t.level = L_SYSTEM;
+		else
+			continue;
+		parsed.push_back(t);
+	}
+	pthread_mutex_lock(&token_mutex);
+	tokens.swap(parsed);
+	pthread_mutex_unlock(&token_mutex);
 }
 
 bool yapi::handles(const std::string &path)

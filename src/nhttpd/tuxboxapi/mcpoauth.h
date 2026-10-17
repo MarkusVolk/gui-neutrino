@@ -21,6 +21,7 @@
 #ifndef __nhttpd_mcpoauth__
 #define __nhttpd_mcpoauth__
 
+#include <map>
 #include <string>
 
 class CyhookHandler;
@@ -39,6 +40,7 @@ namespace mcp_oauth
 	/* the request came from the internet: through a tunnel or proxy, which
 	 * its headers show, or to the public address of the settings */
 	bool viaPublicAddress(CyhookHandler *hh);
+	bool viaPublicAddress(const std::map<std::string, std::string> &headers);
 	/* signs every client out */
 	void revokeAll();
 }

@@ -405,6 +405,7 @@ void Cyhttpd::ReadConfig(void) {
 	ConfigList["server.no_keep-alive_ips"] = Config->getString("server.no_keep-alive_ips", "");
 	// bearer tokens of the REST API: level:token,... with level read, write or system
 	ConfigList["api.tokens"] = Config->getString("api.tokens", "");
+	yapi::read_config();
 	webserver->conf_no_keep_alive_ips = Config->getStringVector("server.no_keep-alive_ips");
 
 	// MainSite

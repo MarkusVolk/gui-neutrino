@@ -38,6 +38,7 @@
 #include <system/main_call.h>
 
 #include <memory>
+#include <set>
 #include <string.h>
 
 #define MCP_LATEST_VERSION	"2025-06-18"
@@ -137,10 +138,38 @@ Json::Value CMcpAPI::initialize(const Json::Value &params)
 	return result;
 }
 
-Json::Value CMcpAPI::toolsList()
+/* the tools come from a table fixed at build time, so they are listed once */
+static std::vector<llm_tool> list_tools()
 {
 	std::vector<llm_tool> tools;
 	CAssistantTools::list(tools);
+	return tools;
+}
+
+static const std::vector<llm_tool> &all_tools()
+{
+	static const std::vector<llm_tool> tools = list_tools();
+	return tools;
+}
+
+static std::set<std::string> list_tool_names()
+{
+	std::set<std::string> names;
+	const std::vector<llm_tool> &tools = all_tools();
+	for (size_t i = 0; i < tools.size(); i++)
+		names.insert(tools[i].name);
+	return names;
+}
+
+static bool known_tool(const std::string &name)
+{
+	static const std::set<std::string> names = list_tool_names();
+	return names.count(name) != 0;
+}
+
+Json::Value CMcpAPI::toolsList()
+{
+	const std::vector<llm_tool> &tools = all_tools();
 	Json::Value list(Json::arrayValue);
 	for (size_t i = 0; i < tools.size(); i++)
 	{
@@ -158,12 +187,7 @@ Json::Value CMcpAPI::toolsList()
 Json::Value CMcpAPI::toolsCall(const Json::Value &params, int &code, std::string &message)
 {
 	std::string name = params["name"].asString();
-	std::vector<llm_tool> tools;
-	CAssistantTools::list(tools);
-	bool known = false;
-	for (size_t i = 0; i < tools.size(); i++)
-		known |= tools[i].name == name;
-	if (!known)
+	if (!known_tool(name))
 	{
 		code = RPC_INVALID_PARAMS;
 		message = "unknown tool " + name;

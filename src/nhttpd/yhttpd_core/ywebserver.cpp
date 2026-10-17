@@ -6,6 +6,7 @@
 //=============================================================================
 // c++
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -80,9 +81,9 @@ TRequest::~TRequest()
 
 // Header names are case-insensitive (RFC 9110); they are kept as
 // Content-Type, If-None-Match, ... whatever case a client sent them in
-std::string canonical_header_name(const std::string &name)
+std::string canonical_header_name(const char *name)
 {
-	std::string out = name;
+	std::string out = name ? name : "";
 	bool start = true;
 	for (size_t i = 0; i < out.size(); i++) {
 		out[i] = start ? toupper((unsigned char) out[i]) : tolower((unsigned char) out[i]);
@@ -183,7 +184,8 @@ std::string client_address(struct MHD_Connection *connection)
 MHD_Result collect_header(void *cls, enum MHD_ValueKind, const char *key, const char *value)
 {
 	CStringList *headers = (CStringList *) cls;
-	(*headers)[canonical_header_name(key)] = trim(value ? value : "");
+	std::string name = canonical_header_name(key);
+	(*headers)[std::move(name)] = trim(value ? value : "");
 	return MHD_YES;
 }
 
@@ -268,11 +270,10 @@ MHD_Result post_iterator(void *cls, enum MHD_ValueKind, const char *key, const c
 }
 
 // The header block BuildHeader() writes, as headers of the response;
-// what follows the block (the body of a redirect) is returned
-std::string add_headers(struct MHD_Response *response, const std::string &header_block)
+// what follows the block (the body of a redirect) is left out
+void add_headers(struct MHD_Response *response, const std::string &header_block)
 {
-	std::string head, tail;
-	ySplitStringExact(header_block, "\r\n\r\n", head, tail);
+	std::string head = header_block.substr(0, header_block.find("\r\n\r\n"));
 	std::string::size_type pos = head.find("\r\n");
 	// the first line is the status line
 	while (pos != std::string::npos) {
@@ -292,19 +293,27 @@ std::string add_headers(struct MHD_Response *response, const std::string &header
 			continue;
 		MHD_add_response_header(response, name.c_str(), value.c_str());
 	}
-	return tail;
 }
 
 MHD_Result queue_buffer(struct MHD_Connection *connection, int status, const std::string &header_block,
 		const std::string &body)
 {
-	std::string head, tail;
-	ySplitStringExact(header_block, "\r\n\r\n", head, tail);
-	const std::string content = tail + body;
-	struct MHD_Response *response =
-		MHD_create_response_from_buffer_copy(content.size(), content.data());
-	if (!response)
+	// what follows the header block (the body of a redirect), then the body, in one buffer MHD frees
+	std::string::size_type tail = header_block.find("\r\n\r\n");
+	size_t tail_len = tail == std::string::npos ? 0 : header_block.size() - tail - 4;
+	size_t size = tail_len + body.size();
+	char *content = (char *) malloc(size ? size : 1);
+	if (!content)
 		return MHD_NO;
+	if (tail_len)
+		memcpy(content, header_block.data() + tail + 4, tail_len);
+	memcpy(content + tail_len, body.data(), body.size());
+	struct MHD_Response *response =
+		MHD_create_response_from_buffer_with_free_callback(size, content, free);
+	if (!response) {
+		free(content);
+		return MHD_NO;
+	}
 	add_headers(response, header_block);
 	MHD_Result ret = MHD_queue_response(connection, status, response);
 	MHD_destroy_response(response);

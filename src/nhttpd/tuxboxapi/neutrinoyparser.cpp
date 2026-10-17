@@ -224,6 +224,17 @@ std::string  CNeutrinoYParser::func_get_bouquets_as_templatelist(CyhookHandler *
 // y-func : get_channellists_as_template <name of all channels>~<template with %s bouquet, %s name>
 // all channels, and all web channels when there are any; all channels only when some come from a tuner
 //-------------------------------------------------------------------------
+// whether GetAllWebTVChannels / GetAllWebRadioChannels would find a channel, without building the list
+static bool have_web_channels(bool radio)
+{
+	tallchans *chans = CServiceManager::getInstance()->GetAllChannels();
+	int type = radio ? ST_DIGITAL_RADIO_SOUND_SERVICE : ST_DIGITAL_TELEVISION_SERVICE;
+	for (tallchans::iterator it = chans->begin(); it != chans->end(); ++it)
+		if ((it->second.flags & CZapitChannel::PRESENT) && !it->second.getUrl().empty() && it->second.getServiceType() == type)
+			return true;
+	return false;
+}
+
 std::string  CNeutrinoYParser::func_get_channellists_as_template(CyhookHandler *, std::string para)
 {
 	std::string all_name, ytemplate;
@@ -245,10 +256,7 @@ std::string  CNeutrinoYParser::func_get_channellists_as_template(CyhookHandler *
 		ytemplate = "<tr class=\"blist\"><td><a href=\"Y_Boxcontrol_Channellist.yhtm?bouquet=%s#akt\" target=\"content\">%s</a></td></tr>";
 	bool radio = NeutrinoAPI->Zapit->getMode() == CZapitClient::MODE_RADIO;
 
-	ZapitChannelList web;
-	bool have_web = radio
-		? g_settings.make_webradio_list && CServiceManager::getInstance()->GetAllWebRadioChannels(web)
-		: g_settings.make_webtv_list && CServiceManager::getInstance()->GetAllWebTVChannels(web);
+	bool have_web = (radio ? g_settings.make_webradio_list : g_settings.make_webtv_list) && have_web_channels(radio);
 
 	bool have_tuner = false;
 	if (g_bouquetManager) {
@@ -364,12 +372,14 @@ std::string CNeutrinoYParser::func_get_bouquets_with_epg(CyhookHandler *hh, std:
 		//num = 1;
 	}
 	NeutrinoAPI->GetChannelEvents();
-	if (epg_first)
-		std::stable_partition(channels.begin(), channels.end(), [this](CZapitChannel *channel) {
-			CChannelEvent event;
-			NeutrinoAPI->GetChannelEvent(channel->getChannelID(), event);
-			return event.eventID != 0;
+	if (epg_first) {
+		// one lock for all channels instead of GetChannelEvent per channel
+		std::set<unsigned> with_event;
+		NeutrinoAPI->GetChannelsWithEvent(with_event);
+		std::stable_partition(channels.begin(), channels.end(), [&with_event](CZapitChannel *channel) {
+			return with_event.count((unsigned) channel->getEpgID()) != 0;
 		});
+	}
 
 	int i = 1;
 	char classname;

@@ -333,18 +333,26 @@ static std::string public_url()
 	return pub;
 }
 
-bool mcp_oauth::viaPublicAddress(CyhookHandler *hh)
+bool mcp_oauth::viaPublicAddress(const CStringList &headers)
 {
 	/* a request that came through a proxy counts as one from the internet,
 	 * whether or not the public address is set */
 	for (size_t i = 0; i < sizeof(proxy_headers) / sizeof(proxy_headers[0]); i++)
 	{
-		CStringList::iterator it = hh->HeaderList.find(proxy_headers[i]);
-		if (it != hh->HeaderList.end() && !it->second.empty())
+		CStringList::const_iterator it = headers.find(proxy_headers[i]);
+		if (it != headers.end() && !it->second.empty())
 			return true;
 	}
 	std::string pub = public_url();
-	return !pub.empty() && hh->HeaderList["Host"] == host_of(pub);
+	if (pub.empty())
+		return false;
+	CStringList::const_iterator host = headers.find("Host");
+	return (host == headers.end() ? std::string() : host->second) == host_of(pub);
+}
+
+bool mcp_oauth::viaPublicAddress(CyhookHandler *hh)
+{
+	return viaPublicAddress(hh->HeaderList);
 }
 
 std::string mcp_oauth::baseUrl(CyhookHandler *hh)

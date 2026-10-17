@@ -158,7 +158,7 @@ public:
 		{HookList.remove(yh);};
 
 	// session handling
-	void 		session_init(CStringList _ParamList, CStringList _UrlData, CStringList _HeaderList,
+	void 		session_init(const CStringList& _ParamList, const CStringList& _UrlData, const CStringList& _HeaderList,
 					CStringList& _ConfigList, THttp_Method _Method, bool _keep_alive,
 					const std::string &_Body = "");
 

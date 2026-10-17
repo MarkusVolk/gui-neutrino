@@ -190,8 +190,8 @@ THandleStatus CyhookHandler::Hooks_UploadReady(const std::string& Filename) {
 //=============================================================================
 // Output helpers
 //=============================================================================
-void CyhookHandler::session_init(CStringList _ParamList, CStringList _UrlData,
-		CStringList _HeaderList, CStringList& _ConfigList,
+void CyhookHandler::session_init(const CStringList& _ParamList, const CStringList& _UrlData,
+		const CStringList& _HeaderList, CStringList& _ConfigList,
 		THttp_Method _Method, bool _keep_alive, const std::string &_Body) {
 	ParamList = _ParamList;
 	Body = _Body;

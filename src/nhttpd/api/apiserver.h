@@ -59,6 +59,8 @@ namespace yapi
 	};
 
 	void init(CNeutrinoAPI *api);
+	// after nhttpd read its configuration: the tokens of api.tokens
+	void read_config();
 	bool handles(const std::string &path);
 	void dispatch(const Request &in, Response &out);
 }
