@@ -341,7 +341,7 @@ int CComponentsForm::addCCItem(CComponentsItem* cc_Item)
 		cc_Item->setFocus(true);
 
 		dprintf(DEBUG_DEBUG, "\t%s-%d parent index = %d, assigned index ======> %d\n", __func__, __LINE__, cc_item_index, new_index);
-		return getCCItemId(cc_Item);
+		return (int)v_cc_items.size() - 1;
 	}
 	else
 		dprintf(DEBUG_NORMAL, "[CComponentsForm]  %s-%d tried to add an empty or invalide cc_item !!!\n", __func__, __LINE__);

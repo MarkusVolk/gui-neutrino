@@ -1023,10 +1023,10 @@ std::string &htmlEntityDecode(std::string &text)
 {
 	struct decode_table
 	{
-		const char *code;
-		const char *htmlCode;
+		std::string code;
+		std::string htmlCode;
 	};
-	decode_table dt[] =
+	static const decode_table dt[] =
 	{
 		{"\n", "&#x0a;"},
 		{"\n", "&#x0d;"},
@@ -1043,11 +1043,13 @@ std::string &htmlEntityDecode(std::string &text)
 		{"„",  "&#8222;"},
 		{"•",  "&#8226;"},
 		{"…",  "&#8230;"},
-		{"'",  "&#39;"},
-		{NULL,  NULL}
+		{"'",  "&#39;"}
 	};
-	for (int i = 0; dt[i].code != NULL; i++)
-		text = str_replace(dt[i].htmlCode, dt[i].code, text);
+	if (text.find('&') == std::string::npos)
+		return text;
+	/* keep the pass order: a pass may uncover an entity for a later one */
+	for (size_t i = 0; i < sizeof(dt) / sizeof(dt[0]); i++)
+		str_replace(dt[i].htmlCode, dt[i].code, text);
 
 	return text;
 }
@@ -2358,7 +2360,11 @@ time_t GetBuildTime()
 
 int getBoxMode()
 {
-	int boxmode = -1;
+	/* hw_caps and /proc/cmdline do not change while neutrino runs */
+	static int boxmode = -2;
+	if (boxmode != -2)
+		return boxmode;
+	boxmode = -1;
 
 	if (!g_info.hw_caps->can_boxmode)
 		return boxmode;
@@ -2381,7 +2387,11 @@ int getBoxMode()
 
 int getActivePartition()
 {
-	int c = -1;
+	/* hw_caps, /proc/cmdline and the devicetree do not change while neutrino runs */
+	static int c = -2;
+	if (c != -2)
+		return c;
+	c = -1;
 
 	if (g_info.hw_caps->multiboot_first_partition)
 	{
@@ -2532,25 +2542,35 @@ bool getDefaultNetworkInterface(std::string &ifname, bool prefer_route)
 //name = str_replace("&", "___and___", name);
 std::string GetSpecialName(std::string name)
 {
+	struct replace_table
+	{
+		std::string search;
+		std::string replace;
+	};
+	static const replace_table rt[] =
+	{
+		{" ", "-"},
+		{"ä", "ae"},
+		{"ö", "oe"},
+		{"ü", "ue"},
+		{"ß", "ss"},
+		{"ø", "o"},
+		{"+", "-"},
+		{"&", "-"},
+		{"!", "-"},
+		{",", "-"},
+		{";", "-"},
+		{":", "-"},
+		{"*", "-"},
+		{"'", "-"},
+		{"?", "-"},
+		{"|", "-"},
+		{"/", "-"},
+		{"\\", "-"}
+	};
 	std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-	name = str_replace(" ", "-", name);
-	name = str_replace("ä", "ae", name);
-	name = str_replace("ö", "oe", name);
-	name = str_replace("ü", "ue", name);
-	name = str_replace("ß", "ss", name);
-	name = str_replace("ø", "o", name);
-	name = str_replace("+", "-", name);
-	name = str_replace("&", "-", name);
-	name = str_replace("!", "-", name);
-	name = str_replace(",", "-", name);
-	name = str_replace(";", "-", name);
-	name = str_replace(":", "-", name);
-	name = str_replace("*", "-", name);
-	name = str_replace("'", "-", name);
-	name = str_replace("?", "-", name);
-	name = str_replace("|", "-", name);
-	name = str_replace("/", "-", name);
-	name = str_replace("\\", "-", name);
+	for (size_t i = 0; i < sizeof(rt) / sizeof(rt[0]); i++)
+		str_replace(rt[i].search, rt[i].replace, name);
 
 	return name;
 }

@@ -916,7 +916,7 @@ void CEventList::paintHead(t_channel_id _channel_id, std::string _channelname, s
 	paintNaviBar(_channelname_prev, _channelname_next);
 }
 
-void CEventList::paintNaviBar(std::string _channelname_prev, std::string _channelname_next)
+void CEventList::paintNaviBar(const std::string &_channelname_prev, const std::string &_channelname_next)
 {
 	int navibar_y = y + height - OFFSET_SHADOW - footer_height - navibar_height;
 

@@ -830,9 +830,7 @@ int CMenuWidget::getItemId(const char *name)
 {
 	for (uint i= 0; i< items.size(); i++)
 	{
-		std::string s_item_name(items[i]->getName());
-		std::string s_name(name);
-		if (s_name == s_item_name)
+		if (strcmp(items[i]->getName(), name) == 0)
 			return i;
 	}
 	return -1;
@@ -840,9 +838,8 @@ int CMenuWidget::getItemId(const char *name)
 
 CMenuItem* CMenuWidget::getItem(const uint& item_id)
 {
-	for (uint i= 0; i< items.size(); i++)
-		if (i == item_id)
-			return items[i];
+	if (item_id < items.size())
+		return items[item_id];
 	return NULL;
 }
 
@@ -1374,10 +1371,7 @@ void CMenuWidget::calcSize()
 	   Most menus has an upper offset too,
 	   which is added with the intro-items
 	*/
-	CMenuItem *separator = new CMenuSeparator();
-	height += separator->getHeight();
-	delete separator;
-	separator = NULL;
+	height += CMenuSeparator().getHeight();
 
 	//scrollbar width
 	scrollbar_width=0;

@@ -312,7 +312,7 @@ bool CUpnpBrowserGui::getResults(std::string id, unsigned int start, unsigned in
 	return true;
 }
 
-std::vector<UPnPEntry> *CUpnpBrowserGui::decodeResult(std::string result)
+std::vector<UPnPEntry> *CUpnpBrowserGui::decodeResult(const std::string &result)
 {
 	xmlNodePtr root, node, snode;
 	xmlDocPtr parser = parseXml(result.c_str(), "UTF-8");

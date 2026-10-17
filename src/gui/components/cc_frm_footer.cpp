@@ -350,16 +350,7 @@ void CComponentsFooter::setButtonLabels(const struct button_label * const conten
 
 void CComponentsFooter::setButtonLabels(const std::vector<button_label_cc> &v_content, const int &chain_width, const int &label_width)
 {
-	size_t label_count = v_content.size();
-	std::vector<button_label_cc> buttons;
-	buttons.reserve(label_count);
-
-	for (size_t i = 0; i < label_count; i++) {
-		button_label_cc button = v_content[i]; // Kopiere alle Felder
-		buttons.emplace_back(std::move(button));
-	}
-
-	setButtonLabels(buttons.data(), buttons.size(), chain_width, label_width);
+	setButtonLabels(v_content.data(), v_content.size(), chain_width, label_width);
 }
 
 void CComponentsFooter::setButtonLabel(	const char *button_icon,

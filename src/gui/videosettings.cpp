@@ -241,9 +241,12 @@ bool videoModeAvailable(int mode)
 }
 
 /* the formats the box offers, in the order of the menu */
-static std::vector<CMenuOptionChooser::keyval> videoFormatOptions()
+static const std::vector<CMenuOptionChooser::keyval> &videoFormatOptions()
 {
-	std::vector<CMenuOptionChooser::keyval> v;
+	/* depends only on hw_caps, which are fixed for the lifetime of the process */
+	static std::vector<CMenuOptionChooser::keyval> v;
+	if (!v.empty())
+		return v;
 	v.push_back({ DISPLAY_AR_4_3, LOCALE_VIDEOMENU_VIDEOFORMAT_43 });
 	v.push_back({ DISPLAY_AR_16_9, LOCALE_VIDEOMENU_VIDEOFORMAT_169 });
 #if !HAVE_CST_HARDWARE
@@ -349,7 +352,7 @@ int CVideoSettings::showVideoSetup()
 	vs_43mode_ch->setHint("", LOCALE_MENU_HINT_VIDEO_43MODE);
 
 	// display format
-	std::vector<CMenuOptionChooser::keyval> format_options = videoFormatOptions();
+	const std::vector<CMenuOptionChooser::keyval> &format_options = videoFormatOptions();
 	CMenuOptionChooser *vs_dispformat_ch = new CMenuOptionChooser(LOCALE_VIDEOMENU_VIDEOFORMAT, &g_settings.video_Format, &format_options[0], format_options.size(), true, this);
 	vs_dispformat_ch->setHint("", LOCALE_MENU_HINT_VIDEO_FORMAT);
 
@@ -712,7 +715,7 @@ void CVideoSettings::SwitchFormat()
 	neutrino_locale_t text;
 	int curmode = 0;
 
-	std::vector<CMenuOptionChooser::keyval> options = videoFormatOptions();
+	const std::vector<CMenuOptionChooser::keyval> &options = videoFormatOptions();
 	for (size_t i = 0; i < options.size(); i++)
 	{
 		if (options[i].key == g_settings.video_Format)

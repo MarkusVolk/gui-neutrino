@@ -548,7 +548,8 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 		 * usable item dimensions and exit here if found any problem.
 		*/
 		for(size_t i=0; i<v_fbdata.size(); i++){
-			if (!CheckFbData(v_fbdata.at(i), __func__, __LINE__)){
+			cc_fbdata_t &fbdata = v_fbdata[i];
+			if (!CheckFbData(fbdata, __func__, __LINE__)){
 				break;
 			}
 
@@ -558,7 +559,7 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 			* call the restore method from framebuffer class to restore
 			* background.
 			*/
-			if (v_fbdata.at(i).fbdata_type == CC_FBDATA_TYPE_BGSCREEN){
+			if (fbdata.fbdata_type == CC_FBDATA_TYPE_BGSCREEN){
 				/* Taking the snapshot and claiming the area must be one step for
 				 * a painter in another thread: it asks isObscured() under the
 				 * same lock, so it either sees the claim and stays away, or it
@@ -566,7 +567,7 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 				 * could pass the check here and paint right afterwards - into a
 				 * background that hide() then writes back over it. */
 				std::lock_guard<std::recursive_mutex> lock(frameBuffer->overlay_paint_mutex);
-				v_fbdata.at(i).pixbuf = getScreen(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy);
+				fbdata.pixbuf = getScreen(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy);
 				/* Only an item that sits on the screen by itself claims its
 				 * area. An embedded child's background belongs to its parent
 				 * form, which restores the whole region anyway - and a child
@@ -576,9 +577,9 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 				 * do not reserve the area either - and clearSavedScreen() only
 				 * releases a claim when a pixel buffer exists, so this claim
 				 * would outlive enableSaveBg(false) until the next hide(). */
-				if (v_fbdata.at(i).pixbuf && claimsBackgroundArea())
-					frameBuffer->addOverlay(this, v_fbdata.at(i).x, v_fbdata.at(i).y,
-								v_fbdata.at(i).dx, v_fbdata.at(i).dy);
+				if (fbdata.pixbuf && claimsBackgroundArea())
+					frameBuffer->addOverlay(this, fbdata.x, fbdata.y,
+								fbdata.dx, fbdata.dy);
 				break;
 			}
 		}
@@ -586,14 +587,15 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 	}
 	
 	for(size_t i=0; i< v_fbdata.size(); i++){
-		int fbtype = v_fbdata.at(i).fbdata_type;
+		cc_fbdata_t &fbdata = v_fbdata[i];
+		int fbtype = fbdata.fbdata_type;
 
 		//ignore bg screen layer
 		if (fbtype == CC_FBDATA_TYPE_BGSCREEN)
 			continue;
 
 		// Don't paint on dimension or position error dx or dy are 0.
-		if (!CheckFbData(v_fbdata.at(i), __func__, __LINE__))
+		if (!CheckFbData(fbdata, __func__, __LINE__))
 			continue;
 
 		/* Paint all fb relevant basic parts (shadow, frame and body)
@@ -601,39 +603,39 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 		*/
 		if (cc_enable_frame && cc_bg_image.empty()){
 			if (fbtype == CC_FBDATA_TYPE_FRAME) {
-				if (v_fbdata.at(i).frame_thickness > 0 && cc_allow_paint){
-					frameBuffer->paintBoxFrame(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, v_fbdata.at(i).frame_thickness, v_fbdata.at(i).color, v_fbdata.at(i).r, v_fbdata.at(i).rtype);
-					v_fbdata.at(i).is_painted = true;
+				if (fbdata.frame_thickness > 0 && cc_allow_paint){
+					frameBuffer->paintBoxFrame(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, fbdata.frame_thickness, fbdata.color, fbdata.r, fbdata.rtype);
+					fbdata.is_painted = true;
 				}
 				continue;
 			}
 		}
 		if (paint_bg){
 			if (fbtype == CC_FBDATA_TYPE_BACKGROUND){
-				frameBuffer->paintBackgroundBoxRel(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy);
-				v_fbdata.at(i).is_painted = true;
+				frameBuffer->paintBackgroundBoxRel(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy);
+				fbdata.is_painted = true;
 				if (CCDraw_debug)
-					frameBuffer->paintBoxFrame(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, 1, COL_RANDOM);
+					frameBuffer->paintBoxFrame(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, 1, COL_RANDOM);
 			}
 		}
-		if (fbtype == CC_FBDATA_TYPE_SHADOW_BOX && ((!is_painted || !v_fbdata.at(i).is_painted)|| shadow_force || force_paint_bg)) {
-			if (v_fbdata.at(i).enabled) {
+		if (fbtype == CC_FBDATA_TYPE_SHADOW_BOX && ((!is_painted || !fbdata.is_painted)|| shadow_force || force_paint_bg)) {
+			if (fbdata.enabled) {
 				/* Here we paint the shadow around the body.
 				* On 1st step we check for already cached screen buffer, if true
 				* then restore this instead to call the paint methode.
 				* This could be usally, if we use an existant instances of "this" object
 				*/
 				if (cc_allow_paint){
-					if (v_fbdata.at(i).pixbuf){
+					if (fbdata.pixbuf){
 						dprintf(DEBUG_INFO, "\033[33m[CCDraw]\t[%s - %d], paint shadow from cache...\033[0m\n", __func__, __LINE__);
-						frameBuffer->RestoreScreen(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, v_fbdata.at(i).pixbuf);
+						frameBuffer->RestoreScreen(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, fbdata.pixbuf);
 					}else{
-						frameBuffer->paintBoxRel(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, v_fbdata.at(i).color, v_fbdata.at(i).r, v_fbdata.at(i).rtype);
+						frameBuffer->paintBoxRel(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, fbdata.color, fbdata.r, fbdata.rtype);
 					}
 					//If is paint cache enabled, catch screen into cache
-					if (cc_paint_cache && v_fbdata.at(i).pixbuf == NULL)
-						v_fbdata.at(i).pixbuf = getScreen(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy);
-					v_fbdata.at(i).is_painted = true;
+					if (cc_paint_cache && fbdata.pixbuf == NULL)
+						fbdata.pixbuf = getScreen(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy);
+					fbdata.is_painted = true;
 				}
 				continue;
 			}
@@ -646,15 +648,15 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 					* then restore this instead to call the paint methodes and gradient creation.
 					* Paint cache can be enable/disable with enablePaintCache()
 					*/
-					if (v_fbdata.at(i).pixbuf){
+					if (fbdata.pixbuf){
 						 /* If is paint cache enabled and cache is filled, it's prefered to paint
 						  * from cache. Cache is also filled if body background images are used
 						 */
 						dprintf(DEBUG_INFO, "\033[33m[CCDraw]\t[%s - %d], paint body from cache...\033[0m\n", __func__, __LINE__);
-						frameBuffer->RestoreScreen(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, v_fbdata.at(i).pixbuf);
+						frameBuffer->RestoreScreen(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, fbdata.pixbuf);
 					}else{
 						//Ensure clean gradient data on disabled gradient.
-						if (v_fbdata.at(i).gradient_data){
+						if (fbdata.gradient_data){
 							if(cc_body_gradient_enable == CC_COLGRAD_OFF){
 								dprintf(DEBUG_INFO, "\033[33m[CCDraw]\t[%s - %d], gradient mode is disabled but filled\033[0m\n", __func__, __LINE__);
 								clearFbGradientData();
@@ -666,20 +668,20 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 						*  Paint of background image is prefered, next steps will be ignored!
 						*/
 						if (!cc_bg_image.empty()){
-							if (g_PicViewer->DisplayImage(cc_bg_image, v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, cc_bg_image_tr_mode)){
+							if (g_PicViewer->DisplayImage(cc_bg_image, fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, cc_bg_image_tr_mode)){
 								// catch screen and store into paint cache
 								if (cc_paint_cache)
-									v_fbdata.at(i).pixbuf = getScreen(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy);
-								v_fbdata.at(i).is_painted = true;
+									fbdata.pixbuf = getScreen(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy);
+								fbdata.is_painted = true;
 							}else{
-								if (v_fbdata.at(i).pixbuf){
-									delete[] v_fbdata.at(i).pixbuf;
-									v_fbdata.at(i).pixbuf = NULL;
+								if (fbdata.pixbuf){
+									delete[] fbdata.pixbuf;
+									fbdata.pixbuf = NULL;
 								}
 							}
 
 							// On failed image paint, write this into log and reset image name.
-							if (!v_fbdata.at(i).is_painted){
+							if (!fbdata.is_painted){
 								dprintf(DEBUG_NORMAL, "\033[33m\[CCDraw]\t[%s - %d], WARNING: bg image %s defined, but paint failed,\nfallback to default rendering...\033[0m\n", __func__, __LINE__, cc_bg_image.c_str());
 								cc_bg_image = "";
 							}
@@ -695,22 +697,22 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 								* instance and add it to the fbdata object
 								* On disabled color gradient or image paint was failed, we do paint only a default box
 								*/
-								if (v_fbdata.at(i).gradient_data == NULL){
+								if (fbdata.gradient_data == NULL){
 									dprintf(DEBUG_INFO, "\033[33m[CCDraw]\t[%s - %d], create new gradient data)...\033[0m\n", __func__, __LINE__);
-									v_fbdata.at(i).gradient_data = getGradientData();
+									fbdata.gradient_data = getGradientData();
 								}
 
-								if (v_fbdata.at(i).gradient_data->boxBuf == NULL){
-									if (v_fbdata.at(i).pixbuf == NULL){
+								if (fbdata.gradient_data->boxBuf == NULL){
+									if (fbdata.pixbuf == NULL){
 										/* Before we paint any gradient box with hw acceleration, we must cleanup first.
 										* FIXME: This is only a workaround for this framebuffer behavior on enabled hw acceleration.
 										* Without this, ugly ghost letters or ghost images inside gradient boxes are possible.
 										*/
 										if (cc_gradient_bg_cleanup)
-											frameBuffer->paintBoxRel(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, 0, v_fbdata.at(i).r, v_fbdata.at(i).rtype);
+											frameBuffer->paintBoxRel(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, 0, fbdata.r, fbdata.rtype);
 
 										// create gradient buffer and paint gradient box
-										v_fbdata.at(i).gradient_data->boxBuf = frameBuffer->paintBoxRel(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, 0, v_fbdata.at(i).gradient_data, v_fbdata.at(i).r, v_fbdata.at(i).rtype);
+										fbdata.gradient_data->boxBuf = frameBuffer->paintBoxRel(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, 0, fbdata.gradient_data, fbdata.r, fbdata.rtype);
 										dprintf(DEBUG_INFO, "\033[33m[CCDraw]\t[%s - %d], paint and cache new gradient into gradient cache...\033[0m\n", __func__, __LINE__);
 									}
 
@@ -719,16 +721,16 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 									*/
 									if (cc_paint_cache || cc_gradient_bg_cleanup){
 										dprintf(DEBUG_INFO, "\033[33m[CCDraw]\t[%s - %d], cache new created gradient into external cache...\033[0m\n", __func__, __LINE__);
-										v_fbdata.at(i).pixbuf = getScreen(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy);
+										fbdata.pixbuf = getScreen(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy);
 										if (clearFbGradientData())
 											dprintf(DEBUG_INFO, "\033[33m[CCDraw]\t[%s - %d], remove unused gradient data...\033[0m\n", __func__, __LINE__);
 									}
 								}else{
 									// If found gradient buffer, paint box from gradient cache.
-									if (frameBuffer->checkFbArea(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, true)){
+									if (frameBuffer->checkFbArea(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, true)){
 										dprintf(DEBUG_INFO, "\033[33m[CCDraw]\t[%s - %d], paint cached gradient)...\033[0m\n", __func__, __LINE__);
-										frameBuffer->blitBox2FB(v_fbdata.at(i).gradient_data->boxBuf, v_fbdata.at(i).gradient_data->dx, v_fbdata.at(i).dy, v_fbdata.at(i).gradient_data->x, v_fbdata.at(i).y);
-										frameBuffer->checkFbArea(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, false);
+										frameBuffer->blitBox2FB(fbdata.gradient_data->boxBuf, fbdata.gradient_data->dx, fbdata.dy, fbdata.gradient_data->x, fbdata.y);
+										frameBuffer->checkFbArea(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, false);
 									}
 								}
 							}else{
@@ -736,21 +738,21 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 								*  render a default box.
 								*/
 								dprintf(DEBUG_INFO, "\033[33m[CCDraw]\t[%s - %d], paint default box)...\033[0m\n", __func__, __LINE__);
-								frameBuffer->paintBoxRel(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, v_fbdata.at(i).color, v_fbdata.at(i).r, v_fbdata.at(i).rtype);
+								frameBuffer->paintBoxRel(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, fbdata.color, fbdata.r, fbdata.rtype);
 
 								//If is paint cache enabled, catch screen into cache.
 								if (cc_paint_cache)
-									v_fbdata.at(i).pixbuf = getScreen(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy);
+									fbdata.pixbuf = getScreen(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy);
 							}
 						}
 					}
-					v_fbdata.at(i).is_painted = true;
+					fbdata.is_painted = true;
 					OnAfterPaintBg();
 				}
 			}
 		}
 		if (CCDraw_debug)
-			frameBuffer->paintBoxFrame(v_fbdata.at(i).x, v_fbdata.at(i).y, v_fbdata.at(i).dx, v_fbdata.at(i).dy, 1, getRandomColor({255, 255}, {1,255}, {1, 255}));
+			frameBuffer->paintBoxFrame(fbdata.x, fbdata.y, fbdata.dx, fbdata.dy, 1, getRandomColor({255, 255}, {1,255}, {1, 255}));
 	}
 
 	//set is_painted attribut. if any layer was painted set it to true;
@@ -758,7 +760,8 @@ void CCDraw::paintFbItems(const bool &do_save_bg)
 		is_painted = false;
 	}else{
 		for(size_t i=0; i< v_fbdata.size(); i++){
-			if (v_fbdata.at(i).is_painted){
+			cc_fbdata_t &fbdata = v_fbdata[i];
+			if (fbdata.is_painted){
 				is_painted = true;
 				break;
 			}

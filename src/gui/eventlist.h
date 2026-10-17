@@ -111,7 +111,7 @@ class CEventList : public CListHelpers
 	void paintDescription(int index);
 	void paint(t_channel_id channel_id = 0);
 	void paintHead(t_channel_id _channel_id, std::string _channelname, std::string _channelname_prev = "", std::string _channelname_next = "");
-	void paintNaviBar(std::string _channelname_prev, std::string _channelname_next);
+	void paintNaviBar(const std::string &_channelname_prev, const std::string &_channelname_next);
 	void showProgressBar(int pos);
 	void hide();
 	void paintFoot(t_channel_id channel_id);

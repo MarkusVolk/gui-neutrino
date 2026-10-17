@@ -829,15 +829,16 @@ void CInfoViewer::showMovieTitle(const int playState, const t_channel_id &Channe
 		g_Font[SNeutrinoSettings::FONT_TYPE_INFOBAR_CHANNAME]->RenderString(ChanNameX + OFFSET_INNER_MID, ChanNameY + header_height,BoxEndX - (ChanNameX + 2*OFFSET_INNER_MID) - time_width - OFFSET_INNER_MID, ChannelName, COL_INFOBAR_TEXT, 0, renderFlag);
 
 	// show_Data
-	if (CMoviePlayerGui::getInstance().file_prozent > 100)
-		CMoviePlayerGui::getInstance().file_prozent = 100;
+	CMoviePlayerGui &mp = CMoviePlayerGui::getInstance();
+	if (mp.file_prozent > 100)
+		mp.file_prozent = 100;
 
 	const char *unit_short_minute = g_Locale->getText(LOCALE_UNIT_SHORT_MINUTE);
 	char runningRest[32]; // %d can be 10 digits max...
 	snprintf(runningRest, sizeof(runningRest), "%d / %d %s", (curr_pos + 30000) / 60000, (duration - curr_pos + 30000) / 60000, unit_short_minute);
-	display_Info(g_file_epg.c_str(), g_file_epg1.c_str(), false, CMoviePlayerGui::getInstance().file_prozent, NULL, runningRest);
+	display_Info(g_file_epg.c_str(), g_file_epg1.c_str(), false, mp.file_prozent, NULL, runningRest);
 
-	int speed = CMoviePlayerGui::getInstance().GetSpeed();
+	int speed = mp.GetSpeed();
 	const char *playicon = NULL;
 	switch (playState) {
 	case CMoviePlayerGui::PLAY:

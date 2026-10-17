@@ -3588,7 +3588,8 @@ void CNeutrinoApp::RealRun()
 	}
 	g_RCInput->clearRCMsg();
 
-	CScreenSaver::getInstance()->resetIdleTime();
+	CScreenSaver *screenSaver = CScreenSaver::getInstance();
+	screenSaver->resetIdleTime();
 
 	while( true ) {
 		/* What waited for the string inputs, taken up here if nothing took
@@ -3606,7 +3607,7 @@ void CNeutrinoApp::RealRun()
 #endif
 
 		if (msg <= CRCInput::RC_MaxRC)
-			CScreenSaver::getInstance()->resetIdleTime();
+			screenSaver->resetIdleTime();
 
 #if HAVE_ARM_HARDWARE || HAVE_MIPS_HARDWARE
 		if (mode == NeutrinoModes::mode_radio)
@@ -3616,17 +3617,17 @@ void CNeutrinoApp::RealRun()
 		{
 			if (msg == CRCInput::RC_timeout || msg == NeutrinoMessages::EVT_TIMER)
 			{
-				if (/*!blank_screen && */CScreenSaver::getInstance()->canStart() && !CScreenSaver::getInstance()->isActive())
+				if (/*!blank_screen && */screenSaver->canStart() && !screenSaver->isActive())
 				{
-					CScreenSaver::getInstance()->Start();
+					screenSaver->Start();
 				}
 			}
-			else if (!CScreenSaver::getInstance()->ignoredMsg(msg))
+			else if (!screenSaver->ignoredMsg(msg))
 			{
-				if (CScreenSaver::getInstance()->isActive())
+				if (screenSaver->isActive())
 				{
 					printf("[neutrino] CScreenSaver stop; msg: %lX\n", msg);
-					CScreenSaver::getInstance()->Stop();
+					screenSaver->Stop();
 
 					frameBuffer->stopFrame();
 					frameBuffer->showFrame("radiomode.jpg");

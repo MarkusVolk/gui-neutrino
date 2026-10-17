@@ -2015,8 +2015,9 @@ void CChannelList::paintItem(int pos, const bool firstpaint)
 	if (selected >= (*chanlist).size())
 		selected = (*chanlist).size()-1;
 
+	int active_nr	= CNeutrinoApp::getInstance()->channelList->getActiveChannelNumber();
 	bool i_selected	= curr == selected;
-	bool i_marked	= getKey(curr) == CNeutrinoApp::getInstance()->channelList->getActiveChannelNumber() && new_zap_mode != 2 /*active*/;
+	bool i_marked	= getKey(curr) == active_nr && new_zap_mode != 2 /*active*/;
 	int i_radius	= RADIUS_NONE;
 
 	fb_pixel_t color;
@@ -2058,7 +2059,7 @@ void CChannelList::paintItem(int pos, const bool firstpaint)
 	if (!is_available)
 		color = COL_MENUCONTENTINACTIVE_TEXT;
 
-	if (!firstpaint || i_selected || getKey(curr) == CNeutrinoApp::getInstance()->channelList->getActiveChannelNumber())
+	if (!firstpaint || i_selected || getKey(curr) == active_nr)
 		  frameBuffer->paintBoxRel(x,ypos, width - SCROLLBAR_WIDTH, fheight, bgcolor, i_radius);
 
 	if(curr < (*chanlist).size()) {
@@ -2086,7 +2087,9 @@ void CChannelList::paintItem(int pos, const bool firstpaint)
 			p_event = &chan->nextEvent;
 
 		//record check
-		rec_mode = CRecordManager::getInstance()->GetRecordMode((*chanlist)[curr]->getChannelID());
+		rec_mode = CRecordManager::RECMODE_OFF;
+		if (CRecordManager::getInstance()->GetRecordCount())
+			rec_mode = CRecordManager::getInstance()->GetRecordMode((*chanlist)[curr]->getChannelID());
 
 		//set recording icon
 		const char *record_icon = NULL;

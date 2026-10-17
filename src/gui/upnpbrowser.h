@@ -109,7 +109,7 @@ class CUpnpBrowserGui : public CMenuTarget, public CListHelpers
 		bool discoverDevices();
 		void splitProtocol(std::string &protocol, std::string &prot, std::string &network, std::string &mime, std::string &additional);
 		bool getResults(std::string id, unsigned int start, unsigned int count, std::list<UPnPAttribute> &results);
-		std::vector<UPnPEntry> *decodeResult(std::string);
+		std::vector<UPnPEntry> *decodeResult(const std::string &);
 		void Init();
 		void updateDeviceSelection(int newpos);
 		void selectDevice();

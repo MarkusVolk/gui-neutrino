@@ -207,12 +207,14 @@ bool CConfigFile::getBool(const char *const key, const bool defaultVal)
 
 bool CConfigFile::getBool(const std::string &key, const bool defaultVal)
 {
-	if (configData.find(key) == configData.end())
+	ConfigDataMap::iterator it = configData.find(key);
+	if (it == configData.end())
 	{
 		if (saveDefaults)
 		{
 			unknownKeyQueryedFlag = true;
 			storeBool(key, defaultVal);
+			it = configData.find(key);
 		}
 		else
 		{
@@ -220,7 +222,7 @@ bool CConfigFile::getBool(const std::string &key, const bool defaultVal)
 		}
 	}
 
-	return !((configData[key] == "false") || (configData[key] == "0"));
+	return !((it->second == "false") || (it->second == "0"));
 }
 
 int32_t CConfigFile::getInt32(const char *const key, const int32_t defaultVal)
@@ -230,12 +232,14 @@ int32_t CConfigFile::getInt32(const char *const key, const int32_t defaultVal)
 
 int32_t CConfigFile::getInt32(const std::string &key, const int32_t defaultVal)
 {
-	if (configData.find(key) == configData.end())
+	ConfigDataMap::iterator it = configData.find(key);
+	if (it == configData.end())
 	{
 		if (saveDefaults)
 		{
 			unknownKeyQueryedFlag = true;
 			storeInt32(key, defaultVal);
+			it = configData.find(key);
 		}
 		else
 		{
@@ -243,11 +247,11 @@ int32_t CConfigFile::getInt32(const std::string &key, const int32_t defaultVal)
 		}
 	}
 
-	if (configData[key] == "false")
+	if (it->second == "false")
 		return 0;
-	if (configData[key] == "true")
+	if (it->second == "true")
 		return 1;
-	return atoi(configData[key].c_str());
+	return atoi(it->second.c_str());
 }
 
 int64_t CConfigFile::getInt64(const char *const key, const int64_t defaultVal)
@@ -257,12 +261,14 @@ int64_t CConfigFile::getInt64(const char *const key, const int64_t defaultVal)
 
 int64_t CConfigFile::getInt64(const std::string &key, const int64_t defaultVal)
 {
-	if (configData.find(key) == configData.end())
+	ConfigDataMap::iterator it = configData.find(key);
+	if (it == configData.end())
 	{
 		if (saveDefaults)
 		{
 			unknownKeyQueryedFlag = true;
 			storeInt64(key, defaultVal);
+			it = configData.find(key);
 		}
 		else
 		{
@@ -270,11 +276,11 @@ int64_t CConfigFile::getInt64(const std::string &key, const int64_t defaultVal)
 		}
 	}
 
-	if (configData[key] == "false")
+	if (it->second == "false")
 		return 0;
-	if (configData[key] == "true")
+	if (it->second == "true")
 		return 1;
-	return atoll(configData[key].c_str());
+	return atoll(it->second.c_str());
 }
 
 std::string CConfigFile::getString(const char *const key, const std::string &defaultVal)
@@ -284,12 +290,14 @@ std::string CConfigFile::getString(const char *const key, const std::string &def
 
 std::string CConfigFile::getString(const std::string &key, const std::string &defaultVal)
 {
-	if (configData.find(key) == configData.end())
+	ConfigDataMap::iterator it = configData.find(key);
+	if (it == configData.end())
 	{
 		if (saveDefaults)
 		{
 			unknownKeyQueryedFlag = true;
 			storeString(key, defaultVal);
+			it = configData.find(key);
 		}
 		else
 		{
@@ -297,7 +305,7 @@ std::string CConfigFile::getString(const std::string &key, const std::string &de
 		}
 	}
 
-	return configData[key];
+	return it->second;
 }
 
 std::vector <int32_t> CConfigFile::getInt32Vector(const std::string &key)
