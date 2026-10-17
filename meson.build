@@ -322,7 +322,7 @@ crypto_dep = enable_assistant ? dependency('libcrypto') : []
 webp_dep = enable_webp ? dependency('libwebp') : []
 heif_dep = enable_heif ? dependency('libheif') : []
 jxl_dep = enable_jxl ? dependency('libjxl') : []
-mhd_dep = dependency('libmicrohttpd', version : '>= 1.0.0')
+mhd_dep = dependency('libmicrohttpd', version : '>= 0.9.75')
 
 nt_deps = [
 	threads_dep,
