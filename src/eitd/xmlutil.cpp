@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <netdb.h>
 #include <time.h>
 #include <string>
 #include <set>
@@ -788,6 +789,50 @@ static void readEventsFromXMLTVFile(std::string &name, int &ev_count, bool delet
 static std::set<std::string> xmltv_cache_read;
 static pthread_mutex_t xmltv_cache_lock = PTHREAD_MUTEX_INITIALIZER;
 
+#define XMLTV_NAME_SERVER_WAIT_S 60
+
+/*
+	Right after the start no name server may answer yet. Wait while that
+	is so, asking every second, and say whether the name is known now; a
+	name that does not exist is not waited for.
+*/
+static bool waitForXMLTVNameServer(const std::string &url)
+{
+	std::string::size_type begin = url.find("://");
+	if (begin == std::string::npos)
+		return false;
+	begin += 3;
+	std::string host = url.substr(begin, url.find_first_of(":/?#", begin) - begin);
+	if (host.empty() || host[0] == '[')
+		return false;
+
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	const int64_t start = time_monotonic_ms();
+	for (;;)
+	{
+		struct addrinfo *result = NULL;
+		int ret = getaddrinfo(host.c_str(), NULL, &hints, &result);
+		if (result)
+			freeaddrinfo(result);
+		int waited = (time_monotonic_ms() - start) / 1000;
+		if (ret != EAI_AGAIN)
+		{
+			if (waited > 0)
+				debug(DEBUG_NORMAL, "Waited %d s for a name server for %s", waited, host.c_str());
+			return ret == 0;
+		}
+		if (waited >= XMLTV_NAME_SERVER_WAIT_S)
+		{
+			debug(DEBUG_NORMAL, "No name server for %s after %d s", host.c_str(), waited);
+			return false;
+		}
+		sleep(1);
+	}
+}
+
 void *insertEventsfromXMLTV(void * data)
 {
 	set_threadname(__func__);
@@ -827,7 +872,8 @@ void *insertEventsfromXMLTV(void * data)
 				debug(DEBUG_NORMAL, "Read %d events kept from %s", ev_count, url.c_str());
 			}
 		}
-		if (!::downloadUrl(url, tmp_name))
+		if (!::downloadUrl(url, tmp_name) &&
+		    !(waitForXMLTVNameServer(url) && ::downloadUrl(url, tmp_name)))
 		{
 			unlink(tmp_name.c_str());
 			reader_ready = true;
