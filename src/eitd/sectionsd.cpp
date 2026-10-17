@@ -39,6 +39,8 @@
 #include <sys/time.h>
 #include <sys/timex.h>
 #include <time.h>
+#include <set>
+#include <string>
 #include <connection/basicsocket.h>
 #include <connection/basicserver.h>
 
@@ -79,6 +81,7 @@ static bool notify_complete = false;
 #define META_HOUSEKEEPING_COUNT (24 * 60 * 60) / HOUSEKEEPING_SLEEP // meta housekeeping after XX housekeepings - every 24h -
 #define STANDBY_HOUSEKEEPING_COUNT (60 * 60) / HOUSEKEEPING_SLEEP
 #define EPG_SERVICE_FREQUENTLY_COUNT (60 * 60) / HOUSEKEEPING_SLEEP
+#define XMLTV_READ_AGAIN_MS (60 * 60 * 1000)
 
 // Timeout bei tcp/ip connections in ms
 #define READ_TIMEOUT_IN_SECONDS  2
@@ -1253,16 +1256,22 @@ static void commandReadSIfromXML(int connfd, char *data, const unsigned dataLeng
 	pthread_attr_destroy(&attr);
 }
 
-static void commandReadSIfromXMLTV(int connfd, char *data, const unsigned dataLength)
+/*
+	The programme guides that were asked for since the start, read again
+	from here every hour: a guide that covers only a few hours runs out,
+	and neutrino, which asks for them, does not get to it while a program
+	has the display, nor does the housekeeping in standby.
+*/
+static std::set<std::string> xmltv_urls;
+static int64_t xmltv_read_at;
+static pthread_mutex_t xmltv_urls_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void startXMLTVReader(const std::string &address)
 {
 	pthread_t thrInsertXMLTV;
 
-	sendEmptyResponse(connfd, NULL, 0);
-
-	if (dataLength == 0)
-		return ;
-	/* a URL may be long, and the next one may come before this one is read: the thread gets its own copy and frees it */
-	char *url = strndup(data, dataLength);
+	/* the next one may come before this one is read: the thread gets its own copy and frees it */
+	char *url = strdup(address.c_str());
 	if (url == NULL)
 		return ;
 
@@ -1277,6 +1286,33 @@ static void commandReadSIfromXMLTV(int connfd, char *data, const unsigned dataLe
 	}
 
 	pthread_attr_destroy(&attr);
+}
+
+static void readXMLTVAgain(void)
+{
+	pthread_mutex_lock(&xmltv_urls_lock);
+	std::set<std::string> urls = xmltv_urls;
+	xmltv_read_at = time_monotonic_ms();
+	pthread_mutex_unlock(&xmltv_urls_lock);
+
+	for (std::set<std::string>::const_iterator it = urls.begin(); it != urls.end(); ++it)
+		startXMLTVReader(*it);
+}
+
+static void commandReadSIfromXMLTV(int connfd, char *data, const unsigned dataLength)
+{
+	sendEmptyResponse(connfd, NULL, 0);
+
+	if (dataLength == 0)
+		return ;
+	std::string url(data, strnlen(data, dataLength));
+
+	pthread_mutex_lock(&xmltv_urls_lock);
+	xmltv_urls.insert(url);
+	xmltv_read_at = time_monotonic_ms();
+	pthread_mutex_unlock(&xmltv_urls_lock);
+
+	startXMLTVReader(url);
 }
 
 static void commandWriteSI2XML(int connfd, char *data, const unsigned dataLength)
@@ -2316,6 +2352,14 @@ static void *houseKeepingThread(void *)
 		if (sectionsd_stop)
 			break;
 
+		if (epg_read_frequently > 0) {
+			pthread_mutex_lock(&xmltv_urls_lock);
+			bool again = !xmltv_urls.empty() && time_monotonic_ms() - xmltv_read_at >= XMLTV_READ_AGAIN_MS;
+			pthread_mutex_unlock(&xmltv_urls_lock);
+			if (again)
+				readXMLTVAgain();
+		}
+
 		if (!scanning) {
 			scount++;
 			if (scount < STANDBY_HOUSEKEEPING_COUNT)
@@ -2356,8 +2400,6 @@ static void *houseKeepingThread(void *)
 					perror("sectionsd: pthread_create()");
 					}
 				pthread_attr_destroy(&attr);
-
-				eventServer->sendEvent(CSectionsdClient::EVT_RELOAD_XMLTV, CEventServer::INITID_SECTIONSD);
 			}
 			ecount = 0;
 		}
