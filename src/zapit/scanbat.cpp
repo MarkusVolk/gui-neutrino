@@ -79,7 +79,7 @@ void CBat::run()
 bool CBat::Read()
 {
 	bool ret = true;
-	int secdone[255];
+	int secdone[256];
 	int sectotal = -1;
 
 	memset(secdone, 0, sizeof(secdone));

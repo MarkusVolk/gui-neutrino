@@ -110,7 +110,7 @@ bool CSdt::PMTPing(unsigned short pid, unsigned short sid)
 /* read all sdt sections */
 bool CSdt::Read()
 {
-	int secdone[255];
+	int secdone[256];
 	int sectotal = -1;
 	bool cable_hack_done = false;
 

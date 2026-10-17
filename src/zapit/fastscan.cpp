@@ -324,7 +324,7 @@ bool CServiceScan::ReadFstVersion(int num)
 
 bool CServiceScan::ReadFst(unsigned short pid, unsigned short operator_id, bool one_section)
 {
-	int secdone[255];
+	int secdone[256];
 	int sectotal = -1;
 	uint8_t last = 0;
 
@@ -563,10 +563,10 @@ bool CServiceScan::ParseFst(unsigned short pid, fast_scan_operator_t * op)
 
 bool CServiceScan::ParseFnt(unsigned short pid, unsigned short operator_id)
 {
-	int secdone[255];
+	int secdone[256];
 	int sectotal = -1;
 
-	for(int i = 0; i < 255; i++)
+	for(int i = 0; i < 256; i++)
 		secdone[i] = 0;
 
 	cDemux * dmx = new cDemux();;

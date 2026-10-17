@@ -76,12 +76,12 @@ void CNit::run()
 bool CNit::Read()
 {
 	bool ret = true;
-	int secdone[2][255];
+	int secdone[2][256];
 	int sectotal[2] = { -1, -1 };
 	int nit_index = 0;
 
 	for(int i = 0; i < 2; i++) {
-		for (int j = 0; j < 255; j++)
+		for (int j = 0; j < 256; j++)
 		secdone[i][j] = 0;
 	}
 

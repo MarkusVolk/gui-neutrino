@@ -71,7 +71,8 @@ bool CPat::Parse()
 	do {
 		/* set filter for program association section */
 		/* read section */
-		if ((!dmx->sectionFilter(0, filter, mask, 5)) || (dmx->Read(buffer, PAT_SECTION_SIZE) < 0))
+		int len = -1;
+		if ((!dmx->sectionFilter(0, filter, mask, 5)) || ((len = dmx->Read(buffer, PAT_SECTION_SIZE)) < 8))
 		{
 			delete dmx;
 			printf("[pat.cpp] dmx read failed\n");
@@ -79,8 +80,11 @@ bool CPat::Parse()
 		}
 		/* set Transport_Stream_ID from pat */
 		ts_id = ((buffer[3] << 8) | buffer[4]);
-		/* loop over service id / program map table pid pairs */
-		for (i = 8; i < (((buffer[1] & 0x0F) << 8) | buffer[2]) + 3 - crc_len; i += 4) {
+		/* loop over service id / program map table pid pairs, section_length bounded by what was read */
+		int end = (((buffer[1] & 0x0F) << 8) | buffer[2]) + 3 - crc_len;
+		if (end > len)
+			end = len;
+		for (i = 8; i + 4 <= end; i += 4) {
 			/* store program map table pid */
 			int service_id	= ((buffer[i] << 8) | buffer[i+1]);
 			int pmt_pid	= (((buffer[i+2] & 0x1F) << 8) | buffer[i+3]);

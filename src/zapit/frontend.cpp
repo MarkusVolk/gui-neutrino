@@ -278,7 +278,8 @@ void CFrontend::getFEInfo(void)
 				//printf("NIM SOCKET: %s\n", line.substr(line.find_first_of(":") + 2).c_str());
 				if (get_hwcaps()->nim_socket_vuplus_format)
 				{
-					sprintf(info.name,"%s", line.substr(line.find_first_of(":") + 9).c_str());
+					std::string::size_type p = line.find_first_of(":") + 9;
+					snprintf(info.name, sizeof(info.name), "%s", p <= line.length() ? line.substr(p).c_str() : "");
 					// no hybrid for BCM3466 T2 tuner
 					if (!strncmp(line.substr(line.find_first_of("(") + 1).c_str(), "BCM3466)", 8))
 					{
@@ -289,7 +290,8 @@ void CFrontend::getFEInfo(void)
 				else
 				{
 					std::string tmp = info.name;
-					sprintf(info.name,"%s (%s)", tmp.c_str(), line.substr(line.find_first_of(":") + 2).c_str());
+					std::string::size_type p = line.find_first_of(":") + 2;
+					snprintf(info.name, sizeof(info.name), "%s (%s)", tmp.c_str(), p <= line.length() ? line.substr(p).c_str() : "");
 				}
 				break;
 			}
