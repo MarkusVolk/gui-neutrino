@@ -204,7 +204,7 @@ void CFbAccelCSHD2::blit2FB(void *fbbuff, uint32_t width, uint32_t height, uint3
 	CFrameBuffer::blit2FB(fbbuff, width, height, xoff, yoff, xp, yp, transp);
 }
 
-void CFbAccelCSHD2::blitBox2FB(const fb_pixel_t* boxBuf, uint32_t width, uint32_t height, uint32_t xoff, uint32_t yoff)
+void CFbAccelCSHD2::blitBox2FB(const fb_pixel_t* boxBuf, const uint32_t& width, const uint32_t& height, const uint32_t& xoff, const uint32_t& yoff)
 {
 	if(width <1 || height <1 || !boxBuf )
 		return;
