@@ -119,7 +119,8 @@ void fh_crw_find_jpeg_thumbnail(FILE *fh)
 	long hlength=0;
 
 	fseek (fh, 0, SEEK_SET);
-	fread (header, 1, 26, fh);
+	if (fread (header, 1, 26, fh) != 26)
+		return;
 	fseek (fh, 0, SEEK_END);
 	fsize = ftell(fh);
 	fseek (fh, 0, SEEK_SET);
@@ -146,8 +147,10 @@ int fh_crw_id(const char *name)
 	int fd;
 	unsigned char id[14];
 	fd=open(name,O_RDONLY); if(fd==-1) return(0);
-	read(fd,id,14);
+	ssize_t got = read(fd,id,14);
 	close(fd);
+	if (got != 14)
+		return(0);
 //	 dbout("fh_crw_id }\n");
 	if(id[6]=='H' && id[7]=='E' && id[8]=='A' && id[9]=='P' &&
 		id[10]=='C' && id[11]=='C' && id[12]=='D' && id[13]=='R')	return(1);

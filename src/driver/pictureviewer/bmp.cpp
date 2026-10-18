@@ -3,6 +3,7 @@
 #ifdef FBV_SUPPORT_BMP
 #include "pictureviewer.h"
 #include <cstdlib>
+#include <cstring>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -23,6 +24,11 @@ struct color {
 	unsigned char blue;
 };
 
+static bool read_all(int fd, void *buf, size_t n)
+{
+	return read(fd, buf, n) == (ssize_t)n;
+}
+
 int fh_bmp_id(const char *name)
 {
 	int fd;
@@ -34,9 +40,9 @@ int fh_bmp_id(const char *name)
 		return(0);
 	}
 
-	read(fd, id, 2);
+	bool ok = read_all(fd, id, 2);
 	close(fd);
-	if ( id[0]=='B' && id[1]=='M' ) {
+	if (ok && id[0]=='B' && id[1]=='M' ) {
 		return(1);
 	}
 	return(0);
@@ -50,7 +56,8 @@ void fetch_pallete(int fd, struct color pallete[], int count)
 
 	lseek(fd, BMP_COLOR_OFFSET, SEEK_SET);
 	for (i=0; i<count; i++) {
-		read(fd, buff, 4);
+		if (!read_all(fd, buff, 4))
+			memset(buff, 0, sizeof(buff));
 		pallete[i].red = buff[2];
 		pallete[i].green = buff[1];
 		pallete[i].blue = buff[0];
@@ -77,7 +84,10 @@ int fh_bmp_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 		return(FH_ERROR_FORMAT);
 	}
 
-	read(fd, buff, 4);
+	if (!read_all(fd, buff, 4)) {
+		close(fd);
+		return(FH_ERROR_FORMAT);
+	}
 	raster = buff[0] + (buff[1]<<8) + (buff[2]<<16) + (buff[3]<<24);
 
 	if (lseek(fd, BMP_BPP_OFFSET, SEEK_SET) == -1) {
@@ -85,7 +95,10 @@ int fh_bmp_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 		return(FH_ERROR_FORMAT);
 	}
 
-	read(fd, buff, 2);
+	if (!read_all(fd, buff, 2)) {
+		close(fd);
+		return(FH_ERROR_FORMAT);
+	}
 	bpp = buff[0] + (buff[1]<<8);
 
 	switch (bpp){
@@ -104,7 +117,11 @@ int fh_bmp_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 					return (FH_ERROR_MALLOC);
 				}
 				for (i=0; i<y; i++) {
-					read(fd, tbuffer, bytes);
+					if (!read_all(fd, tbuffer, bytes)) {
+						free(tbuffer);
+						close(fd);
+						return(FH_ERROR_FORMAT);
+					}
 					for (j=0; j<x/8; j++) {
 						for (k=0; k<8; k++) {
 							if (tbuffer[j] & 0x80) {
@@ -136,7 +153,7 @@ int fh_bmp_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 
 					}
 					if (skip) {
-						read(fd, tbuffer, skip);
+						lseek(fd, skip, SEEK_CUR);
 					}
 					wr_buffer -= x*6; /* backoff 2 lines - x*2 *3 */
 				}
@@ -157,7 +174,11 @@ int fh_bmp_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 			}
 			unsigned char c1,c2;
 			for (i=0; i<y; i++) {
-				read(fd, tbuffer, x/2 + x%2);
+				if (!read_all(fd, tbuffer, x/2 + x%2)) {
+					free(tbuffer);
+					close(fd);
+					return(FH_ERROR_FORMAT);
+				}
 				for (j=0; j<x/2; j++) {
 					c1 = tbuffer[j]>>4;
 					c2 = tbuffer[j] & 0x0f;
@@ -175,7 +196,7 @@ int fh_bmp_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 					*wr_buffer++ = pallete[c1].blue;
 				}
 				if (skip) {
-					read(fd, buff, skip);
+					lseek(fd, skip, SEEK_CUR);
 				}
 				wr_buffer -= x*6; /* backoff 2 lines - x*2 *3 */
 			}
@@ -196,14 +217,18 @@ int fh_bmp_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 			}
 			for (i=0; i<y; i++)
 		   {
-				read(fd, tbuffer, x);
+				if (!read_all(fd, tbuffer, x)) {
+					free(tbuffer);
+					close(fd);
+					return(FH_ERROR_FORMAT);
+				}
 				for (j=0; j<x; j++) {
 					wr_buffer[j*3] = pallete[tbuffer[j]].red;
 					wr_buffer[j*3+1] = pallete[tbuffer[j]].green;
 					wr_buffer[j*3+2] = pallete[tbuffer[j]].blue;
 				}
 				if (skip) {
-					read(fd, buff, skip);
+					lseek(fd, skip, SEEK_CUR);
 				}
 				wr_buffer -= x*3; /* backoff 2 lines - x*2 *3 */
 			}
@@ -220,7 +245,10 @@ int fh_bmp_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 			unsigned char c;
 			for (i=0; i<y; i++)
 			{
-				read(fd,wr_buffer,x*3);
+				if (!read_all(fd, wr_buffer, x*3)) {
+					close(fd);
+					return(FH_ERROR_FORMAT);
+				}
 				for(j=0; j < x*3 ; j=j+3)
 				{
 					c=wr_buffer[j];
@@ -228,7 +256,7 @@ int fh_bmp_load(const char *name,unsigned char **buffer,int* xp,int* yp)
 					wr_buffer[j+2]=c;
 				}
 				if (skip) {
-					read(fd, buff, skip);
+					lseek(fd, skip, SEEK_CUR);
 				}
 				wr_buffer -= x*3; // backoff 1 lines - x*3
 			}
@@ -257,10 +285,16 @@ int fh_bmp_getsize(const char *name,int *x,int *y, int /*wanted_width*/, int /*w
 		return(FH_ERROR_FORMAT);
 	}
 
-	read(fd, size, 4);
+	if (!read_all(fd, size, 4)) {
+		close(fd);
+		return(FH_ERROR_FORMAT);
+	}
 	*x = size[0] + (size[1]<<8) + (size[2]<<16) + (size[3]<<24);
 //	*x-=1;
-	read(fd, size, 4);
+	if (!read_all(fd, size, 4)) {
+		close(fd);
+		return(FH_ERROR_FORMAT);
+	}
 	*y = size[0] + (size[1]<<8) + (size[2]<<16) + (size[3]<<24);
 
 	close(fd);

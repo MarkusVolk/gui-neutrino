@@ -35,8 +35,10 @@ int fh_gif_id(const char *name)
 	int fd;
 	char id[4];
 	fd=open(name,O_RDONLY); if(fd==-1) return(0);
-	read(fd,id,4);
+	ssize_t got = read(fd,id,4);
 	close(fd);
+	if (got != 4)
+		return(0);
 	if(id[0]=='G' && id[1]=='I' && id[2]=='F') return(1);
 	return(0);
 }

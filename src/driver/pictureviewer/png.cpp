@@ -18,8 +18,10 @@ int fh_png_id(const char *name)
 	int fd;
 	char id[4];
 	fd=open(name,O_RDONLY); if(fd==-1) return(0);
-	read(fd,id,4);
+	ssize_t got = read(fd,id,4);
 	close(fd);
+	if (got != 4)
+		return(0);
 	if(id[1]=='P' && id[2]=='N' && id[3]=='G') return(1);
 	return(0);
 }
