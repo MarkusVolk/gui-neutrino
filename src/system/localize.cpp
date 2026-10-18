@@ -253,15 +253,16 @@ CLocaleManager::loadLocale_ret_t CLocaleManager::loadLocale(const char * const l
 	if(buf)
 		free(buf);
 	if(memp - mem > 0){
+		uintptr_t old_mem = (uintptr_t)mem;
 		char *_mem = (char *) realloc(mem, memp - mem);
 		if (_mem) {
-			if (_mem != mem) {
+			if ((uintptr_t)_mem != old_mem) {
 				// most likely doesn't happen
 				for(unsigned int i = 1; i < sizeof(locale_real_names)/sizeof(const char *); i++)
 					if (loadData[i] != locale_real_names[i])
-						loadData[i] -= mem - _mem;
-				mem = _mem;
+						loadData[i] = _mem + ((uintptr_t)loadData[i] - old_mem);
 			}
+			mem = _mem;
 		}
 	}
 	for (unsigned j = 1; j < (sizeof(locale_real_names)/sizeof(const char *)); j++)
