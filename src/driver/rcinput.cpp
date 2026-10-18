@@ -738,7 +738,12 @@ void CRCInput::getMsg_us(neutrino_msg_t * msg, neutrino_msg_data_t * data, uint6
 		{
 			struct event buf;
 
-			read(fd_pipe_high_priority[0], &buf, sizeof(buf));
+			if (read(fd_pipe_high_priority[0], &buf, sizeof(buf)) != sizeof(buf))
+			{
+				*msg  = RC_nokey;
+				*data = 0;
+				return;
+			}
 
 			*msg  = buf.msg;
 			*data = buf.data;
@@ -1496,7 +1501,12 @@ void CRCInput::getMsg_us(neutrino_msg_t * msg, neutrino_msg_data_t * data, uint6
 		{
 			struct event buf;
 
-			read(fd_pipe_low_priority[0], &buf, sizeof(buf));
+			if (read(fd_pipe_low_priority[0], &buf, sizeof(buf)) != sizeof(buf))
+			{
+				*msg  = RC_nokey;
+				*data = 0;
+				return;
+			}
 
 			*msg  = buf.msg;
 			*data = buf.data;
