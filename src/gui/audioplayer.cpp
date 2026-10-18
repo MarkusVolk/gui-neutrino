@@ -66,6 +66,7 @@ extern CPictureViewer * g_PicViewer;
 #include <driver/screen_max.h>
 
 #include <algorithm>
+#include <random>
 #include <sys/time.h>
 #include <fstream>
 #include <iostream>
@@ -1055,7 +1056,7 @@ bool CAudioPlayerGui::clearPlaylist(void)
 
 bool CAudioPlayerGui::shufflePlaylist(void)
 {
-	RandomNumber rnd;
+	std::mt19937 rnd(std::random_device{}());
 	bool result = false;
 	if (!(m_playlist.empty()))
 	{
@@ -1065,7 +1066,7 @@ bool CAudioPlayerGui::shufflePlaylist(void)
 			m_current = 0;
 		}
 
-		std::random_shuffle((m_current != 0) ? m_playlist.begin() : m_playlist.begin() + 1, m_playlist.end(), rnd);
+		std::shuffle((m_current != 0) ? m_playlist.begin() : m_playlist.begin() + 1, m_playlist.end(), rnd);
 		if (m_select_title_by_name)
 			buildSearchTree();
 

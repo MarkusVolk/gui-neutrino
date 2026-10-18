@@ -36,6 +36,7 @@
 #include <gui/widget/hourglass.h>
 
 #include <algorithm>
+#include <random>
 #include <iostream>
 #include <cctype>
 
@@ -1106,7 +1107,7 @@ bool CFileBrowser::playlist_manager(CFileList &playlist, unsigned int playing, b
 		}
 		else if (msg == CRCInput::RC_blue )
 		{
-			std::random_shuffle ( filelist.begin(), filelist.end() );
+			std::shuffle(filelist.begin(), filelist.end(), std::mt19937(std::random_device{}()));
 			selected = 0;
 			paint();
 			paintFoot();
@@ -1519,7 +1520,7 @@ void CFileBrowser::paintSMSKey()
 
 	if(m_SMSKeyInput.getOldKey()!=0)
 	{
-		char cKey[2] = {m_SMSKeyInput.getOldKey(), 0};
+		char cKey[2] = {(char)m_SMSKeyInput.getOldKey(), 0};
 		cKey[0] = toupper(cKey[0]);
 		int len = fnt_foot->getRenderWidth(cKey);
 		fnt_foot->RenderString(x + width - smskey_width, smskey_y + footer_height/2 + smskey_height/2, len, cKey, COL_MENUHEAD_TEXT);

@@ -60,14 +60,6 @@ class CAudiofileExt : public CAudiofile
 
 typedef std::vector<CAudiofileExt> CAudioPlayList;
 
-class RandomNumber
-{
-	public:
-		RandomNumber() { std::srand(time(0)); }
-
-		int operator()(int n) { return std::rand() / (1.0 + RAND_MAX) * n; }
-};
-
 class CAudioPlayerGui : public CMenuTarget
 {
 	public:
