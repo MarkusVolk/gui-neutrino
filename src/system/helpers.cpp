@@ -1202,15 +1202,20 @@ bool CFileHelpers::cp(const char *Src, const char *Dst, const char *Flags/*=""*/
 					if (file_exists(dst.c_str()) && (lstat(dst.c_str(), &FileInfo2) != -1))
 					{
 						if (S_ISDIR(FileInfo2.st_mode))
-							symlink(buf, (dst + fname).c_str());
+						{
+							if (symlink(buf, (dst + fname).c_str()) != 0)
+								dprintf(DEBUG_NORMAL, "[helpers] symlink %s: %s\n", (dst + fname).c_str(), strerror(errno));
+						}
 						else
 						{
 							unlink(dst.c_str());
-							symlink(buf, dst.c_str());
+							if (symlink(buf, dst.c_str()) != 0)
+								dprintf(DEBUG_NORMAL, "[helpers] symlink %s: %s\n", dst.c_str(), strerror(errno));
 						}
 					}
 					else
-						symlink(buf, dst.c_str());
+						if (symlink(buf, dst.c_str()) != 0)
+							dprintf(DEBUG_NORMAL, "[helpers] symlink %s: %s\n", dst.c_str(), strerror(errno));
 				}
 			}
 		}
@@ -1307,9 +1312,26 @@ bool CFileHelpers::copyFile(const char *Src, const char *Dst, mode_t forceMode/*
 	{
 		if (fsize64 < (off64_t)FileBufSize)
 			block = (uint32_t)fsize64;
-		read(fd1, FileBuf, block);	/* FIXME: short read??? */
-		write(fd2, FileBuf, block);	/* FIXME: short write?? */
-		fsize64 -= block;
+		ssize_t got = read(fd1, FileBuf, block);
+		if (got < 0 && errno == EINTR)
+			continue;
+		bool ok = got > 0;
+		for (ssize_t done = 0; ok && done < got;)
+		{
+			ssize_t w = write(fd2, FileBuf + done, got - done);
+			if (w < 0 && errno == EINTR)
+				continue;
+			ok = w > 0;
+			done += ok ? w : 0;
+		}
+		if (!ok)
+		{
+			close(fd1);
+			close(fd2);
+			FileBuf = deleteFileBuf(FileBuf);
+			return false;
+		}
+		fsize64 -= got;
 	}
 	lseek64(fd2, 0, SEEK_SET);
 	off64_t fsizeDst64 = lseek64(fd2, 0, SEEK_END);
@@ -1352,7 +1374,8 @@ bool CFileHelpers::copyDir(const char *Src, const char *Dst, bool backupMode)
 		if (len != -1)
 		{
 			buf[len] = '\0';
-			symlink(buf, Dst);
+			if (symlink(buf, Dst) != 0)
+				dprintf(DEBUG_NORMAL, "[helpers] symlink %s: %s\n", Dst, strerror(errno));
 		}
 	}
 	else
@@ -1389,7 +1412,8 @@ bool CFileHelpers::copyDir(const char *Src, const char *Dst, bool backupMode)
 				if (len != -1)
 				{
 					buf[len] = '\0';
-					symlink(buf, dstPath);
+					if (symlink(buf, dstPath) != 0)
+						dprintf(DEBUG_NORMAL, "[helpers] symlink %s: %s\n", dstPath, strerror(errno));
 				}
 			}
 			// is directory
