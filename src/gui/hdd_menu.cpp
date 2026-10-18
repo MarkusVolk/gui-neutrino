@@ -746,7 +746,6 @@ int CHDDMenuHandler::showDeviceMenu(std::string dev)
 		fsoptions[0].valname = devtools[0].fmt.c_str();
 		opcount++;
 	}
-	int cnt = 0;
 	bool found = false;
 	for (std::vector<hdd_s>::iterator it = hdd_list.begin(); it != hdd_list.end(); ++it) {
 		std::string mdev = it->devname.substr(0, dev.size());
@@ -763,7 +762,6 @@ int CHDDMenuHandler::showDeviceMenu(std::string dev)
 			mf->setHint("", LOCALE_MENU_HINT_HDD_CHECK);
 			hddmenu->addItem(mf);
 			found = true;
-			cnt++;
 		}
 	}
 
@@ -853,7 +851,8 @@ bool CHDDMenuHandler::scanDevices()
 			f = fopen(str, "r");
 		}
 		if (f) {
-			fscanf(f, "%127s", vendor);
+			if (fscanf(f, "%127s", vendor) != 1)
+				vendor[0] = 0;
 			fclose(f);
 		} else {
 			oldkernel = true;
@@ -871,7 +870,8 @@ bool CHDDMenuHandler::scanDevices()
 			f = fopen(str, "r");
 		}
 		if (f) {
-			fscanf(f, "%127s", model);
+			if (fscanf(f, "%127s", model) != 1)
+				model[0] = 0;
 			fclose(f);
 		}
 #if 0
@@ -1516,7 +1516,8 @@ int CHDDDestExec::exec(CMenuTarget* /*parent*/, const std::string&)
 	std::string hdidle = find_executable("hd-idle");
 	printf("CHDDDestExec::exec: hd-idle = %s\n", hdidle.c_str());
 	if (!hdidle.empty() && g_settings.hdd_sleep > 0) {
-		system("kill $(pidof hd-idle)");
+		if (system("kill $(pidof hd-idle)") < 0)
+			perror("hd-idle");
 		int sleep_seconds = g_settings.hdd_sleep;
 		switch (sleep_seconds) {
 			case 241:

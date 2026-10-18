@@ -115,13 +115,11 @@ int CMiscMenue::exec(CMenuTarget *parent, const std::string &actionKey)
 		MoviePluginSelector.addItem(new CMenuForwarder(LOCALE_PLUGINS_NO_PLUGIN, true, NULL, new CMoviePluginChangeExec(), "---", CRCInput::RC_red));
 		MoviePluginSelector.addItem(GenericMenuSeparatorLine);
 		char id[5];
-		int enabled_count = 0;
 		for (unsigned int count = 0; count < (unsigned int) g_Plugins->getNumberOfPlugins(); count++)
 		{
 			if (!g_Plugins->isHidden(count))
 			{
 				sprintf(id, "%d", count);
-				enabled_count++;
 				MoviePluginSelector.addItem(new CMenuForwarder(g_Plugins->getName(count), true, NULL, new CMoviePluginChangeExec(), id, CRCInput::convertDigitToKey(count)));
 			}
 		}

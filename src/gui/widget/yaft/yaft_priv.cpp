@@ -26,13 +26,13 @@
 void YaFT_p::reset_parm(parm_t *pt)
 {
 	pt->argc = 0;
-	for (int i = 0; i < MAX_ARGS; i++)
+	for (size_t i = 0; i < MAX_ARGS; i++)
 		pt->argv[i].clear();
 }
 
 void add_parm(struct parm_t *pt, std::string cp)
 {
-	if (pt->argc >= MAX_ARGS)
+	if ((size_t)pt->argc >= MAX_ARGS)
 		return;
 
 	logging(DEBUG, "argv[%d]: %s\n", pt->argc, cp.c_str());

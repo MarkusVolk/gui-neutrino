@@ -718,7 +718,6 @@ int eval_triplet(int iOData, tstCachedPage *pstCachedPage,
 			{
 
 				int c = *pAPx0 + (*endcol == 40 ? *pAPx : 0);	/* current column */
-				int c1 = offset;
 				tstPageAttr *p = &page_atrb[offset];
 				do
 				{
@@ -748,7 +747,6 @@ int eval_triplet(int iOData, tstCachedPage *pstCachedPage,
 					if (bw) p->IgnoreAtBlackBgSubst = 0;
 					p++;
 					c++;
-					c1++;
 				} while (c < *endcol);
 			}
 			break;

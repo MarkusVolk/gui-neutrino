@@ -148,7 +148,8 @@ int CStartUpWizard::exec(CMenuTarget *parent, const string &/*actionKey*/)
 			if (ShowMsg(LOCALE_WIZARD_INITIAL_SETTINGS, g_Locale->getText(LOCALE_WIZARD_INSTALL_SETTINGS),
 					CMsgBox::mbrYes, CMsgBox::mbYes | CMsgBox::mbNo, NULL, 450, 30) == CMsgBox::mbrYes)
 			{
-				system("/bin/cp " CONFIGDIR "/initial/* " ZAPITDIR);
+				if (system("/bin/cp " CONFIGDIR "/initial/* " ZAPITDIR) != 0)
+					printf("[start wizard] copying the initial settings failed\n");
 				CFEManager::getInstance()->loadSettings();
 				CFEManager::getInstance()->saveSettings();
 				CZapit::getInstance()->PrepareChannels();

@@ -1050,7 +1050,8 @@ void CControlAPI::rc_sync(int fd)
 	ev.type = EV_SYN;
 	ev.code = SYN_REPORT;
 	ev.value = 0;
-	write(fd, &ev, sizeof(ev));
+	if (write(fd, &ev, sizeof(ev)) != sizeof(ev))
+		perror("rc_sync");
 }
 
 int CControlAPI::rc_send(int fd, unsigned int code, unsigned int value)
@@ -1269,8 +1270,8 @@ void CControlAPI::LogolistCGI(CyhookHandler *hh)
 			char _real[PATH_MAX + 1] = {0};
 			if (g_PicViewer->GetLogoName(channel_id, NeutrinoAPI->GetServiceName(channel_id), logo_used, NULL, NULL))
 			{
-				realpath(logo_used.c_str(), _real);
-				logo_real = std::string(_real);
+				if (realpath(logo_used.c_str(), _real))
+					logo_real = std::string(_real);
 				if (strcmp(logo_used.c_str(), logo_real.c_str()) == 0)
 					logo_real.clear();
 			}
@@ -2560,12 +2561,11 @@ void CControlAPI::LCDAction(CyhookHandler *hh)
 //-------------------------------------------------------------------------
 void CControlAPI::SendEventList(CyhookHandler *hh, t_channel_id channel_id)
 {
-	int pos = 0;
 	CChannelEventList eList;
 	CEitManager::getInstance()->getEventsServiceKey(channel_id, eList);
 	CChannelEventList::iterator eventIterator;
 
-	for (eventIterator = eList.begin(); eventIterator != eList.end(); ++eventIterator, pos++)
+	for (eventIterator = eList.begin(); eventIterator != eList.end(); ++eventIterator)
 		hh->printf("%llu %ld %d %s\n", eventIterator->eventID, eventIterator->startTime, eventIterator->duration, eventIterator->description.c_str());
 }
 

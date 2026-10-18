@@ -282,13 +282,15 @@ std::string CyParser::cgi_file_parsing(CyhookHandler *hh,
 #endif //Y_CONFIG_USE_HOSTEDWEB
 
 	char cwd[255];
-	getcwd(cwd, 254);
+	if (!getcwd(cwd, sizeof(cwd)))
+		cwd[0] = 0;
 	for (unsigned int i = 0; i < (isHosted ? 1 : HTML_DIR_COUNT) && !found; i++) {
 		htmlfullfilename = (isHosted ? "" : HTML_DIRS[i]) + "/" + htmlfilename;
 		std::fstream fin(htmlfullfilename.c_str(), std::fstream::in);
 		if (fin.good()) {
 			found = true;
-			chdir(HTML_DIRS[i].c_str()); // set working dir
+			if (chdir(HTML_DIRS[i].c_str()) != 0) // set working dir
+				perror(HTML_DIRS[i].c_str());
 
 			// read whole file into html_template
 			std::string ytmp;
@@ -300,7 +302,8 @@ std::string CyParser::cgi_file_parsing(CyhookHandler *hh,
 			fin.close();
 		}
 	}
-	chdir(cwd);
+	if (cwd[0] && chdir(cwd) != 0)
+		perror(cwd);
 	if (!found) {
 		printf("[CyParser] Y-cgi:template %s not found %s\n", htmlfilename.c_str(), isHosted ? "" : "in");
 		if (!isHosted)

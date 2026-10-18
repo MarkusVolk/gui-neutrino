@@ -62,7 +62,7 @@ bool CConfigFile::loadConfig(const char *const filename, char _delimiter)
 		clear();
 		modifiedFlag = false;
 
-		for (int linenr = 1; ; linenr++)
+		for (;;)
 		{
 			getline(configFile, s);
 			if (configFile.fail())

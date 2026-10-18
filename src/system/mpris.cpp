@@ -360,6 +360,6 @@ void CMprisServer::act(const char *method)
 	else if (!strcmp(method, "Stop") && player)
 		key = g_settings.mpkey_stop;
 
-	if (key != CRCInput::RC_nokey && key >= 0)
+	if (key != (int)CRCInput::RC_nokey && key >= 0)
 		g_RCInput->postMsg((neutrino_msg_t)key, 0);
 }

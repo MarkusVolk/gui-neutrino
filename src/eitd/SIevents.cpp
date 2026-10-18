@@ -634,7 +634,7 @@ void SIevent::appendExtendedText(unsigned int lang, const std::string &text, boo
 			if (append){
 				it->text[SILangData::langExtendedText] += tmp;
 				if(endappend && it->text[SILangData::langExtendedText].capacity() > it->text[SILangData::langExtendedText].size()){
-					it->text[SILangData::langExtendedText].reserve();
+					it->text[SILangData::langExtendedText].shrink_to_fit();
 				}
 			}
 			else{

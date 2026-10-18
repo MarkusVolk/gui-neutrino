@@ -712,7 +712,8 @@ void CLCD::ShowText(const char * str, bool update_timestamp)
 	if (fd < 0)
 		return;
 	printf("%s '%s'\n", __func__, str);
-	write(fd, str, len);
+	if (write(fd, str, len) != len)
+		perror(__func__);
 	close(fd);
 	if (update_timestamp)
 	{

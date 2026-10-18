@@ -54,7 +54,7 @@ void CLastChannel::store(t_channel_id channel_id)
 	timeDiff = tv.tv_sec - lastTimestamp;
 
 	/* prev zap time was less than threshold, remove prev channel */
-	if (!this->lastChannels.empty() && (timeDiff <= secs_diff_before_store))
+	if (!this->lastChannels.empty() && (timeDiff <= (int64_t)secs_diff_before_store))
 		this->lastChannels.pop_front();
 
 	/* push new channel to the head */
@@ -63,7 +63,7 @@ void CLastChannel::store(t_channel_id channel_id)
 	this->lastChannels.push_front(newChannel);
 
 	/* this zap time was more than threshold, it will stay, remove last in the list */
-	if ((timeDiff > secs_diff_before_store) && (this->lastChannels.size() > this->maxSize))
+	if ((timeDiff > (int64_t)secs_diff_before_store) && (this->lastChannels.size() > this->maxSize))
 		this->lastChannels.pop_back();
 
 	/* remove this channel at other than 0 position */

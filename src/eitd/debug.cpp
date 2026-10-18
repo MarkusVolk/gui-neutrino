@@ -51,6 +51,6 @@ void showProfiling(std::string text)
 	int64_t now = (int64_t) tv.tv_usec + (int64_t)((int64_t) tv.tv_sec * (int64_t) 1000000);
 
 	int64_t tmp = now - last_profile_call;
-	printf("--> '%s' %" PRId64 ".%03" PRId64 "\n", text.c_str(), tmp / 1000LL, tmp % 1000LL);
+	printf("--> '%s' %" PRId64 ".%03" PRId64 "\n", text.c_str(), tmp / 1000, tmp % 1000);
 	last_profile_call = now;
 }

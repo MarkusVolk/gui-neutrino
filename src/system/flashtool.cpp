@@ -702,7 +702,11 @@ void CMTDInfo::getPartitionInfo()
 		return;
 	}
 	char buf[1000];
-	fgets(buf,sizeof(buf),fd);
+	if (!fgets(buf,sizeof(buf),fd))
+	{
+		fclose(fd);
+		return;
+	}
 	while(!feof(fd))
 	{
 		if(fgets(buf,sizeof(buf),fd)!=NULL)

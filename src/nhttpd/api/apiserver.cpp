@@ -547,7 +547,7 @@ Level network_level(const yapi::Request &in)
 Level granted(const yapi::Request &in, bool &by_token, bool &by_session)
 {
 	by_token = by_session = false;
-	Level l;
+	Level l = L_PUBLIC;
 	std::string t = bearer(in);
 	if (!t.empty() && token_level(t, l)) {
 		by_token = true;

@@ -1330,10 +1330,10 @@ void CRadioText::RadiotextDecode(unsigned char *mtext, int len)
 				memcpy(RT_Text[RT_Index], temptext, RT_MEL);
 				// +Memory
 				char *temp;
-				asprintf(&temp, "%s", RT_Text[RT_Index]);
+				temp = strdup(RT_Text[RT_Index]);
 				if (++rtp_content.rt_Index >= 2 * MAX_RTPC)
 					rtp_content.rt_Index = 0;
-				asprintf(&rtp_content.radiotext[rtp_content.rt_Index], "%s", rtrim(temp));
+				rtp_content.radiotext[rtp_content.rt_Index] = strdup(rtrim(temp));
 				free(temp);
 				if (S_Verbose >= 1)
 					printf("Radiotext[%d]: %s\n", RT_Index, RT_Text[RT_Index]);
@@ -1428,7 +1428,7 @@ void CRadioText::RadiotextDecode(unsigned char *mtext, int len)
 									}
 									rtp_content.item_New = (!rtp_content.item_New) ? true : false;
 									if (rtp_content.item_Index >= 0)
-										asprintf(&rtp_content.item_Title[rtp_content.item_Index], "%s", rtrim(rtp_content.temptext));
+										rtp_content.item_Title[rtp_content.item_Index] = strdup(rtrim(rtp_content.temptext));
 									RT_PlusShow = RT_MsgShow = rtp_itoggle = true;
 								}
 							}
@@ -1455,89 +1455,89 @@ void CRadioText::RadiotextDecode(unsigned char *mtext, int len)
 									}
 									rtp_content.item_New = (!rtp_content.item_New) ? true : false;
 									if (rtp_content.item_Index >= 0)
-										asprintf(&rtp_content.item_Artist[rtp_content.item_Index], "%s", rtrim(rtp_content.temptext));
+										rtp_content.item_Artist[rtp_content.item_Index] = strdup(rtrim(rtp_content.temptext));
 									RT_PlusShow = RT_MsgShow = rtp_itoggle = true;
 								}
 							}
 							break;
 						case 12:	// Info_News
-							asprintf(&rtp_content.info_News, "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_News = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 13:	// Info_NewsLocal
-							asprintf(&rtp_content.info_NewsLocal, "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_NewsLocal = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 14:	// Info_Stockmarket
 							if (++rtp_content.info_StockIndex >= MAX_RTPC)
 								rtp_content.info_StockIndex = 0;
-							asprintf(&rtp_content.info_Stock[rtp_content.info_StockIndex], "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_Stock[rtp_content.info_StockIndex] = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 15:	// Info_Sport
 							if (++rtp_content.info_SportIndex >= MAX_RTPC)
 								rtp_content.info_SportIndex = 0;
-							asprintf(&rtp_content.info_Sport[rtp_content.info_SportIndex], "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_Sport[rtp_content.info_SportIndex] = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 16:	// Info_Lottery
 							if (++rtp_content.info_LotteryIndex >= MAX_RTPC)
 								rtp_content.info_LotteryIndex = 0;
-							asprintf(&rtp_content.info_Lottery[rtp_content.info_LotteryIndex], "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_Lottery[rtp_content.info_LotteryIndex] = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 24:	// Info_DateTime
-							asprintf(&rtp_content.info_DateTime, "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_DateTime = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 25:	// Info_Weather
 							if (++rtp_content.info_WeatherIndex >= MAX_RTPC)
 								rtp_content.info_WeatherIndex = 0;
-							asprintf(&rtp_content.info_Weather[rtp_content.info_WeatherIndex], "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_Weather[rtp_content.info_WeatherIndex] = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 26:	// Info_Traffic
-							asprintf(&rtp_content.info_Traffic, "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_Traffic = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 27:	// Info_Alarm
-							asprintf(&rtp_content.info_Alarm, "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_Alarm = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 28:	// Info_Advert
-							asprintf(&rtp_content.info_Advert, "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_Advert = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 29:	// Info_Url
-							asprintf(&rtp_content.info_Url, "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_Url = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 30:	// Info_Other
 							if (++rtp_content.info_OtherIndex >= MAX_RTPC)
 								rtp_content.info_OtherIndex = 0;
-							asprintf(&rtp_content.info_Other[rtp_content.info_OtherIndex], "%s", rtrim(rtp_content.temptext));
+							rtp_content.info_Other[rtp_content.info_OtherIndex] = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 31:	// Programme_Stationname.Long
-							asprintf(&rtp_content.prog_Station, "%s", rtrim(rtp_content.temptext));
+							rtp_content.prog_Station = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 32:	// Programme_Now
-							asprintf(&rtp_content.prog_Now, "%s", rtrim(rtp_content.temptext));
+							rtp_content.prog_Now = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 33:	// Programme_Next
-							asprintf(&rtp_content.prog_Next, "%s", rtrim(rtp_content.temptext));
+							rtp_content.prog_Next = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 34:	// Programme_Part
-							asprintf(&rtp_content.prog_Part, "%s", rtrim(rtp_content.temptext));
+							rtp_content.prog_Part = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 35:	// Programme_Host
-							asprintf(&rtp_content.prog_Host, "%s", rtrim(rtp_content.temptext));
+							rtp_content.prog_Host = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 36:	// Programme_EditorialStaff
-							asprintf(&rtp_content.prog_EditStaff, "%s", rtrim(rtp_content.temptext));
+							rtp_content.prog_EditStaff = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 38:	// Programme_Homepage
-							asprintf(&rtp_content.prog_Homepage, "%s", rtrim(rtp_content.temptext));
+							rtp_content.prog_Homepage = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 39:	// Phone_Hotline
-							asprintf(&rtp_content.phone_Hotline, "%s", rtrim(rtp_content.temptext));
+							rtp_content.phone_Hotline = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 40:	// Phone_Studio
-							asprintf(&rtp_content.phone_Studio, "%s", rtrim(rtp_content.temptext));
+							rtp_content.phone_Studio = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 44:	// Email_Hotline
-							asprintf(&rtp_content.email_Hotline, "%s", rtrim(rtp_content.temptext));
+							rtp_content.email_Hotline = strdup(rtrim(rtp_content.temptext));
 							break;
 						case 45:	// Email_Studio
-							asprintf(&rtp_content.email_Studio, "%s", rtrim(rtp_content.temptext));
+							rtp_content.email_Studio = strdup(rtrim(rtp_content.temptext));
 							break;
 					}
 				}
