@@ -440,7 +440,7 @@ std::string CNeutrinoYParser::func_get_bouquets_with_epg(CyhookHandler *hh, std:
 				zaplink = channel->getName().c_str();
 			else
 				zaplink = string_printf(
-						"<img class=\"channel_logo\" src=\"%s\" title=\"%s\" alt=\"%s\" />"
+						"<img class=\"channel_logo\" src=\"%s\" title=\"%s\" alt=\"%s\" loading=\"lazy\" decoding=\"async\" />"
 						, channel_logo.c_str()
 						, channel->getName().c_str()
 						, channel->getName().c_str()
