@@ -5809,7 +5809,9 @@ void CNeutrinoApp::channelRezap()
 	else
 		return;
 
-	if(CServiceManager::getInstance()->FindChannel(last_chid))
+	/* a zap from outside may have left a channel of the other mode there */
+	if (CServiceManager::getInstance()->FindChannel(last_chid)
+	    && CServiceManager::getInstance()->IsChannelTVChannel(last_chid) == (mode == NeutrinoModes::mode_tv))
 		channelList->zapTo_ChannelID(last_chid, true);
 	else
 		channelList->zapTo(0, true);
