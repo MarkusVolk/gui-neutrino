@@ -242,7 +242,7 @@ void CHDDMenuHandler::getBlkIds()
 	printf("CHDDMenuHandler::getBlkIds: blkid = %s\n", blkid.c_str());
 	if (blkid.empty())
 		return;
-	std::string pcmd = blkid + " -s TYPE";
+	std::string pcmd = blkid + " -s TYPE -s LABEL";
 
 	FILE* f = my_popen(pid, pcmd.c_str(), "r");
 	if (!f) {
@@ -254,6 +254,12 @@ void CHDDMenuHandler::getBlkIds()
 	char buff[512];
 	while (fgets(buff, sizeof(buff), f)) {
 		std::string ret = buff;
+		std::string label;
+		size_t lpos = ret.find(" LABEL=\"");
+		if (lpos != std::string::npos) {
+			label = ret.substr(lpos + 8);
+			label = label.substr(0, label.find("\""));
+		}
 		std::string search = "TYPE=\"";
 		size_t pos = ret.find(search);
 		if (pos == std::string::npos)
@@ -275,7 +281,7 @@ void CHDDMenuHandler::getBlkIds()
 			continue;
 		hdd.mounted = is_mounted(buff + 5);
 		hdd.fmt = ret;
-		hdd.desc = hdd.devname + " (" + hdd.fmt + ")";
+		hdd.desc = hdd.devname + (label.empty() ? "" : " " + label) + " (" + hdd.fmt + ")";
 		printf("device: %s filesystem %s (%s)\n", hdd.devname.c_str(), hdd.fmt.c_str(), hdd.mounted ? "mounted" : "not mounted" );
 		hdd_list.push_back(hdd);
 	}
