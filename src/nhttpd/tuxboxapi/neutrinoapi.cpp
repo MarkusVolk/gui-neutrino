@@ -343,9 +343,10 @@ void CNeutrinoAPI::GetChannelEvent(t_channel_id channel_id, CChannelEvent &event
 		epg_id = ch->getEpgID();
 	}
 
-	CChannelEvent * evt = ChannelListEvents[epg_id];
-	if (evt)
-		event = *evt;
+	/* the guide keys its events by the lower 48 bits, as sectionsd's own lookups do */
+	std::map<t_channel_id, CChannelEvent *>::const_iterator it = ChannelListEvents.find(epg_id & 0xFFFFFFFFFFFFULL);
+	if (it != ChannelListEvents.end() && it->second)
+		event = *it->second;
 }
 
 void CNeutrinoAPI::GetChannelsWithEvent(std::set<t_channel_id> &epg_ids)

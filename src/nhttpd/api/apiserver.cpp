@@ -627,7 +627,7 @@ bool web_list(bool radio, ZapitChannelList &list, const std::set<t_channel_id> *
 		std::sort(list.begin(), list.end(), by_number);
 	if (with_epg)
 		std::stable_partition(list.begin(), list.end(), [with_epg](CZapitChannel *ch) {
-			return with_epg->count(ch->getEpgID()) != 0;
+			return with_epg->count(ch->getEpgID() & 0xFFFFFFFFFFFFULL) != 0;
 		});
 	return true;
 }

@@ -405,7 +405,7 @@ std::string CNeutrinoYParser::func_get_bouquets_with_epg(CyhookHandler *hh, std:
 		std::set<t_channel_id> with_event;
 		NeutrinoAPI->GetChannelsWithEvent(with_event);
 		std::stable_partition(channels.begin(), channels.end(), [&with_event](CZapitChannel *channel) {
-			return with_event.count(channel->getEpgID()) != 0;
+			return with_event.count(channel->getEpgID() & 0xFFFFFFFFFFFFULL) != 0;
 		});
 	}
 
