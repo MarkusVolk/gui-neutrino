@@ -28,6 +28,8 @@ extern int fh_gif_id (const char *);
 #ifdef FBV_SUPPORT_JPEG
 extern int fh_jpeg_getsize (const char *, int *, int *, int, int);
 extern int fh_jpeg_load (const char *, unsigned char **, int *, int *);
+#include <setjmp.h>
+#include <jpeglib.h>
 extern int fh_jpeg_id (const char *);
 #endif
 #ifdef FBV_SUPPORT_PNG
@@ -35,6 +37,7 @@ extern int fh_png_getsize (const char *, int *, int *, int, int);
 extern int fh_png_load (const char *, unsigned char **, int *, int *);
 extern int png_load_ext (const char * name, unsigned char ** buffer, int * xp, int * yp, int * bpp);
 extern int fh_png_id (const char *);
+#include <png.h>
 #endif
 #ifdef FBV_SUPPORT_BMP
 extern int fh_bmp_getsize (const char *, int *, int *, int, int);
@@ -581,6 +584,172 @@ void CPictureViewer::getSize(const char* name, int* width, int *height)
 	}
 }
 
+#ifdef FBV_SUPPORT_PNG
+/* a palette or grey PNG whose transparency is a tRNS chunk: the loader
+   reads it without its alpha channel */
+static bool png_has_trns(const char *name)
+{
+	FILE *f = fopen(name, "rb");
+	if (!f)
+		return false;
+	bool ret = false;
+	png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	png_infop info = png ? png_create_info_struct(png) : NULL;
+	if (info && !setjmp(png_jmpbuf(png))) {
+		png_init_io(png, f);
+		png_read_info(png, info);
+		ret = png_get_valid(png, info, PNG_INFO_tRNS) != 0;
+	}
+	png_destroy_read_struct(&png, info ? &info : NULL, NULL);
+	fclose(f);
+	return ret;
+}
+
+static bool write_png(const std::string &name, unsigned char *buf, int x, int y, int bpp)
+{
+	FILE *f = fopen(name.c_str(), "wb");
+	if (!f)
+		return false;
+	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	png_infop info = png ? png_create_info_struct(png) : NULL;
+	bool ok = false;
+	if (info && !setjmp(png_jmpbuf(png))) {
+		png_init_io(png, f);
+		png_set_IHDR(png, info, x, y, 8, bpp == 4 ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB,
+			     PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+		png_write_info(png, info);
+		for (int i = 0; i < y; i++)
+			png_write_row(png, buf + (size_t)i * x * bpp);
+		png_write_end(png, info);
+		ok = true;
+	}
+	png_destroy_write_struct(&png, info ? &info : NULL);
+	if (fclose(f) != 0)
+		ok = false;
+	return ok;
+}
+#endif
+
+#ifdef FBV_SUPPORT_JPEG
+struct logo_jpeg_error
+{
+	struct jpeg_error_mgr pub;
+	jmp_buf jump;
+};
+
+static void logo_jpeg_error_exit(j_common_ptr cinfo)
+{
+	longjmp(((logo_jpeg_error *) cinfo->err)->jump, 1);
+}
+
+static bool write_jpeg(const std::string &name, unsigned char *buf, int x, int y)
+{
+	FILE *f = fopen(name.c_str(), "wb");
+	if (!f)
+		return false;
+	struct jpeg_compress_struct cinfo;
+	struct logo_jpeg_error jerr;
+	cinfo.err = jpeg_std_error(&jerr.pub);
+	jerr.pub.error_exit = logo_jpeg_error_exit;
+	if (setjmp(jerr.jump)) {
+		jpeg_destroy_compress(&cinfo);
+		fclose(f);
+		return false;
+	}
+	jpeg_create_compress(&cinfo);
+	jpeg_stdio_dest(&cinfo, f);
+	cinfo.image_width = x;
+	cinfo.image_height = y;
+	cinfo.input_components = 3;
+	cinfo.in_color_space = JCS_RGB;
+	jpeg_set_defaults(&cinfo);
+	jpeg_set_quality(&cinfo, 90, TRUE);
+	jpeg_start_compress(&cinfo, TRUE);
+	while (cinfo.next_scanline < cinfo.image_height) {
+		JSAMPROW row = buf + (size_t)cinfo.next_scanline * x * 3;
+		jpeg_write_scanlines(&cinfo, &row, 1);
+	}
+	jpeg_finish_compress(&cinfo);
+	jpeg_destroy_compress(&cinfo);
+	return fclose(f) == 0;
+}
+#endif
+
+/* Logo servers hand out pictures of up to some thousand pixels a side, which
+   the boxes show at a fraction of that; a downloaded PNG or JPEG is kept at
+   most LOGO_MAX_SIZE on its longer side, in its own format whatever its
+   name says, so the cache in /tmp and every decode stay small. */
+#define LOGO_MAX_SIZE 400
+void CPictureViewer::shrinkLogo(const std::string &name)
+{
+	enum { NONE, PNG, JPEG } format = NONE;
+	int x = 0, y = 0;
+#ifdef FBV_SUPPORT_PNG
+	if (fh_png_id(name.c_str()) && fh_png_getsize(name.c_str(), &x, &y, INT_MAX, INT_MAX) == FH_ERROR_OK)
+		format = PNG;
+#endif
+#ifdef FBV_SUPPORT_JPEG
+	if (format == NONE && fh_jpeg_id(name.c_str()) && fh_jpeg_getsize(name.c_str(), &x, &y, INT_MAX, INT_MAX) == FH_ERROR_OK)
+		format = JPEG;
+#endif
+	if (format == NONE || x < 1 || y < 1 || (x <= LOGO_MAX_SIZE && y <= LOGO_MAX_SIZE))
+		return;
+	if (x > INT_MAX / 4 / y)
+		return;
+#ifdef FBV_SUPPORT_PNG
+	if (format == PNG && png_has_trns(name.c_str()))
+		return;
+#endif
+	size_t bufsize = (size_t)x * y * 4;
+	if (!checkfreemem(bufsize))
+		return;
+	unsigned char *buffer = (unsigned char *) malloc(bufsize);
+	if (!buffer)
+		return;
+	int bpp = 3, ret = FH_ERROR_FORMAT;
+#ifdef FBV_SUPPORT_PNG
+	if (format == PNG) {
+		ret = png_load_ext(name.c_str(), &buffer, &x, &y, &bpp);
+		/* what png_load_ext does not hand over with alpha it reads as RGB */
+		if (bpp != 4)
+			bpp = 3;
+	}
+#endif
+#ifdef FBV_SUPPORT_JPEG
+	if (format == JPEG)
+		ret = fh_jpeg_load(name.c_str(), &buffer, &x, &y);
+#endif
+	if (ret != FH_ERROR_OK) {
+		free(buffer);
+		return;
+	}
+	int dx = LOGO_MAX_SIZE, dy = LOGO_MAX_SIZE;
+	if (x > y)
+		dy = std::max(1, (int)((int64_t)y * LOGO_MAX_SIZE / x));
+	else
+		dx = std::max(1, (int)((int64_t)x * LOGO_MAX_SIZE / y));
+	unsigned char *resized = (bpp == 4) ? ResizeA(buffer, x, y, dx, dy) : Resize(buffer, x, y, dx, dy, COLOR);
+	if (resized == buffer) {
+		free(buffer);
+		return;
+	}
+	std::string tmp = name + ".tmp";
+	bool ok = false;
+#ifdef FBV_SUPPORT_PNG
+	if (format == PNG)
+		ok = write_png(tmp, resized, dx, dy, bpp);
+#endif
+#ifdef FBV_SUPPORT_JPEG
+	if (format == JPEG)
+		ok = write_jpeg(tmp, resized, dx, dy);
+#endif
+	if (ok && rename(tmp.c_str(), name.c_str()) == 0)
+		dprintf(DEBUG_INFO, "[CPictureViewer] [%s - %d] %s %dx%d -> %dx%d\n", __func__, __LINE__, name.c_str(), x, y, dx, dy);
+	else
+		unlink(tmp.c_str());
+	free(resized);
+}
+
 bool CPictureViewer::GetLogoName(const uint64_t &ChannelID, const std::string &ChannelName, std::string &name, int *width, int *height, int enable_special_logo, bool enable_event_logo)
 {
 	std::string fileType[] = { ".svg", ".png", ".jpg", ".gif" };
@@ -786,6 +955,7 @@ bool CPictureViewer::GetLogoName(const uint64_t &ChannelID, const std::string &C
 				   network, and a channel lock held across that would stop the
 				   box for as long as the far end takes. */
 				std::string lname = downloadUrlToLogo(alternate_logo, LOGODIR_TMP, (t_channel_id) ChannelID);
+				shrinkLogo(lname);
 				if (width && height)
 					getSize(lname.c_str(), width, height);
 				name = lname;

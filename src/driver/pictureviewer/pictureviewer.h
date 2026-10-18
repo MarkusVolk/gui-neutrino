@@ -76,6 +76,8 @@ class CPictureViewer
 	fb_pixel_t * getImage (const std::string & name, int width, int height);
 	fb_pixel_t * getIcon (const std::string & name, int *width, int *height);
 	void getSize(const char *name, int* width, int *height);
+	/* scales a downloaded PNG or JPEG logo down in place */
+	void shrinkLogo(const std::string &name);
 	unsigned char * Resize(unsigned char *orgin, int ox, int oy, int dx, int dy, ScalingMode type, unsigned char * dst = NULL);
 	unsigned char * ResizeA(unsigned char *orgin, int ox, int oy, int dx, int dy);
 	void rescaleImageDimensions(int *width, int *height, const int max_width, const int max_height, bool upscale=false);

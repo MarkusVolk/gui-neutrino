@@ -1864,6 +1864,7 @@ void CBouquetManager::run()
 		if (!logo_running)
 			break;
 		nlogo = downloadUrlToLogo(ologo, LOGODIR_TMP, chid);
+		g_PicViewer->shrinkLogo(nlogo);
 		{
 			CServiceManager::ChannelGuard guard;
 			cc = CServiceManager::getInstance()->FindChannel(chid);
