@@ -144,7 +144,7 @@ known bugs:
 
 /* somewhat safe, 0-terminated sprintf and strcpy */
 #define SPRINTF(a, b...) snprintf(a, sizeof(a)-1, b)
-#define STRCPY(a, b)     { strncpy(a, b, sizeof(a)-1);     a[sizeof(a)-1] = 0; }
+#define STRCPY(a, b)     { const char *_s = (b); size_t _l = strlen(_s); if (_l > sizeof(a)-1) _l = sizeof(a)-1; memcpy(a, _s, _l); a[_l] = 0; }
 
 
 
@@ -243,7 +243,7 @@ void getOpts()
 
 	if(!fd)
 		return;
-	fread(buf, sizeof(char), 4095, fd);
+	buf[fread(buf, sizeof(char), sizeof(buf) - 1, fd)] = 0;
 	fclose(fd);
 
 	if(strstr(buf, "debug=1"))
@@ -259,7 +259,8 @@ void getOpts()
 	{
 		STRCPY(logfile, strchr(ptr, '=') + 1);
 		CRLFCut(logfile);
-		freopen(logfile, "w", stderr);
+		if (!freopen(logfile, "w", stderr))
+			printf("netfile: cannot open %s: %s\n", logfile, strerror(errno));
 	}
 }
 
@@ -839,7 +840,7 @@ FILE *f_open(const char *filename, const char *acctype)
 
 		if(fd)
 		{
-			fread(buf, sizeof(char), 4095, fd);
+			buf[fread(buf, sizeof(char), sizeof(buf) - 1, fd)] = 0;
 			fclose(fd);
 
 			ptr = strstr(buf, "://");
@@ -1032,7 +1033,7 @@ FILE *f_open(const char *filename, const char *acctype)
 					return NULL;
 				}
 
-				fread(buf2, 1, 32768, _fd);
+				buf2[fread(buf2, 1, sizeof(buf2) - 1, _fd)] = 0;
 				f_close(_fd);
 
 				ptr = strstr(buf2, "rn=");
@@ -1070,7 +1071,7 @@ FILE *f_open(const char *filename, const char *acctype)
 					/* operating system because we don't need/want stream caching for */
 					/* this operation */
 
-					/*rval =*/ fread(buf, sizeof(char), 4096, fd);
+					buf[fread(buf, sizeof(char), sizeof(buf) - 1, fd)] = 0;
 					f_close(fd);
 
 					ptr = strstr(buf, "http://");
@@ -1128,7 +1129,8 @@ FILE *f_open(const char *filename, const char *acctype)
 				fd = fopen(url.file, type);
 				if (fd == NULL)
 					return NULL;
-				fread(&magic, 4, 1, fd);
+				if (fread(&magic, 4, 1, fd) != 1)
+					memset(magic, 0, sizeof(magic));
 				rewind(fd);
 
 				/* first stage: try to determine the filetype from the file */
