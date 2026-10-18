@@ -2190,8 +2190,12 @@ std::string downloadUrlToLogo(std::string url, std::string directory, t_channel_
 		std::string file = directory + "/" + strChnId + url.substr(url.find_last_of("."));
 		if (file_exists(file))
 			return file;
-		if (downloadUrl(url, file, " ", timeout))
+		/* put in place only when complete: the logo thread and a paint may
+		   fetch the same logo at once, and a reader must not see half of it */
+		std::string part = randomFile("part", directory);
+		if (downloadUrl(url, part, " ", timeout) && rename(part.c_str(), file.c_str()) == 0)
 			return file;
+		unlink(part.c_str());
 	}
 	return url;
 }
