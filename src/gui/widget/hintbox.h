@@ -405,14 +405,7 @@ class CHint : public CHintBox
 
 		virtual void setDelay(int d) {delay = d;}
 
-		virtual ~CHint()
-		{
-			if (delay)
-			{
-				setTimeOut(delay, false);
-				exec();
-			}
-		};
+		virtual ~CHint();
 };
 
 //! Sub class of CHintBox. Shows a simplified hint as a text hint without footer and optional header.
@@ -457,14 +450,7 @@ class CLoaderHint : public CHintBox
 
 		virtual void setDelay(int d) {delay = d;}
 
-		virtual ~CLoaderHint()
-		{
-			if (delay)
-			{
-				setTimeOut(delay, false);
-				exec();
-			}
-		};
+		virtual ~CLoaderHint();
 };
 
 
