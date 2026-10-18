@@ -617,10 +617,9 @@ bool CMovieInfo::saveFile(const CFile & file, std::string &text)
 	bool result = false;
 	int fd;
 	if ((fd = open(file.Name.c_str(), O_SYNC | O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) >= 0) {
-		write(fd, text.c_str(), text.size());
+		result = write(fd, text.c_str(), text.size()) == (ssize_t)text.size();
 		//fdatasync(fd);
 		close(fd);
-		result = true;
 		//TRACE("[mi] saved (%d)\n",nr);
 	} else {
 		TRACE("[mi] ERROR: cannot open\n");

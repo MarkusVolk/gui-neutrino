@@ -479,11 +479,14 @@ int CGenPsi::genpsi(int fd)
 {
 	uint8_t   buffer[SIZE_TS_PKT];
 
+	int ret = 1;
 	build_pat(buffer);
-	write(fd, buffer, SIZE_TS_PKT);
+	if (write(fd, buffer, SIZE_TS_PKT) != SIZE_TS_PKT)
+		ret = 0;
 
 	build_pmt(buffer);
-	write(fd, buffer, SIZE_TS_PKT);
+	if (write(fd, buffer, SIZE_TS_PKT) != SIZE_TS_PKT)
+		ret = 0;
 
 	//-- finish --
 	vpid=0;
@@ -496,7 +499,7 @@ int CGenPsi::genpsi(int fd)
 	naacp = 0;
 	vtype = 0;
 	fdatasync(fd);
-	return 1;
+	return ret;
 
 }
 

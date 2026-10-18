@@ -115,7 +115,8 @@ void CMovieCut::WriteHeader(const char *path, uint32_t duration)
 			PVR_FILE_INFO pinfo;
 			pinfo.uDuration = duration;
 			pinfo.uTSPacketSize = 188;
-			write(srcfd, (uint8_t *)&pinfo, sizeof(PVR_FILE_INFO));
+			if (write(srcfd, (uint8_t *)&pinfo, sizeof(PVR_FILE_INFO)) != sizeof(PVR_FILE_INFO))
+				perror(path);
 		}
 		close(srcfd);
 	}
@@ -133,8 +134,8 @@ uint32_t CMovieCut::getHeaderDurationMS(MI_MOVIE_INFO *minfo)
 		{
 			PVR_FILE_INFO pinfo;
 			memset(&pinfo, 0, sizeof(PVR_FILE_INFO));
-			read(srcfd, (uint8_t *)&pinfo, sizeof(PVR_FILE_INFO));
-			if (pinfo.uTSPacketSize == 188)
+			if (read(srcfd, (uint8_t *)&pinfo, sizeof(PVR_FILE_INFO)) == sizeof(PVR_FILE_INFO)
+			    && pinfo.uTSPacketSize == 188)
 				duration = pinfo.uDuration;
 			close(srcfd);
 			printf("CMovieCut::%s: [%s] duration %d ms\n", __func__, minfo->file.Name.c_str(), duration);
@@ -435,7 +436,11 @@ bool CMovieCut::cutMovie(MI_MOVIE_INFO *minfo)
 		perror(minfo->file.Name.c_str());
 		goto ret_err;
 	}
-	write(dstfd, psi, PSI_SIZE);
+	if (write(dstfd, psi, PSI_SIZE) != PSI_SIZE)
+	{
+		perror(dpart);
+		goto ret_err;
+	}
 
 	stat64(minfo->file.Name.c_str(), &s);
 
@@ -622,7 +627,11 @@ bool CMovieCut::copyMovie(MI_MOVIE_INFO *minfo, bool onefile)
 			}
 			dst_done = 1;
 			spos = 0;
-			write(dstfd, psi, PSI_SIZE);
+			if (write(dstfd, psi, PSI_SIZE) != PSI_SIZE)
+			{
+				perror(dpart);
+				goto ret_err;
+			}
 		}
 		need_gop = 1;
 

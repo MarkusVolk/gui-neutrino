@@ -180,10 +180,10 @@ bool CRecordInstance::SaveXml()
 	if ((fd = open(xmlfile.c_str(), O_CREAT | O_TRUNC | O_SYNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) >= 0) {
 		std::string extMessage;
 		cMovieInfo->encodeMovieInfoXml(&extMessage, recMovieInfo);
-		write(fd, extMessage.c_str(), extMessage.size() /*strlen(info)*/);
+		bool ok = write(fd, extMessage.c_str(), extMessage.size()) == (ssize_t)extMessage.size();
 		fdatasync(fd);
 		close(fd);
-		return true;
+		return ok;
 	}
 	perror(xmlfile.c_str());
 	return false;
@@ -429,7 +429,8 @@ record_error_msg_t CRecordInstance::Start(CZapitChannel * channel)
 	CGenPsi psi;
 	CollectRecordPids(channel);
 	AddRecordPidsToPsi(psi, channel);
-	psi.genpsi(fd);
+	if (!psi.genpsi(fd))
+		perror("[recording] genpsi");
 
 #if 0
 	if ((StreamPmtPid) && (allpids.PIDs.pmtpid != 0) && (numpids < REC_MAX_APIDS))
@@ -2911,7 +2912,8 @@ void CStreamRec::WriteHeader(uint32_t duration)
 			PVR_FILE_INFO pinfo;
 			pinfo.uDuration = duration;
 			pinfo.uTSPacketSize = 188;
-			write(srcfd, (uint8_t *)&pinfo, sizeof(PVR_FILE_INFO));
+			if (write(srcfd, (uint8_t *)&pinfo, sizeof(PVR_FILE_INFO)) != sizeof(PVR_FILE_INFO))
+				perror(tsfile.c_str());
 		}
 		close(srcfd);
 	} else
