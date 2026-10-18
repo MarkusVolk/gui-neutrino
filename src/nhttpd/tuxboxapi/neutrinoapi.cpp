@@ -30,6 +30,7 @@
 #include <driver/pictureviewer/pictureviewer.h>
 #include <system/httptool.h>
 #include <system/helpers.h>
+#include <system/main_call.h>
 #include <gui/color.h>
 #include <gui/widget/icons.h>
 #include <gui/movieplayer.h>
@@ -211,13 +212,30 @@ void CNeutrinoAPI::ZapTo(const char * const target)
 void CNeutrinoAPI::ZapToChannelId(t_channel_id channel_id)
 {
 	OpenThreads::ScopedPointerLock<OpenThreads::Mutex> lock(pmutex);
-	if (channel_id == Zapit->getCurrentServiceID())
+
+	bool tv;
+	{
+		CServiceManager::ChannelGuard guard;
+		tv = CServiceManager::getInstance()->IsChannelTVChannel(channel_id);
+	}
+	/* zapit keeps its TV or radio mode on a zap; switch to the mode that
+	   fits the channel first, as a zap timer does */
+	int mode = CNeutrinoApp::getInstance()->getMode();
+	bool radio = mode == NeutrinoModes::mode_radio || mode == NeutrinoModes::mode_webradio;
+	bool other_mode = (radio || mode == NeutrinoModes::mode_tv || mode == NeutrinoModes::mode_webtv) && tv == radio;
+
+	if (channel_id == Zapit->getCurrentServiceID() && !other_mode)
 	{
 		//printf("Kanal ist aktuell\n");
 		return;
 	}
 
 	CMoviePlayerGui::getInstance().stopPlayBack();
+	if (other_mode)
+		main_call::run([tv] {
+			CNeutrinoApp::getInstance()->handleMsg(NeutrinoMessages::CHANGEMODE,
+				(tv ? NeutrinoModes::mode_tv : NeutrinoModes::mode_radio) | NeutrinoModes::norezap);
+		}, 5000);
 	Zapit->zapTo_serviceID(channel_id);
 }
 //-------------------------------------------------------------------------
