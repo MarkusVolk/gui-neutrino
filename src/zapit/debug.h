@@ -78,8 +78,18 @@ extern int zapit_debug;
 
 #else /* DEBUG */
 
-#define INFO(fmt, args...)
-#define WARN(fmt, args...)
+/* not printed, but the arguments stay checked and used */
+#define INFO(fmt, args...)					\
+	do {							\
+		if (0)						\
+			fprintf(stdout, fmt "\n" , ## args);	\
+	} while (0)
+
+#define WARN(fmt, args...)					\
+	do {							\
+		if (0)						\
+			fprintf(stderr, fmt "\n" , ## args);	\
+	} while (0)
 
 #endif /* DEBUG */
 
