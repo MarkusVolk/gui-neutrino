@@ -201,6 +201,8 @@ static bool timerd_thread_started = false;
    and double-delete the singletons */
 static volatile sig_atomic_t shutdown_in_progress = 0;
 static volatile sig_atomic_t exit_signalled = 0;
+/* monotonic second of the first SIGTERM/SIGINT */
+static volatile sig_atomic_t exit_signal_time = 0;
 extern void *timerd_main_thread(void *data);
 extern void *nhttpd_main_thread(void *data);
 
@@ -6246,6 +6248,16 @@ void sighandler (int signum)
 	switch (signum) {
 	case SIGTERM:
 	case SIGINT:
+	{
+		/* systemd signals the main process' group and the whole cgroup,
+		   so one stop arrives as two signals at once; only a signal some
+		   seconds after the first asks for the hard way out below */
+		struct timespec now;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		if (exit_signalled && now.tv_sec - exit_signal_time < 5) {
+			signal(signum, sighandler);
+			return;
+		}
 		if (shutdown_in_progress) {
 			/* teardown is already running (ExitRun or an earlier signal);
 			   running it again double-deletes the singletons. Only
@@ -6258,6 +6270,7 @@ void sighandler (int signum)
 			   settings; saving from here could tear the file. postMsg()
 			   is a write() to a pipe. A second signal takes the way below. */
 			exit_signalled = 1;
+			exit_signal_time = now.tv_sec;
 			g_RCInput->postMsg(NeutrinoMessages::EXIT, 0);
 			signal(signum, sighandler);
 			return;
@@ -6278,6 +6291,7 @@ void sighandler (int signum)
 		   alive, the atexit/static-destructor pass would crash in them */
 		fflush(NULL);
 		_exit(CNeutrinoApp::EXIT_NORMAL);
+	}
 	default:
 		break;
 	}
