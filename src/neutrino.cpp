@@ -3923,7 +3923,8 @@ void CNeutrinoApp::RealRun()
 					CRecordManager::getInstance()->StartTimeshift();
 				}
 			}
-			else if( msg == CRCInput::RC_video || msg == CRCInput::RC_play || msg == CRCInput::RC_pvr)
+			else if( msg == CRCInput::RC_video || msg == CRCInput::RC_play || msg == CRCInput::RC_pvr ||
+				 msg == (CRCInput::RC_playpause | CRCInput::RC_Repeat))
 			{
 				//open moviebrowser via media player menu object
 				if (g_settings.recording_type != CNeutrinoApp::RECORDING_OFF)

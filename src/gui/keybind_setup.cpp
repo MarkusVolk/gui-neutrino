@@ -250,6 +250,9 @@ bool checkLongPress(uint32_t key)
 		return false;
 	if (key == CRCInput::RC_standby)
 		return true;
+	/* held in live TV it opens the recordings, see CNeutrinoApp::RealRun */
+	if (key == CRCInput::RC_playpause)
+		return true;
 	key |= CRCInput::RC_Repeat;
 	for (unsigned int i = 0; i < CKeybindSetup::KEYBINDS_COUNT; i++)
 		if ((uint32_t)*key_settings[i].keyvalue_p == key)
