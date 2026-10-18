@@ -206,6 +206,35 @@ bool CHDDMenuHandler::is_mounted(const char *dev)
 	return res;
 }
 
+/* Only what is mounted below MOUNT_BASE is the box's own. A partition the
+   system runs from or keeps its data on, such as /boot or /home on a PC,
+   is not offered for unmounting. */
+static bool mounted_outside_media(const std::string &devname)
+{
+	std::string devpath = "/dev/" + devname;
+	std::string realdev = readlink(devpath.c_str());
+	realdev = trim(realdev);
+	bool outside = false;
+	FILE *f = fopen("/proc/mounts", "r");
+	if (!f)
+		return false;
+	char buffer[512];
+	while (!outside && fgets(buffer, sizeof(buffer), f)) {
+		if (buffer[0] != '/')
+			continue;
+		char dev[256], dir[256];
+		if (sscanf(buffer, "%255s %255s", dev, dir) != 2)
+			continue;
+		std::string realmount = readlink(dev);
+		if (devpath != dev && realdev != trim(realmount))
+			continue;
+		if (strncmp(dir, MOUNT_BASE, strlen(MOUNT_BASE)) != 0)
+			outside = true;
+	}
+	fclose(f);
+	return outside;
+}
+
 void CHDDMenuHandler::getBlkIds()
 {
 	pid_t pid;
@@ -952,6 +981,8 @@ _show_menu:
 			memset(&dev_st, 0, sizeof(dev_st));
 			if (stat(("/dev/" + it->devname).c_str(), &dev_st) != -1
 			    && dev_st.st_rdev == root_st.st_dev)
+				enabled = false;
+			else if (it->mounted && mounted_outside_media(it->devname))
 				enabled = false;
 			else if (kernel_fs_list.find(it->fmt) == kernel_fs_list.end())
 				enabled = false;
