@@ -5453,7 +5453,7 @@ void CNeutrinoApp::saveEpg(int _mode)
 void CNeutrinoApp::tvMode(bool rezap)
 {
 	if (mode == NeutrinoModes::mode_webradio) {
-		CMoviePlayerGui::getInstance().setLastMode(NeutrinoModes::mode_unknown);
+		CMoviePlayerGui::getInstance(true).setLastMode(NeutrinoModes::mode_unknown);
 		CMoviePlayerGui::getInstance().stopPlayBack();
 		CVFD::getInstance()->ShowIcon(FP_ICON_TV, false);
 		rezap = true;
@@ -5597,6 +5597,10 @@ void CNeutrinoApp::standbyMode(bool bOnOff, bool fromDeepStandby)
 #if ENABLE_PIP
 		g_Zapit->stopPip();
 #endif
+		/* no mode change back from webtv here: standby keeps the mode
+		 * for the way back, and a nested tvMode() would undo parts of
+		 * the standby setup above */
+		CMoviePlayerGui::getInstance(true).setLastMode(NeutrinoModes::mode_unknown);
 		CMoviePlayerGui::getInstance().stopPlayBack();
 		bool stream_status = CStreamManager::getInstance()->StreamStatus();
 		if((g_settings.epg_scan_mode == CEpgScan::MODE_OFF) && !fromDeepStandby &&
@@ -5760,7 +5764,7 @@ void CNeutrinoApp::radioMode(bool rezap)
 	//printf("radioMode: rezap %s\n", rezap ? "yes" : "no");
 	INFO("rezap %d current mode %s", rezap, neutrinoMode_to_string(mode));
 	if (mode == NeutrinoModes::mode_webtv) {
-		CMoviePlayerGui::getInstance().setLastMode(NeutrinoModes::mode_unknown);
+		CMoviePlayerGui::getInstance(true).setLastMode(NeutrinoModes::mode_unknown);
 		CMoviePlayerGui::getInstance().stopPlayBack();
 		CVFD::getInstance()->ShowIcon(FP_ICON_TV, false);
 	}
