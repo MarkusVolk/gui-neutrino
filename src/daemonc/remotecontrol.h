@@ -82,6 +82,8 @@ class CRemoteControl
 
 	public:
 		t_channel_id current_channel_id;
+		/* a zap waits for its EVT_ZAP_COMPLETE; a further zap is held back */
+		bool zapGuardPending(void) const { return zap_completion_timeout != 0; }
 		uint64_t current_EPGid;
 		//uint64_t next_EPGid;
 		CZapitClient::responseGetPIDs current_PIDs;

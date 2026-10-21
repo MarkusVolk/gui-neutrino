@@ -4282,7 +4282,17 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 	if(msg == NeutrinoMessages::EVT_WEBTV_ZAP_COMPLETE) {
 		t_channel_id chid = *(t_channel_id *) data;
 		printf("EVT_WEBTV_ZAP_COMPLETE: %" PRIx64 "\n", chid);
-		if (mode == NeutrinoModes::mode_standby) {
+		if (mode != NeutrinoModes::mode_tv && mode != NeutrinoModes::mode_radio &&
+		    mode != NeutrinoModes::mode_webtv && mode != NeutrinoModes::mode_webradio) {
+			/* standby, or the movie player, audio player, UPnP, pictures
+			 * or AV input own the one playback: a zap from outside, e.g.
+			 * the web interface, must not replace what plays */
+			printf("[webtv] zap complete: ignored in mode %d channel=%llx\n", mode, (unsigned long long)chid);
+			delete [] (unsigned char*) data;
+		} else if (g_RemoteControl->zapGuardPending() && chid != g_RemoteControl->current_channel_id) {
+			/* zapped on within the zap guard: the guard zaps to the
+			 * channel chosen last, this one is not started */
+			printf("[webtv] zap complete: zapped on, skipped channel=%llx\n", (unsigned long long)chid);
 			delete [] (unsigned char*) data;
 		} else {
 			CZapitChannel * cc = CZapit::getInstance()->GetCurrentChannel();
