@@ -230,12 +230,14 @@ void CNeutrinoAPI::ZapToChannelId(t_channel_id channel_id)
 		return;
 	}
 
-	CMoviePlayerGui::getInstance().stopPlayBack();
-	if (other_mode)
-		main_call::run([tv] {
+	/* the stop of a web stream restores the DVB mode, a mode change like
+	 * any other: both run on the main thread */
+	main_call::run([tv, other_mode] {
+		CMoviePlayerGui::getInstance().stopPlayBack();
+		if (other_mode)
 			CNeutrinoApp::getInstance()->handleMsg(NeutrinoMessages::CHANGEMODE,
 				(tv ? NeutrinoModes::mode_tv : NeutrinoModes::mode_radio) | NeutrinoModes::norezap);
-		}, 5000);
+	}, 10000);
 	Zapit->zapTo_serviceID(channel_id);
 }
 //-------------------------------------------------------------------------
