@@ -1640,7 +1640,13 @@ bool CRecordManager::Update(const t_channel_id channel_id)
 
 int CRecordManager::handleMsg(const neutrino_msg_t msg, neutrino_msg_data_t data)
 {
-	if(msg == NeutrinoMessages::EVT_ZAP_COMPLETE || msg == NeutrinoMessages::EVT_WEBTV_ZAP_COMPLETE) {
+	/* For a web channel zapit sends EVT_ZAP_COMPLETE as well, but only
+	 * EVT_WEBTV_ZAP_COMPLETE reaches here when the stream has started;
+	 * a failed start ends in EVT_ZAP_FAILED. */
+	if (msg == NeutrinoMessages::EVT_ZAP_FAILED)
+		g_RCInput->killTimer(shift_timer);
+	else if ((msg == NeutrinoMessages::EVT_ZAP_COMPLETE && !IS_WEBCHAN(*(t_channel_id *) data)) ||
+		 msg == NeutrinoMessages::EVT_WEBTV_ZAP_COMPLETE) {
 		g_RCInput->killTimer (shift_timer);
 		if (g_settings.timeshift_auto) {
 			int delay = g_settings.timeshift_auto;

@@ -4360,7 +4360,7 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		cGLCD::Update();
 #endif
 		g_RCInput->killTimer(scrambled_timer);
-		if (mode != NeutrinoModes::mode_webtv) {
+		if (!IS_WEBCHAN(*(t_channel_id *) data)) {
 			g_Zapit->setMode43(g_settings.video_43mode);
 			videoDecoder->setAspectRatio(g_settings.video_Format,-1);
 
