@@ -1021,7 +1021,7 @@ bool CZapit::StartPip(const t_channel_id channel_id, int pip)
 
 	StopPip(pip);
 
-	if (!need_lock && !SAME_TRANSPONDER(newchannel->getChannelID(), live_channel_id))
+	if (!need_lock && !IS_WEBCHAN(live_channel_id) && !SAME_TRANSPONDER(newchannel->getChannelID(), live_channel_id))
 		live_channel_id = newchannel->getChannelID();
 
 	if(!TuneChannel(frontend, newchannel, transponder_change))

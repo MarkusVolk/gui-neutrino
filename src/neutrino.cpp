@@ -6671,7 +6671,8 @@ bool CNeutrinoApp::StartPip(const t_channel_id channel_id, int pip)
 		return ret;
 
 	CZapitChannel * channel = CServiceManager::getInstance()->FindChannel(channel_id);
-	if (!channel)
+	/* a web channel has no frontend to show in the PIP decoder */
+	if (!channel || IS_WEBCHAN(channel_id))
 		return ret;
 
 	if (channel->getRecordDemux() == channel->getPipDemux())
