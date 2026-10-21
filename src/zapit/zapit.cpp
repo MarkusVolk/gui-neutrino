@@ -1835,9 +1835,12 @@ bool CZapit::ParseCommand(CBasicMessage::Header &rmsg, int connfd)
 			CServiceManager::ChannelGuard guard;
 			current_channel = CServiceManager::getInstance()->FindChannel(cid);
 		}
-		if (current_channel)
-			ParsePatPmt(current_channel);//reinit pids
-		else
+		if (current_channel) {
+			/* a web channel has no PAT/PMT; the read would wait for the
+			 * demux timeout on whatever transponder is still tuned */
+			if (!IS_WEBCHAN(current_channel->getChannelID()))
+				ParsePatPmt(current_channel);//reinit pids
+		} else
 			WARN("current channel " PRINTF_CHANNEL_ID_TYPE_NO_LEADING_ZEROS " not found after service reinit", cid);
 
 		SendCmdReady(connfd);
