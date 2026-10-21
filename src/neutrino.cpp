@@ -2777,6 +2777,10 @@ void CNeutrinoApp::CmdParser(int argc, char **argv)
 		{
 			zapit_debug = 1;
 		}
+		else if (argv[x][0] == '{')
+		{
+			/* an LG webOS TV hands its apps their launch parameters as JSON */
+		}
 		else
 		{
 			dprintf(DEBUG_NORMAL, "Usage: neutrino [-v | --verbose 0..3]\n");
