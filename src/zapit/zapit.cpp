@@ -729,6 +729,12 @@ bool CZapit::ZapIt(const t_channel_id channel_id, bool forupdate, bool startplay
 		if (!IS_WEBCHAN(live_channel_id))
 			CCamManager::getInstance()->Stop(live_channel_id, CCamManager::PLAY);
 
+		/* the DVB channel before ends here: its PMT filter would rezap the
+		 * web channel on a version change, and its picture and sound would
+		 * go on when the web stream does not start */
+		pmt_stop_update_filter(&pmt_update_fd);
+		StopPlayBack(false);
+
 		live_channel_id = newchannel->getChannelID();
 		lock_channel_id = live_channel_id;
 
@@ -3187,7 +3193,7 @@ void CZapit::run()
 			if (ret > 0) {
 				pmt_stop_update_filter(&pmt_update_fd);
 				printf("[zapit] pmt updated, sid 0x%x new version 0x%x\n", (buf[3] << 8) + buf[4], (buf[5] >> 1) & 0x1F);
-				if(current_channel) {
+				if (current_channel && !IS_WEBCHAN(current_channel->getChannelID())) {
 					t_channel_id channel_id = current_channel->getChannelID();
 					int vpid = current_channel->getVideoPid();
 					int apid = current_channel->getAudioPid();
