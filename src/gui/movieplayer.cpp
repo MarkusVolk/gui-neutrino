@@ -998,6 +998,7 @@ void CMoviePlayerGui::Init(void)
 	timeshift = TSHIFT_MODE_OFF;
 	timeshift_delay = -1;
 	timeshift_zap = 0;
+	m_ThisMode = NeutrinoModes::mode_unknown;
 	numpida = 0;
 	showStartingHint = false;
 
@@ -2452,16 +2453,22 @@ bool CMoviePlayerGui::getLiveUrlDetailed(const std::string &url, const std::stri
 		// Note: livestreamScriptPath is disabled in webchannels-setup; just here for compatibility
 		// copied under the lock: the stream server's thread looks scripts up too
 		paths.push_back(settingsText(g_settings.livestreamScriptPath));
-		// try livestreamScripts from webradio/webtv autoload directories
+		// try livestreamScripts from webradio/webtv autoload directories;
+		// both: the stream server, the recorder and a zap call this on
+		// instances whose mode says nothing about the channel
 		if (m_ThisMode == NeutrinoModes::mode_webradio)
 		{
 			paths.push_back(WEBRADIODIR_VAR);
 			paths.push_back(WEBRADIODIR);
+			paths.push_back(WEBTVDIR_VAR);
+			paths.push_back(WEBTVDIR);
 		}
 		else
 		{
 			paths.push_back(WEBTVDIR_VAR);
 			paths.push_back(WEBTVDIR);
+			paths.push_back(WEBRADIODIR_VAR);
+			paths.push_back(WEBRADIODIR);
 		}
 
 		std::string _s;
