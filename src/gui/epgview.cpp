@@ -1519,8 +1519,8 @@ void CEpgData::GetEPGData(const t_channel_id channel_id, uint64_t id, time_t* st
 		strftime( temp, sizeof(temp), "%H:%M", pStartZeit);
 		epg_start= temp;
 
-		long int uiEndTime((epgData.epg_times).startzeit+ (epgData.epg_times).dauer);
-		struct tm *pEndeZeit = localtime((time_t*)&uiEndTime);
+		time_t uiEndTime = (epgData.epg_times).startzeit + (epgData.epg_times).dauer;
+		struct tm *pEndeZeit = localtime(&uiEndTime);
 		strftime( temp, sizeof(temp), "%H:%M", pEndeZeit);
 		epg_end= temp;
 
