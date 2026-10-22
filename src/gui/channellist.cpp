@@ -2549,6 +2549,10 @@ bool CChannelList::SameTP(CZapitChannel * channel)
 		if (IS_WEBCHAN(channel->getChannelID()))
 			return true;
 
+		/* a zap ends a timeshift, and it starts again on the new channel */
+		if (CRecordManager::getInstance()->TimeshiftOnly())
+			return true;
+
 		// Usable CI channel while recording
 		if(g_settings.ci_mode != 0 && channel->bUseCI && CRecordManager::getInstance()->getUseCI()) {
 			if(g_settings.ci_mode == 1)

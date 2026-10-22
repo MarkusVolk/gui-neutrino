@@ -3249,8 +3249,7 @@ void CMoviePlayerGui::quickZap(neutrino_msg_t msg)
 		}
 		else if (msg == (neutrino_msg_t) g_settings.key_quickzap_up && timeshift)
 		{
-			// zap atm not possible, but signalize it in timeshift mode to get feedback
-			CNeutrinoApp::getInstance()->channelList->quickZap(msg);
+			CNeutrinoApp::getInstance()->quickZap(msg);
 		}
 	}
 	else if ((msg == CRCInput::RC_left) || msg == (neutrino_msg_t) g_settings.key_quickzap_down)
@@ -3272,8 +3271,7 @@ void CMoviePlayerGui::quickZap(neutrino_msg_t msg)
 		}
 		else if (msg == (neutrino_msg_t) g_settings.key_quickzap_down && timeshift)
 		{
-			// zap atm not possible, but signalize it in timeshift mode to get feedback
-			CNeutrinoApp::getInstance()->channelList->quickZap(msg);
+			CNeutrinoApp::getInstance()->quickZap(msg);
 		}
 	}
 }
@@ -3659,6 +3657,9 @@ void CMoviePlayerGui::PlayFileLoop(void)
 			SetPosition(duration/2, true);
 		} else if (msg == CRCInput::RC_8) {	// goto end
 			SetPosition(duration - 60 * 1000, true);
+		} else if (timeshift != TSHIFT_MODE_OFF && (msg == CRCInput::RC_page_up || msg == CRCInput::RC_page_down)) {
+			/* the channel keys zap out of the timeshift, as they zap in live TV */
+			CNeutrinoApp::getInstance()->quickZap(msg == CRCInput::RC_page_up ? CRCInput::RC_right : CRCInput::RC_left);
 		} else if (msg == CRCInput::RC_page_up) {
 			SetPosition(10 * 1000);
 		} else if (msg == CRCInput::RC_page_down) {
