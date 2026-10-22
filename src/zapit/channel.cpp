@@ -428,8 +428,12 @@ void CZapitChannel::dumpBouquetXml(FILE * fd, bool bUser)
 	// references (mandatory)
 	if (url.empty())
 		fprintf(fd, " i=\"%x\" t=\"%x\" on=\"%x\" s=\"%hd\" frq=\"%hd\"",getServiceId(), getTransportStreamId(), getOriginalNetworkId(), getSatellitePosition(), getFreqId());
-	else
+	else {
 		fprintf(fd, " u=\"%s\"",convert_UTF8_To_UTF8_XML(url.c_str()).c_str());
+		/* a web radio station, should it be missing on the next load */
+		if (getServiceType() == ST_DIGITAL_RADIO_SOUND_SERVICE)
+			fprintf(fd, " r=\"1\"");
+	}
 
 	// service names
 	if (bUser || !url.empty()) {

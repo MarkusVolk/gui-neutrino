@@ -675,7 +675,8 @@ void CBouquetManager::parseBouquetsXml(const char *fname, bool bUser)
 				} else if (bUser) {
 					if (url) {
 						chid = create_channel_id64(0, 0, 0, 0, 0, url);
-						chan = new CZapitChannel(name2.c_str(), chid, url, NULL);
+						int mode = xmlGetNumericAttribute(channel_node, "r", 10) ? MODE_WEBRADIO : MODE_WEBTV;
+						chan = new CZapitChannel(name2.c_str(), chid, url, NULL, 0, NULL, mode);
 					}
 					else
 						chan = new CZapitChannel(name2, CREATE_CHANNEL_ID64, 1 /*service_type*/,

@@ -222,6 +222,38 @@ int CBouquetList::exec(bool bShowChannelList)
 	return res;
 }
 
+CZapitBouquet *CBouquetList::copyToFavorites(CZapitBouquet *source, const std::string &name, bool *added)
+{
+	if (added)
+		*added = false;
+	int bouquet_id = g_bouquetManager->existsUBouquet(name.c_str());
+	CZapitBouquet *fav;
+	if (bouquet_id < 0)
+	{
+		fav = g_bouquetManager->addBouquet(name, true);
+		bouquet_id = g_bouquetManager->existsUBouquet(name.c_str());
+	}
+	else
+		fav = g_bouquetManager->Bouquets[bouquet_id];
+	if (bouquet_id < 0)
+		return NULL;
+
+	ZapitChannelList *lists[] = { &source->tvChannels, &source->radioChannels };
+	for (int l = 0; l < 2; l++)
+	{
+		for (size_t i = 0; i < lists[l]->size(); i++)
+		{
+			if (!g_bouquetManager->existsChannelInBouquet(bouquet_id, (*lists[l])[i]->getChannelID()))
+			{
+				fav->addService((*lists[l])[i]);
+				if (added)
+					*added = true;
+			}
+		}
+	}
+	return fav;
+}
+
 int CBouquetList::doMenu()
 {
 	int i = 0, ret = 0;
@@ -229,7 +261,7 @@ int CBouquetList::doMenu()
 	static int old_selected = 0;
 	signed int bouquet_id;
 	char cnt[5];
-	CZapitBouquet *tmp, *zapitBouquet;
+	CZapitBouquet *zapitBouquet;
 	ZapitChannelList *channels;
 
 	if (Bouquets.empty() || g_settings.minimode)
@@ -294,36 +326,8 @@ int CBouquetList::doMenu()
 				// copy to favorites
 				case 0:
 					hide();
-					bouquet_id = g_bouquetManager->existsUBouquet(Bouquets[selected]->channelList->getName());
-					if (bouquet_id < 0)
-					{
-						tmp = g_bouquetManager->addBouquet(Bouquets[selected]->channelList->getName(), true);
-						bouquet_id = g_bouquetManager->existsUBouquet(Bouquets[selected]->channelList->getName());
-					}
-					else
-						tmp = g_bouquetManager->Bouquets[bouquet_id];
-
-					if (bouquet_id < 0)
+					if (!copyToFavorites(zapitBouquet, Bouquets[selected]->channelList->getName(), &added))
 						return 0;
-
-					channels = &zapitBouquet->tvChannels;
-					for (int li = 0; li < (int) channels->size(); li++)
-					{
-						if (!g_bouquetManager->existsChannelInBouquet(bouquet_id, ((*channels)[li])->getChannelID()))
-						{
-							added = true;
-							tmp->addService((*channels)[li]);
-						}
-					}
-					channels = &zapitBouquet->radioChannels;
-					for (int li = 0; li < (int) channels->size(); li++)
-					{
-						if (!g_bouquetManager->existsChannelInBouquet(bouquet_id, ((*channels)[li])->getChannelID()))
-						{
-							added = true;
-							tmp->addService((*channels)[li]);
-						}
-					}
 					if (added)
 					{
 						CNeutrinoApp::getInstance()->MarkFavoritesChanged();

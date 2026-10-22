@@ -113,6 +113,9 @@ class CBouquetList : public CListHelpers
 		CBouquet *addBouquet(const char *const name, int BouquetKey = -1, bool locked = false);
 		CBouquet *addBouquet(CZapitBouquet *zapitBouquet);
 		void deleteBouquet(CBouquet *bouquet);
+		/* the channels of a bouquet into the favourite of the same name,
+		   made when there is none; added: whether a channel went in */
+		static CZapitBouquet *copyToFavorites(CZapitBouquet *source, const std::string &name, bool *added = NULL);
 		t_bouquet_id getActiveBouquetNumber();
 		int activateBouquet(int id, bool bShowChannelList);
 		int show(bool bShowChannelList = true);

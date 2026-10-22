@@ -354,7 +354,7 @@ int CChannelList::doChannelMenu(void)
 	CMenuSelectorTarget * selector = new CMenuSelectorTarget(&select);
 
 	bool empty = (*chanlist).empty();
-	bool allow_edit = (bouquet && bouquet->zapitBouquet && !bouquet->zapitBouquet->bOther && (!bouquet->zapitBouquet->bWebtv && !bouquet->zapitBouquet->bWebradio));
+	bool allow_edit = (bouquet && bouquet->zapitBouquet && !bouquet->zapitBouquet->bOther);
 	bool got_history = (CNeutrinoApp::getInstance()->channelList->getLastChannels().size() > 1);
 
 	int i = 0;
@@ -415,6 +415,20 @@ int CChannelList::doChannelMenu(void)
 							unlocked = zp->check();
 							delete zp;
 						}
+					}
+					/* a web bouquet comes from its list on every reload: the
+					 * editing goes into the favourite of the same name, which
+					 * this list shows until the lists are made anew */
+					if (unlocked && (bouquet->zapitBouquet->bWebtv || bouquet->zapitBouquet->bWebradio)) {
+						bool added = false;
+						CZapitBouquet *fav = CBouquetList::copyToFavorites(bouquet->zapitBouquet, name, &added);
+						if (fav) {
+							bouquet->zapitBouquet = fav;
+							if (added)
+								CNeutrinoApp::getInstance()->MarkFavoritesChanged();
+							CNeutrinoApp::getInstance()->MarkChannelsInit();
+						} else
+							unlocked = false;
 					}
 					if (unlocked)
 						editMode(true);
