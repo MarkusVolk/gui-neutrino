@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/resource.h>
 #include <unistd.h>
 #include <dirent.h>
 
@@ -1841,6 +1842,9 @@ bool CBouquetManager::LogoStop()
 void CBouquetManager::run()
 {
 	set_threadname(__func__);
+	/* downloading and shrinking hundreds of logos must not take the time
+	   playback needs; on Linux this lowers only the calling thread */
+	setpriority(PRIO_PROCESS, 0, 19);
 	//printf(">>>>>> LogoThread [%s] started...\n",__func__);
 	CZapitChannel *cc = NULL;
 	std::string ologo;
