@@ -66,9 +66,8 @@ void send_hotplug(const std::string &data)
 	close(fd);
 }
 
-void handle(struct udev_device *dev)
+void handle(struct udev_device *dev, const char *action)
 {
-	const char *action = udev_device_get_action(dev);
 	const char *devname = udev_device_get_devnode(dev);
 	const char *devtype = udev_device_get_devtype(dev);
 	if (!action || !devname || !devtype)
@@ -81,6 +80,42 @@ void handle(struct udev_device *dev)
 
 	printf("[udev_hotplug] %s %s\n", action, devname);
 	send_hotplug(std::string("ACTION=") + action + " DEVNAME=" + devname + " ");
+}
+
+bool mounted(const char *devname)
+{
+	FILE *f = fopen("/proc/mounts", "r");
+	if (!f)
+		return false;
+	char line[512];
+	size_t len = strlen(devname);
+	bool found = false;
+	while (!found && fgets(line, sizeof(line), f))
+		found = !strncmp(line, devname, len) && line[len] == ' ';
+	fclose(f);
+	return found;
+}
+
+/* devices that were there before Neutrino started gave no event; what
+ * nobody mounted counts as just added */
+void coldplug(struct udev *udev)
+{
+	struct udev_enumerate *en = udev_enumerate_new(udev);
+	if (!en)
+		return;
+	udev_enumerate_add_match_subsystem(en, "block");
+	udev_enumerate_scan_devices(en);
+	struct udev_list_entry *entry;
+	udev_list_entry_foreach(entry, udev_enumerate_get_list_entry(en)) {
+		struct udev_device *dev = udev_device_new_from_syspath(udev, udev_list_entry_get_name(entry));
+		if (!dev)
+			continue;
+		const char *devname = udev_device_get_devnode(dev);
+		if (devname && !mounted(devname))
+			handle(dev, "add");
+		udev_device_unref(dev);
+	}
+	udev_enumerate_unref(en);
 }
 
 void *run(void *)
@@ -102,6 +137,8 @@ void *run(void *)
 		return NULL;
 	}
 
+	coldplug(udev);
+
 	struct pollfd pfd;
 	pfd.fd = udev_monitor_get_fd(mon);
 	pfd.events = POLLIN;
@@ -111,7 +148,7 @@ void *run(void *)
 		struct udev_device *dev = udev_monitor_receive_device(mon);
 		if (!dev)
 			continue;
-		handle(dev);
+		handle(dev, udev_device_get_action(dev));
 		udev_device_unref(dev);
 	}
 	return NULL;
