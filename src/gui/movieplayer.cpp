@@ -2747,13 +2747,15 @@ bool CMoviePlayerGui::HoldLive()
 /* The held stream reads on into its buffer; while that buffer reaches
  * from the held picture to now, it plays on without a switch. HLS comes
  * in segments of several seconds, so the buffer grows in steps and may
- * lack the newest one; it only must have kept growing. */
+ * lack the newest one; it only must have kept growing. Live TV from a
+ * decoder without a buffer of its own goes on through the timeshift. */
 bool CMoviePlayerGui::ResumeLive()
 {
 	bool ok = false;
 #if !HAVE_CST_HARDWARE
 	mutex.lock();
-	if (live_held && liveBufferedMs(playback, live_held_webtv) + 10000 >= live_hold_buffer_ms + LiveHeldFor()) {
+	int slack = live_held_webtv ? 10000 : 1000;
+	if (live_held && liveBufferedMs(playback, live_held_webtv) + slack >= live_hold_buffer_ms + LiveHeldFor()) {
 		if (live_held_webtv && webtv_started && playback) {
 			playback->SetSpeed(1);
 			ok = true;
