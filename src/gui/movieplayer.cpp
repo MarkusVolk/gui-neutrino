@@ -1070,6 +1070,11 @@ void CMoviePlayerGui::cutNeutrino()
 	if (isUPNP)
 		return;
 
+	/* a file or stream of its own ends the timeshift of the live channel,
+	 * the zap back on the way out starts it anew */
+	if (!isWebChannel && timeshift == TSHIFT_MODE_OFF)
+		CRecordManager::getInstance()->StopAutoRecord();
+
 	g_Zapit->lockPlayBack();
 
 	m_ThisMode = NeutrinoModes::mode_unknown;
