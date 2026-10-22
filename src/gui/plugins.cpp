@@ -572,7 +572,9 @@ bool CPlugins::hasPlugin(CPlugins::p_type_t type)
 {
 	for (std::vector<plugin>::iterator it = plugin_list.begin(); it != plugin_list.end(); ++it)
 	{
-		if ((it->type & type) && !it->hide)
+		/* as CPluginList shows them: what is integrated into another menu
+		   is not in the list, and an empty list is not worth an entry */
+		if ((it->type & type) && !it->hide && it->integration == PLUGIN_INTEGRATION_DISABLED)
 			return true;
 	}
 	return false;
