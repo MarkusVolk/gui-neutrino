@@ -1,4 +1,0 @@
-SUBDIRS = \
-	fonts \
-	icons \
-	themes
