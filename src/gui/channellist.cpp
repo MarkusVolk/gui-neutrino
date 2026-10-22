@@ -1886,7 +1886,7 @@ struct button_label SChannelListButtons_SMode[] =
 	{ NEUTRINO_ICON_BUTTON_BLUE,            LOCALE_INFOVIEWER_NEXT},
 	{ NEUTRINO_ICON_BUTTON_RECORD_INACTIVE, NONEXISTANT_LOCALE},
 	{ NEUTRINO_ICON_BUTTON_PLAY,            LOCALE_EXTRA_KEY_PIP_CLOSE},
-	{ NEUTRINO_ICON_BUTTON_INFO_SMALL,      NONEXISTANT_LOCALE},
+	{ NEUTRINO_ICON_BUTTON_INFO_SMALL,      LOCALE_TIMERLIST_INFO},
 	{ NEUTRINO_ICON_BUTTON_MENU_SMALL,      LOCALE_CHANNELLIST_EDIT},
 	{ NEUTRINO_ICON_BUTTON_MUTE_ZAP_ACTIVE, NONEXISTANT_LOCALE}
 };
@@ -1918,7 +1918,9 @@ void CChannelList::paintButtonBar(bool is_current)
 		channel_id = (*chanlist)[selected]->getChannelID();
 
 	struct button_label Button[NUM_LIST_BUTTONS_SORT];
-	bool do_record = CRecordManager::getInstance()->RecordingStatus(getActiveChannel_ChannelID());
+	/* the record key keeps a timeshift as recording, it does not stop it */
+	bool do_record = CRecordManager::getInstance()->RecordingStatus(getActiveChannel_ChannelID()) &&
+			 !CRecordManager::getInstance()->TimeshiftOnly();
 
 	int bcnt = 0;
 	for (int i = 0; i < NUM_LIST_BUTTONS_SORT; i++) {
