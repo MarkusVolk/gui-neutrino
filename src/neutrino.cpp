@@ -2578,10 +2578,13 @@ void CNeutrinoApp::channelsInit(bool bOnly)
 				if (b->getTvChannels(zapitList) || (g_settings.show_empty_favorites && b->bUser)) {
 					if(b->bUser)
 						tmp = TVfavList->addBouquet(b);
-					else if(b->bWebtv)
-						tmp = TVwebList->addBouquet(b);
-					else
+					else {
+						/* a web bouquet is a provider as well, and in the
+						 * list of the WWW key too */
+						if (b->bWebtv)
+							TVwebList->addBouquet(b)->channelList->SetChannelList(&zapitList);
 						tmp = TVbouquetList->addBouquet(b);
+					}
 
 					tmp->channelList->SetChannelList(&zapitList);
 					tvi++;
@@ -2589,10 +2592,11 @@ void CNeutrinoApp::channelsInit(bool bOnly)
 				if (b->getRadioChannels(zapitList) || (g_settings.show_empty_favorites && b->bUser)) {
 					if(b->bUser)
 						tmp = RADIOfavList->addBouquet(b);
-					else if(b->bWebradio)
-						tmp = RADIOwebList->addBouquet(b);
-					else
+					else {
+						if (b->bWebradio)
+							RADIOwebList->addBouquet(b)->channelList->SetChannelList(&zapitList);
 						tmp = RADIObouquetList->addBouquet(b);
+					}
 
 					tmp->channelList->SetChannelList(&zapitList);
 					ri++;

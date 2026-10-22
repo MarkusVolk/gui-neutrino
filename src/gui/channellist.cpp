@@ -778,9 +778,14 @@ int CChannelList::show()
 		}
 		else if (CNeutrinoApp::getInstance()->listModeKey(msg)) {
 			if (!edit_state) {
-				//FIXME: what about LIST_MODE_WEB?
-				int newmode = msg == CRCInput::RC_sat ? LIST_MODE_SAT : LIST_MODE_FAV;
+				int newmode = LIST_MODE_FAV;
+				if (msg == CRCInput::RC_sat)
+					newmode = LIST_MODE_SAT;
+				else if (msg == CRCInput::RC_www)
+					newmode = LIST_MODE_WEB;
 				CNeutrinoApp::getInstance()->SetChannelMode(newmode);
+				if (newmode == LIST_MODE_WEB && bouquetList->Bouquets.empty())
+					CNeutrinoApp::getInstance()->SetChannelMode(LIST_MODE_PROV);
 				res = CHANLIST_CHANGE_MODE;
 				loop = false;
 			}
