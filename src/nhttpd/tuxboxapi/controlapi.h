@@ -78,6 +78,7 @@ private:
 	void SetModeCGI(CyhookHandler *hh);
 	void GetModeCGI(CyhookHandler *hh);
 	void ExecCGI(CyhookHandler *hh);
+	void WolCGI(CyhookHandler *hh);
 	void SystemCGI(CyhookHandler *hh);
 	void StandbyCGI(CyhookHandler *hh);
 	void RCCGI(CyhookHandler *hh);

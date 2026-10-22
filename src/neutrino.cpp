@@ -4809,8 +4809,7 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 			for(int i=0 ; i < NETWORK_NFS_NR_OF_ENTRIES ; i++) {
 				if (g_settings.network_nfs[i].local_dir == recordingDir) {
 					printf("[neutrino] waking up %s (%s)\n", g_settings.network_nfs[i].ip.c_str(), recordingDir);
-					if (my_system(2, "ether-wake", g_settings.network_nfs[i].mac.c_str()) != 0)
-						perror("ether-wake failed");
+					wake_on_lan(g_settings.network_nfs[i].mac);
 					break;
 				}
 			}

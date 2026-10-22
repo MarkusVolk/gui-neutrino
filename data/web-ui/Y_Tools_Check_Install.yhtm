@@ -85,12 +85,6 @@ function do_check(){
 	{=if-empty:{=var-get:fbshot=}~~
 		sLog_addRow(sLog_body, "green", "Programs: fbshot is installed at: {=var-get:fbshot=}. OSD Screenshot is enabled.", "ok");
 	=}
-	{=var-set:ether-wake={=find-exec:ether-wake=}=}
-	{=if-empty:{=var-get:ether-wake=}~
-		sLog_addRow(sLog_body, "red", "Programs: ether-wake is not installed. Wake on LAN is disabled. ", "failed");
-	~
-		sLog_addRow(sLog_body, "green", "Programs: ether-wake is installed at: {=var-get:ether-wake=}. Wake on LAN is enabled.", "ok");
-	=}
 	/*automount*/
 	{=var-set:automount={=find-exec:automount=}=}
 	{=if-empty:{=var-get:automount=}~~

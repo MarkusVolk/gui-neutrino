@@ -298,18 +298,6 @@ proc()
 }
 
 # -----------------------------------------------------------
-# wake up $1=MAC
-# -----------------------------------------------------------
-wol()
-{
-	if [ -e $y_path_sbin/ether-wake ]; then
-		msg=`ether-wake $1`
-	fi
-	msg="<b>Wake on LAN $1</b><br><br>$msg"
-	y_format_message_html
-}
-
-# -----------------------------------------------------------
 # lcd shot
 # $1= optionen | leer
 # -----------------------------------------------------------
@@ -417,7 +405,6 @@ case "$1" in
 	ext_uninstaller)		shift 1; do_ext_uninstaller $* 2>&1 ;;
 	ext_installer)			shift 1; do_ext_installer $* 2>&1 ;;
 	proc)				shift 1; proc $* ;;
-	wol)				shift 1; wol $* ;;
 	lcshot)				shift 1; do_lcshot $* ;;
 	fbshot)				shift 1; do_fbshot $* ;;
 	fbshot_clear)			do_fbshot_clear ;;

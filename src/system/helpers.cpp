@@ -48,6 +48,8 @@
 #include <mntent.h>
 #include <fstream>
 #include <linux/hdreg.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <linux/fs.h>
 #include "debug.h"
 
@@ -395,6 +397,50 @@ int my_system(const char *cmd)
 		return -1;
 
 	return my_system(1, cmd);
+}
+
+bool wake_on_lan(const std::string &mac)
+{
+	unsigned char addr[6];
+	unsigned int b[6];
+	char sep[5];
+	if (sscanf(mac.c_str(), "%2x%c%2x%c%2x%c%2x%c%2x%c%2x", &b[0], &sep[0], &b[1], &sep[1], &b[2], &sep[2], &b[3], &sep[3], &b[4], &sep[4], &b[5]) != 11)
+	{
+		dprintf(DEBUG_NORMAL, "[%s] not a MAC address: '%s'\n", __func__, mac.c_str());
+		return false;
+	}
+	for (int i = 0; i < 6; i++)
+	{
+		if (i < 5 && sep[i] != ':' && sep[i] != '-')
+		{
+			dprintf(DEBUG_NORMAL, "[%s] not a MAC address: '%s'\n", __func__, mac.c_str());
+			return false;
+		}
+		addr[i] = b[i];
+	}
+	unsigned char packet[6 + 16 * 6];
+	memset(packet, 0xff, 6);
+	for (int i = 0; i < 16; i++)
+		memcpy(packet + 6 + i * 6, addr, 6);
+
+	int fd = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+	if (fd < 0)
+	{
+		dprintf(DEBUG_NORMAL, "[%s] socket: %s\n", __func__, strerror(errno));
+		return false;
+	}
+	int on = 1;
+	setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
+	struct sockaddr_in to;
+	memset(&to, 0, sizeof(to));
+	to.sin_family = AF_INET;
+	to.sin_port = htons(9);
+	to.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+	bool ok = sendto(fd, packet, sizeof(packet), 0, (struct sockaddr *)&to, sizeof(to)) == (ssize_t)sizeof(packet);
+	if (!ok)
+		dprintf(DEBUG_NORMAL, "[%s] sendto: %s\n", __func__, strerror(errno));
+	close(fd);
+	return ok;
 }
 
 int my_system(int argc, const char *arg, ...)

@@ -243,6 +243,7 @@ const CControlAPI::TyCgiCall CControlAPI::yCgiCallList[]=
 	// Start skripts, plugins
 	{"startplugin",		&CControlAPI::StartPluginCGI,		"text/plain"},
 	{"exec",		&CControlAPI::ExecCGI,			"text/plain"},
+	{"wol",			&CControlAPI::WolCGI,			"text/plain"},
 	{"yweb",		&CControlAPI::YWebCGI,			"text/plain"},
 	// video & Audio handling
 	{"aspectratio",		&CControlAPI::AspectRatioCGI,		"text/plain"},
@@ -540,6 +541,18 @@ void CControlAPI::GetModeCGI(CyhookHandler *hh)
 }
 
 //-----------------------------------------------------------------------------
+/* /control/wol?<MAC>: wakes that machine up */
+void CControlAPI::WolCGI(CyhookHandler *hh)
+{
+	std::string mac = hh->ParamList["1"];
+	if (mac.empty())
+		mac = hh->ParamList["mac"];
+	if (wake_on_lan(mac))
+		hh->SendOk();
+	else
+		hh->SendError();
+}
+
 void CControlAPI::ExecCGI(CyhookHandler *hh)
 {
 	std::string script, result;

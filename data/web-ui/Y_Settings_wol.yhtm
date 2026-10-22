@@ -9,7 +9,7 @@ var g_wol = new Array(
 	"{=ini-get:%(CONFIGDIR)/Y-Web.conf;wol_mac_3=}");
 function do_wol(_nr)
 {
-	var nhttpd_version = loadSyncURL("/control/exec?Y_Tools&wol&"+g_wol[_nr-1]);
+	loadSyncURL("/control/wol?"+g_wol[_nr-1]);
 }
 function init_wol()
 {
