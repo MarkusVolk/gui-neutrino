@@ -942,9 +942,10 @@ bool CRecordInstance::KeepTimeshift()
 	std::string tsdir = Directory;
 	autoshift = false;
 	Directory = g_settings.network_nfs_recordingdir;
-	bool linked = MakeFileName(channel) == RECORD_OK &&
-		      link((tsname + ".ts").c_str(), (std::string(filename) + ".ts").c_str()) == 0;
-	if (!linked && errno == EXDEV) {
+	bool named = MakeFileName(channel) == RECORD_OK;
+	bool linked = named && link((tsname + ".ts").c_str(), (std::string(filename) + ".ts").c_str()) == 0;
+	int err = errno;
+	if (!linked && err == EXDEV) {
 		/* the recording directory may be the timeshift directory's
 		 * parent under another mount point, as in a sandbox; a link
 		 * through the parent stays on the timeshift's mount */
@@ -957,9 +958,24 @@ bool CRecordInstance::KeepTimeshift()
 				rel = "/" + rel;
 			std::string path = parent + rel;
 			linked = link((tsname + ".ts").c_str(), (path + ".ts").c_str()) == 0;
+			err = errno;
 			if (linked)
 				snprintf(filename, sizeof(filename), "%s", path.c_str());
 		}
+	}
+	if (!linked && named && (err == EPERM || err == EOPNOTSUPP || err == EMLINK || err == ENOSYS)) {
+		/* FAT and the like have no hard links: the recording goes on in
+		   the timeshift file, which a running timeshift keeps playing, and
+		   gets its own name when it ends */
+		final_name = filename;
+		strcpy(filename, tsname.c_str());
+		printf("%s: %s.ts becomes %s.ts when the recording ends\n", __func__, tsname.c_str(), final_name.c_str());
+		SaveXml();
+		if (frontend)
+			CFEManager::getInstance()->lockFrontend(frontend, channel);
+		if (recording_id)
+			CTimerManager::getInstance()->setStopTime(recording_id, RecordingEnd(time(NULL)));
+		return true;
 	}
 	if (!linked) {
 		perror("[record] keep timeshift");
@@ -984,6 +1000,15 @@ bool CRecordInstance::KeepTimeshift()
 
 void CRecordInstance::RemoveTimeshiftName()
 {
+	if (!final_name.empty()) {
+		std::string from = filename;
+		if (rename((from + ".ts").c_str(), (final_name + ".ts").c_str()) == 0) {
+			rename((from + ".xml").c_str(), (final_name + ".xml").c_str());
+			snprintf(filename, sizeof(filename), "%s", final_name.c_str());
+		} else
+			perror("[record] name the kept timeshift");
+		final_name.clear();
+	}
 	if (timeshift_name.empty())
 		return;
 	unlink((timeshift_name + ".ts").c_str());

@@ -104,6 +104,7 @@ class CRecordInstance
 		std::string	Directory;
 		char		filename[FILENAMEBUFFERSIZE];
 		std::string	timeshift_name;	/* the timeshift file name a kept timeshift still has */
+		std::string	final_name;	/* where a kept timeshift goes when it ends, without hard links */
 		std::string	rec_stop_msg;
 
 		CMovieInfo *	cMovieInfo;
