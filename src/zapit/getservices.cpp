@@ -1453,6 +1453,58 @@ int CServiceManager::GetFreeNumber(bool radio)
 	}
 }
 #endif
+void CServiceManager::LoadWebNumbers()
+{
+	/* after a scan the DVB channels are numbered first, the web ones after */
+	if (!keep_numbers || (service_count && !have_numbers))
+		return;
+	xmlDocPtr doc = parseXmlFile(WEBCHANNELS_XML);
+	if (!doc)
+		return;
+	OpenThreads::ScopedLock<OpenThreads::Mutex> lock(channels_mutex);
+	for (xmlNodePtr node = xmlChildrenNode(xmlDocGetRootElement(doc)); node; node = xmlNextNode(node)) {
+		const char *id = xmlGetAttribute(node, "id");
+		int number = xmlGetNumericAttribute(node, "num", 10);
+		if (!id || number <= 0)
+			continue;
+		t_channel_id chid = strtoull(id, NULL, 16);
+		channel_map_iterator_t it = allchans.find(chid);
+		if (!IS_WEBCHAN(chid) || it == allchans.end())
+			continue;
+		service_number_map_t *numbers = (it->second.getServiceType() == ST_DIGITAL_RADIO_SOUND_SERVICE) ? &radio_numbers : &tv_numbers;
+		/* a number a DVB channel has taken meanwhile goes to the web channel no more */
+		if (numbers->find(number) != numbers->end())
+			continue;
+		numbers->insert(number);
+		it->second.number = number;
+	}
+	xmlFreeDoc(doc);
+}
+
+void CServiceManager::SaveWebNumbers()
+{
+	if (!keep_numbers)
+		return;
+	std::string tmp = std::string(WEBCHANNELS_XML) + ".tmp";
+	FILE *fd = fopen(tmp.c_str(), "w");
+	if (!fd)
+		return;
+	OpenThreads::ScopedLock<OpenThreads::Mutex> lock(channels_mutex);
+	fprintf(fd, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<webchannels>\n");
+	for (channel_map_iterator_t it = allchans.begin(); it != allchans.end(); ++it) {
+		if (!IS_WEBCHAN(it->first) || !it->second.number)
+			continue;
+		service_number_map_t *numbers = (it->second.getServiceType() == ST_DIGITAL_RADIO_SOUND_SERVICE) ? &radio_numbers : &tv_numbers;
+		numbers->insert(it->second.number);
+		fprintf(fd, "\t<S id=\"%" PRIx64 "\" num=\"%d\"/>\n", it->first, it->second.number);
+	}
+	fprintf(fd, "</webchannels>\n");
+	if (fclose(fd) == 0)
+		rename(tmp.c_str(), WEBCHANNELS_XML);
+	else
+		unlink(tmp.c_str());
+}
+
 int CServiceManager::GetMaxNumber(bool radio)
 {
 	service_number_map_t * channel_numbers = radio ? &radio_numbers : &tv_numbers;

@@ -735,7 +735,9 @@ void CBouquetManager::loadBouquets(bool ignoreBouquetFile)
 	loadWebtv();
 	loadWebradio();
 	parseBouquetsXml(UBOUQUETS_XML, true);
+	CServiceManager::getInstance()->LoadWebNumbers();
 	renumServices();
+	CServiceManager::getInstance()->SaveWebNumbers();
 	CServiceManager::getInstance()->SetCIFilter();
 	if(!EpgIDMapping.empty()){
 		EpgIDMapping.clear();

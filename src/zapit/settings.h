@@ -35,6 +35,7 @@
 #define SERVICES_XML    ZAPITDIR "/services.xml"
 #define SERVICES_TMP    "/tmp/services.tmp"
 #define BOUQUETS_XML    ZAPITDIR "/bouquets.xml"
+#define WEBCHANNELS_XML ZAPITDIR "/webchannels.xml"
 #define UBOUQUETS_XML    ZAPITDIR "/ubouquets.xml"
 #define BOUQUETS_TMP    "/tmp/bouquets.tmp"
 
