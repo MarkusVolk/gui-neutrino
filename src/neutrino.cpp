@@ -2710,6 +2710,10 @@ void CNeutrinoApp::SetChannelMode(int newmode)
 		sortmode[newmode] = g_settings.channellist_sort_mode;
 		INFO("sorting, mode %d, %d bouquets", g_settings.channellist_sort_mode, (int)bouquetList->Bouquets.size());
 		for (uint32_t i = 0; i < bouquetList->Bouquets.size(); i++) {
+			/* a web bouquet keeps the order of its list */
+			CZapitBouquet *zb = bouquetList->Bouquets[i]->zapitBouquet;
+			if (zb && (zb->bWebtv || zb->bWebradio))
+				continue;
 			if(g_settings.channellist_sort_mode == CChannelList::SORT_ALPHA)
 				bouquetList->Bouquets[i]->channelList->SortAlpha();
 			if(g_settings.channellist_sort_mode == CChannelList::SORT_TP)
