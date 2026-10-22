@@ -13,3 +13,6 @@ subdir('luaclient')
 if enable_upnp
 	subdir('libupnpclient')
 endif
+if enable_lcd
+	subdir('liblcddisplay')
+endif

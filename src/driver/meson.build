@@ -30,9 +30,13 @@ libneutrino_driver_sources = [
 	'shutdown_count.cpp',
 	'streamts.cpp',
 	'volume.cpp',
-	'fb_accel_glfb.cpp',
-	'simple_display.cpp',
 ]
+libneutrino_driver_sources += {
+	'generic' : ['fb_accel_glfb.cpp'],
+	'armbox' : ['fb_accel_arm.cpp', 'slide.cpp'],
+	'mipsbox' : ['fb_accel_mips.cpp', 'slide.cpp'],
+}[boxtype]
+libneutrino_driver_sources += enable_lcd ? 'lcdd.cpp' : 'simple_display.cpp'
 if enable_xkbcommon
 	libneutrino_driver_sources += 'textkeyboard.cpp'
 endif

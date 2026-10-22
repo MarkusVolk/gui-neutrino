@@ -1,7 +1,3 @@
-option('boxtype', type : 'combo', choices : ['generic'], value : 'generic',
-	description : 'Hardware neutrino is built for')
-option('stb-hal-includes', type : 'string', value : '',
-	description : 'Path to the libstb-hal headers, default includedir/libstb-hal')
 
 option('configdir', type : 'string', value : '', description : 'Config files, default localstatedir/tuxbox/config')
 option('zapitdir', type : 'string', value : '', description : 'Zapit files, default localstatedir/tuxbox/config/zapit')
@@ -38,6 +34,7 @@ option('hosted_httpddir', type : 'string', value : '/mnt/hosted', description : 
 option('flagdir', type : 'string', value : '', description : 'Flag files, default localstatedir/etc')
 
 option('default-theme', type : 'string', value : '', description : 'Default theme of the GUI')
+option('default-oled-theme', type : 'string', value : '', description : 'Default OLED theme')
 option('weather-api-key', type : 'string', value : '', description : 'OpenWeather API key')
 option('weather-api-version', type : 'string', value : '', description : 'OpenWeather API version')
 option('tmdb-api-key', type : 'string', value : '', description : 'TMDb API key')
@@ -77,6 +74,10 @@ option('viasatepg', type : 'boolean', value : false, description : 'ViaSat EPG')
 option('fastscan', type : 'boolean', value : false, description : 'Fastscan')
 option('aitscan', type : 'boolean', value : true, description : 'Application Information Table')
 option('pip', type : 'boolean', value : false, description : 'Picture in picture')
+option('quadpip', type : 'boolean', value : false, description : 'Four pictures at once (VU+ 4K models)')
+option('lcd', type : 'boolean', value : false, description : 'Colour LCD of the osmio4kplus')
+option('arm-acc', type : 'boolean', value : true, description : 'Accelerated framebuffer of the armbox models')
+option('mips-acc', type : 'boolean', value : true, description : 'Accelerated framebuffer of the mipsbox models')
 option('lcd4linux', type : 'boolean', value : false, description : 'LCD4Linux')
 option('graphlcd', type : 'boolean', value : false, description : 'GraphLCD')
 option('extupdate', type : 'boolean', value : false, description : 'Extended update routine')

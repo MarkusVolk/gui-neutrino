@@ -55,6 +55,9 @@ endif
 if enable_graphlcd
 	neutrino_libs += libneutrino_driver_glcd
 endif
+if enable_lcd
+	neutrino_libs += liblcddisplay
+endif
 
 neutrino_link_deps = [
 	nt_deps,

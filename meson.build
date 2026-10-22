@@ -13,10 +13,10 @@ project('neutrino', 'c', 'cpp',
 fs = import('fs')
 cc = meson.get_compiler('c')
 
-boxtype = get_option('boxtype')
-if boxtype != 'generic'
-	error('the Meson build supports boxtype=generic only, use autotools for @0@'.format(boxtype))
-endif
+stb_hal_dep = dependency('libstb-hal')
+boxtype = stb_hal_dep.get_variable(pkgconfig : 'boxtype', default_value : 'generic')
+boxmodel = stb_hal_dep.get_variable(pkgconfig : 'boxmodel', default_value : 'generic')
+box_defines = stb_hal_dep.get_variable(pkgconfig : 'boxdefines', default_value : 'HAVE_GENERIC_HARDWARE,BOXMODEL_GENERIC').split(',')
 
 prefix = get_option('prefix')
 bindir = prefix / get_option('bindir')
@@ -105,7 +105,17 @@ enable_heif = get_option('heif')
 enable_jxl = get_option('jxl')
 enable_fribidi = get_option('fribidi')
 enable_pip = get_option('pip')
-enable_quadpip = false
+enable_quadpip = get_option('quadpip')
+if enable_quadpip
+	if boxmodel not in ['vusolo4k', 'vuduo4k', 'vuduo4kse', 'vuultimo4k', 'vuuno4k', 'vuuno4kse']
+		error('quadpip is for vusolo4k, vuduo4k, vuduo4kse, vuultimo4k, vuuno4k and vuuno4kse')
+	endif
+	enable_pip = true
+endif
+enable_lcd = get_option('lcd')
+if enable_lcd and boxmodel != 'osmio4kplus'
+	error('lcd is for osmio4kplus')
+endif
 enable_lcd4linux = get_option('lcd4linux')
 enable_graphlcd = get_option('graphlcd')
 enable_extupdate = get_option('extupdate')
@@ -170,18 +180,19 @@ conf.set_quoted('TARGET_PREFIX', '')
 foreach name, value : dirs
 	conf.set_quoted(name, value)
 endforeach
-conf.set('HAVE_GENERIC_HARDWARE', 1)
-conf.set('BOXMODEL_GENERIC', 1)
+foreach define : box_defines
+	conf.set(define, 1)
+endforeach
 conf.set('HAVE_LIBSTB_HAL', 1)
 conf.set('SCREENSHOT', 1)
 conf.set('ENABLE_FFMPEGDEC', 1)
 conf.set('ENABLE_GIFLIB', 1)
 conf.set('USE_PUGIXML', 1)
-conf.set('ENABLE_ARM_ACC', 1)
-conf.set('ENABLE_MIPS_ACC', 1)
+conf.set('ENABLE_ARM_ACC', boxtype == 'armbox' and get_option('arm-acc') ? 1 : false)
+conf.set('ENABLE_MIPS_ACC', boxtype == 'mipsbox' and get_option('mips-acc') ? 1 : false)
 conf.set('fb_pixel_t', 'uint32_t')
 conf.set_quoted('DEFAULT_THEME', get_option('default-theme'))
-conf.set_quoted('DEFAULT_OLED_THEME', '')
+conf.set_quoted('DEFAULT_OLED_THEME', get_option('default-oled-theme'))
 conf.set_quoted('WEATHER_API_KEY', get_option('weather-api-key'))
 conf.set_quoted('WEATHER_API_VERSION', get_option('weather-api-version'))
 conf.set_quoted('TMDB_API_KEY', get_option('tmdb-api-key'))
@@ -223,6 +234,9 @@ foreach def : [
 	['ENABLE_LUA', enable_lua],
 	['EXIT_CLEANUP', get_option('cleanup')],
 	['ENABLE_PIP', enable_pip],
+	['ENABLE_QUADPIP', enable_quadpip],
+	['ENABLE_LCD', enable_lcd],
+	['LCD_UPDATE', enable_lcd],
 	['DYNAMIC_DEMUX', get_option('dynamicdemux')],
 	['ENABLE_TESTING', get_option('testing')],
 	['ENABLE_FRIBIDI', enable_fribidi],
@@ -256,18 +270,6 @@ build_conf.set_quoted('USED_CXXFLAGS', ' '.join(get_option('cpp_args')))
 build_conf.set_quoted('USED_COMPILER', compiler_version)
 configure_file(output : 'local_build_config.h', configuration : build_conf)
 
-stb_hal_includes = get_option('stb-hal-includes')
-stb_hal_dep = dependency('', required : false)
-if stb_hal_includes == ''
-	stb_hal_dep = dependency('libstb-hal', required : false)
-	stb_hal_includes = includedir / 'libstb-hal'
-endif
-if not stb_hal_dep.found()
-	stb_hal_dep = declare_dependency(
-		compile_args : ['-I' + stb_hal_includes],
-		dependencies : cc.find_library('stb-hal'),
-	)
-endif
 
 source_root_rel = fs.relative_to(meson.project_source_root(), meson.project_build_root())
 add_project_arguments(
@@ -295,6 +297,7 @@ nt_inc = include_directories(
 	'lib/libmd5sum',
 	'lib/libupnpclient',
 	'lib/jsoncpp',
+	'lib/liblcddisplay',
 	'src/nhttpd',
 	'src/nhttpd/yhttpd_core',
 	'src/nhttpd/yhttpd_mods',
