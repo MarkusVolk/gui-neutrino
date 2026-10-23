@@ -180,7 +180,10 @@ int CNetworkServiceSetup::showNetworkServiceSetup()
 		items[i] = new CNetworkService(services[i].cmd, services[i].options);
 		services[i].enabled = items[i]->Enabled();
 
-		active = !find_executable(services[i].cmd.c_str()).empty();
+		/* a service the image does not have is left out, not offered greyed */
+		if (find_executable(services[i].cmd.c_str()).empty())
+			continue;
+		active = true;
 
 		if ((services[i].name == "Telnet") && useinetd)
 			active = false;
