@@ -31,6 +31,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <png.h>
+#include <algorithm>
 #include <zlib.h>
 
 #include <global.h>
@@ -65,6 +66,7 @@ CScreenShot::CScreenShot(const std::string &fname, screenshot_format_t fmt)
 	get_video = g_settings.screenshot_video;
 	get_osd = g_settings.screenshot_mode;
 	scale_to_video = g_settings.screenshot_scale;
+	crop_osd = false;
 #if SCREENSHOT_INTERNAL
 	pixel_data = NULL;
 	fd = NULL;
@@ -321,10 +323,46 @@ bool CScreenShot::StartSync()
 {
 	bool ret = false;
 	printf("[CScreenShot::%s:%d] save to %s format %d\n", __func__, __LINE__, filename.c_str(), format);
-	if (GetData())
+	if (GetData()) {
+		if (crop_osd && !get_video)
+			cropToContent();
 		ret = SaveFile();
+	}
 	printf("[CScreenShot::%s:%d] %s finished: %d\n", __func__, __LINE__, filename.c_str(), ret);
 	return ret;
+}
+
+/* keep only the part of the OSD that shows something, with a small margin;
+ * an OSD without anything visible stays as it is */
+void CScreenShot::cropToContent()
+{
+	int x0 = xres, y0 = yres, x1 = -1, y1 = -1;
+	for (int y = 0; y < yres; y++) {
+		const uint8_t *row = pixel_data + y * xres * 4;
+		for (int x = 0; x < xres; x++) {
+			if (!row[x * 4 + 3])
+				continue;
+			if (x < x0)
+				x0 = x;
+			if (x > x1)
+				x1 = x;
+			if (y < y0)
+				y0 = y;
+			y1 = y;
+		}
+	}
+	if (x1 < 0)
+		return;
+	const int margin = 8;
+	x0 = std::max(0, x0 - margin);
+	y0 = std::max(0, y0 - margin);
+	x1 = std::min(xres - 1, x1 + margin);
+	y1 = std::min(yres - 1, y1 + margin);
+	int w = x1 - x0 + 1, h = y1 - y0 + 1;
+	for (int y = 0; y < h; y++)
+		memmove(pixel_data + y * w * 4, pixel_data + ((y0 + y) * xres + x0) * 4, w * 4);
+	xres = w;
+	yres = h;
 }
 
 /* save file in selected format, free data received from video decoder */

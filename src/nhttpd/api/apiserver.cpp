@@ -1122,8 +1122,8 @@ pthread_mutex_t screenshot_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void ep_screenshot(Call &c)
 {
-	bool osd, video;
-	if (!query_bool(c, "osd", true, osd) || !query_bool(c, "video", true, video))
+	bool osd, video, crop;
+	if (!query_bool(c, "osd", true, osd) || !query_bool(c, "video", true, video) || !query_bool(c, "crop", false, crop))
 		return;
 	bool jpeg = false;
 	if (c.has("format")) {
@@ -1142,6 +1142,7 @@ void ep_screenshot(Call &c)
 	std::shared_ptr<CScreenShot> shot(new CScreenShot(file, jpeg ? CScreenShot::FORMAT_JPG : CScreenShot::FORMAT_PNG));
 	shot->EnableOSD(osd);
 	shot->EnableVideo(video);
+	shot->CropToOSD(crop);
 	/* the capture reads the frame buffer and the decoder, which belong to
 	 * the main loop; the job keeps the shot in case the loop is late */
 	std::shared_ptr<bool> taken(new bool(false));
