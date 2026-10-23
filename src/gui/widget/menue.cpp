@@ -848,6 +848,11 @@ const char *CMenuWidget::getName()
 	return nameString.c_str();
 }
 
+static bool inStandby()
+{
+	return CNeutrinoApp::getInstance()->getMode() == NeutrinoModes::mode_standby;
+}
+
 int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 {
 	neutrino_msg_t msg;
@@ -856,6 +861,11 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 	CVFD::MODES oldLcdMode = CVFD::getInstance()->getMode();
 
 	no_action = false;
+
+	/* a plugin that kept its menu open past a standby (e.g. after its
+	 * player was cancelled) must not paint into the standby screen */
+	if (inStandby())
+		return menu_return::RETURN_EXIT_ALL;
 
 	frameBuffer->Lock();
 
@@ -925,6 +935,11 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 						break;
 					case menu_return::RETURN_REPAINT:
 					case menu_return::RETURN_EXIT_REPAINT:
+						if (inStandby()) {
+							retval = menu_return::RETURN_EXIT_ALL;
+							msg = CRCInput::RC_timeout;
+							break;
+						}
 						if (fade && washidden)
 							fader.StartFadeIn();
 						checkHints();
@@ -1104,6 +1119,11 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 							break;
 						case menu_return::RETURN_REPAINT:
 						case menu_return::RETURN_EXIT_REPAINT:
+							if (inStandby()) {
+								retval = menu_return::RETURN_EXIT_ALL;
+								msg = CRCInput::RC_timeout;
+								break;
+							}
 							if (fade && washidden)
 								fader.StartFadeIn();
 							checkHints();
@@ -1152,7 +1172,11 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 					msg = CRCInput::RC_timeout;
 				}
 		}
-		if(msg == CRCInput::RC_timeout) {
+		if (msg != CRCInput::RC_timeout && inStandby()) {
+			retval = menu_return::RETURN_EXIT_ALL;
+			msg = CRCInput::RC_timeout;
+		}
+		if(msg == CRCInput::RC_timeout && !inStandby()) {
 			if(fade && fader.StartFadeOut()) {
 				timeoutEnd = CRCInput::calcTimeoutEnd(1);
 				msg = 0;
@@ -1177,7 +1201,7 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 
 	fader.StopFade();
 
-	if(!parent)
+	if(!parent && !inStandby())
 		if(oldLcdMode != CVFD::getInstance()->getMode())
 			CVFD::getInstance()->setMode(CVFD::MODE_TVRADIO);
 

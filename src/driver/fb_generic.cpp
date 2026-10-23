@@ -1974,6 +1974,8 @@ void CFrameBuffer::fbCopyArea(uint32_t width, uint32_t height, uint32_t dst_x, u
 void CFrameBuffer::blit2FB(void *fbbuff, uint32_t width, uint32_t height, uint32_t xoff, uint32_t yoff, uint32_t xp, uint32_t yp, bool transp)
 {
 	uint32_t xc, yc;
+	if (!getActive())
+		return;
 	if (xoff >= xRes || yoff >= yRes || xp >= width || yp >= height) {
 		printf(LOGTAG "%s: invalid parameters, xoff: %u yoff: %u xp: %u yp: %u width: %u height: %u\n", __func__, xoff, yoff, xp, yp, width, height);
 		return;
@@ -2033,7 +2035,7 @@ void CFrameBuffer::blit2FB(void *fbbuff, uint32_t width, uint32_t height, uint32
 
 void CFrameBuffer::blitBox2FB(const fb_pixel_t* boxBuf, const uint32_t& width, const uint32_t& height, const uint32_t& xoff, const uint32_t& yoff)
 {
-	if(width <1 || height <1 || !boxBuf )
+	if(width <1 || height <1 || !boxBuf || !getActive())
 		return;
 
 	if (xoff >= xRes || yoff >= yRes)
