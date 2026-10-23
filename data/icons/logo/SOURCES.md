@@ -24,11 +24,13 @@ stays under that licence; the author is named in the table.
 | algerie3.svg | own wordmark | CC0-1.0 |
 | aljazeera.svg | [Commons: Aljazeera eng.svg](https://commons.wikimedia.org/wiki/File:Aljazeera_eng.svg) | Public domain (مريم محمد الغلبان), trademark of its owner |
 | alquiler.svg | own wordmark | CC0-1.0 |
+| anewz.svg | own wordmark | CC0-1.0 |
 | animaux.svg | own wordmark | CC0-1.0 |
 | anixe.svg | own wordmark | CC0-1.0 |
 | antena3.svg | [Commons: Antena 3 2025 (sin wordmark).svg](https://commons.wikimedia.org/wiki/File:Antena_3_2025_%28sin_wordmark%29.svg) | Public domain (Atresmedia - Gédéon), trademark of its owner |
 | antennebayern.svg | [Commons: Antenne Bayern logo.svg](https://commons.wikimedia.org/wiki/File:Antenne_Bayern_logo.svg) | Public domain (Unknown authorUnknown author), trademark of its owner |
 | antennebrbg.svg | own wordmark | CC0-1.0 |
+| apunt.svg | [Commons: Logotip d'À Punt (2017-).svg](https://commons.wikimedia.org/wiki/File:Logotip_d%27%C3%80_Punt_%282017-%29.svg) | Public domain (Aftershare; CVMC.), trademark of its owner |
 | aragontvint.svg | own wordmark | CC0-1.0 |
 | ard_alpha.svg | https://www.ardmediathek.de/ (shape of the ARD "1") | logo of the broadcaster, trademark of its owner |
 | ardtest1.svg | own wordmark | CC0-1.0 |
@@ -36,6 +38,7 @@ stays under that licence; the author is named in the table.
 | aristo.tv.svg | own wordmark | CC0-1.0 |
 | arte.svg | own wordmark | CC0-1.0 |
 | astrotv.svg | [Commons: Astro TV Logo 2021.svg](https://commons.wikimedia.org/wiki/File:Astro_TV_Logo_2021.svg) | Public domain (Adviqo GmbH), trademark of its owner |
+| atreseries.svg | [Commons: Atreseries 2020 logo.svg](https://commons.wikimedia.org/wiki/File:Atreseries_2020_logo.svg) | Public domain (Atresmedia), trademark of its owner |
 | atv.svg | [Commons: ATV.svg](https://commons.wikimedia.org/wiki/File:ATV.svg) | Public domain (Unknown authorUnknown author), trademark of its owner |
 | atv2.svg | [Commons: Logo ATV2.svg](https://commons.wikimedia.org/wiki/File:Logo_ATV2.svg) | Public domain (ATV), trademark of its owner |
 | audioprimo.svg | own wordmark | CC0-1.0 |
@@ -47,8 +50,14 @@ stays under that licence; the author is named in the table.
 | bayern2.svg | [Commons: BR2 Logo 2024.svg](https://commons.wikimedia.org/wiki/File:BR2_Logo_2024.svg) | Public domain (Bayerischer Rundfunk (BR)), trademark of its owner |
 | bayern3.svg | [Commons: BR3 Logo 2024.svg](https://commons.wikimedia.org/wiki/File:BR3_Logo_2024.svg) | Public domain (Bayerischer Rundfunk (BR)), trademark of its owner |
 | bbcarabic.svg | own wordmark | CC0-1.0 |
+| bbcearth.svg | https://www.bbc.com/news | logo of the broadcaster, trademark of its owner |
+| bbcfood.svg | https://www.bbc.com/news | logo of the broadcaster, trademark of its owner |
+| bbchistory.svg | https://www.bbc.com/news | logo of the broadcaster, trademark of its owner |
+| bbclifestyle.svg | https://www.bbc.com/news | logo of the broadcaster, trademark of its owner |
 | bbcnews.svg | https://www.bbc.com/news | logo of the broadcaster, trademark of its owner |
 | bbcnews.svg | https://www.bbc.com/news | logo of the broadcaster, trademark of its owner |
+| bbcseries.svg | https://www.bbc.com/news | logo of the broadcaster, trademark of its owner |
+| bbctopgear.svg | https://www.bbc.com/news | logo of the broadcaster, trademark of its owner |
 | beinsports.svg | [Commons: 2016 beIN Sports logo.svg](https://commons.wikimedia.org/wiki/File:2016_beIN_Sports_logo.svg) | Public domain (beIN Sports), trademark of its owner |
 | bemad.svg | [Commons: BeMad 2022 Logo.svg](https://commons.wikimedia.org/wiki/File:BeMad_2022_Logo.svg) | Public domain (Mediaset), trademark of its owner |
 | bergblick.svg | own wordmark | CC0-1.0 |
@@ -74,6 +83,7 @@ stays under that licence; the author is named in the table.
 | canalalgerie.svg | own wordmark | CC0-1.0 |
 | canalcocina.svg | [Commons: Canal_Cocina.svg](https://commons.wikimedia.org/wiki/File:Canal_Cocina.svg) | CC0 (AMC Networks International Southern Europe), trademark of its owner |
 | canaldecasa.svg | own wordmark | CC0-1.0 |
+| canalextremadura.svg | [Commons: Logo Canal Extremadura 2026 completo.svg](https://commons.wikimedia.org/wiki/File:Logo_Canal_Extremadura_2026_completo.svg) | Public domain (Canal Extremadura), trademark of its owner |
 | canalj.svg | own wordmark | CC0-1.0 |
 | canalplus.svg | [Commons: Logo Canal+ 1995.svg](https://commons.wikimedia.org/wiki/File:Logo_Canal%2B_1995.svg) | Public domain (Canal+ - Étienne Robial), trademark of its owner |
 | canalplusaction.svg | [Commons: Logo Canal+ 1995.svg](https://commons.wikimedia.org/wiki/File:Logo_Canal%2B_1995.svg) | Public domain (Canal+ - Étienne Robial), trademark of its owner |
@@ -104,6 +114,7 @@ stays under that licence; the author is named in the table.
 | clantve.svg | [Commons: Clan 2026.svg](https://commons.wikimedia.org/wiki/File:Clan_2026.svg) | Public domain (RTVE), trademark of its owner |
 | classica.svg | own wordmark | CC0-1.0 |
 | clipmyhorse.tv.svg | own wordmark | CC0-1.0 |
+| cmm.svg | [Commons: CMMedia.svg](https://commons.wikimedia.org/wiki/File:CMMedia.svg) | Public domain (Radiotelevisión de Castilla-La Mancha), trademark of its owner |
 | cnbc.svg | [Commons: CNBC 2025.svg](https://commons.wikimedia.org/wiki/File:CNBC_2025.svg) | Public domain (Versant), trademark of its owner |
 | cnews.svg | own wordmark | CC0-1.0 |
 | cnn.svg | [Commons: CNN Logo (2014).svg](https://commons.wikimedia.org/wiki/File:CNN_Logo_%282014%29.svg) | Public domain (CNN), trademark of its owner |
@@ -119,6 +130,7 @@ stays under that licence; the author is named in the table.
 | currenttimetv.svg | [Commons: Current Time TV logo.svg](https://commons.wikimedia.org/wiki/File:Current_Time_TV_logo.svg) | Public domain (Radio Free Europe/Radio Liberty), trademark of its owner |
 | das_erste.svg | https://www.ardmediathek.de/ (shape of the ARD "1") | logo of the broadcaster, trademark of its owner |
 | dasding.svg | [Commons: Dasding Logo 2022 (ohne Dachmarke).svg](https://commons.wikimedia.org/wiki/File:Dasding_Logo_2022_%28ohne_Dachmarke%29.svg) | Public domain (Südwestrundfunk (SWR)), trademark of its owner |
+| daystarespanol.svg | own wordmark | CC0-1.0 |
 | dazn.svg | [Commons: DAZN Logo Master.svg](https://commons.wikimedia.org/wiki/File:DAZN_Logo_Master.svg) | Public domain (DAZN Group), trademark of its owner |
 | daznf1.svg | [Commons: DAZN F1 2024 logo.svg](https://commons.wikimedia.org/wiki/File:DAZN_F1_2024_logo.svg) | Public domain (DAZN), trademark of its owner |
 | daznlaliga.svg | [Commons: DAZN LALIGA 2024 logo.svg](https://commons.wikimedia.org/wiki/File:DAZN_LALIGA_2024_logo.svg) | Public domain (DAZN), trademark of its owner |
@@ -130,6 +142,7 @@ stays under that licence; the author is named in the table.
 | deluxerap.svg | [Commons: Deluxe Music Logo 2019.svg](https://commons.wikimedia.org/wiki/File:Deluxe_Music_Logo_2019.svg) | Public domain (Just Music Fernsehbetriebs GmbH), trademark of its owner |
 | deluxerock.svg | [Commons: Deluxe Music Logo 2019.svg](https://commons.wikimedia.org/wiki/File:Deluxe_Music_Logo_2019.svg) | Public domain (Just Music Fernsehbetriebs GmbH), trademark of its owner |
 | df1.svg | own wordmark | CC0-1.0 |
+| dfb.tv.svg | own wordmark | CC0-1.0 |
 | diemaus.svg | own wordmark | CC0-1.0 |
 | dieneuezeittv.svg | own wordmark | CC0-1.0 |
 | discovery.svg | [Commons: 2019 Discovery logo.svg](https://commons.wikimedia.org/wiki/File:2019_Discovery_logo.svg) | Public domain (Discovery Channel), trademark of its owner |
@@ -139,6 +152,7 @@ stays under that licence; the author is named in the table.
 | disneyjunior.svg | own wordmark | CC0-1.0 |
 | disneyplus.svg | [Commons: Disney+ 2024.svg](https://commons.wikimedia.org/wiki/File:Disney%2B_2024.svg) | Public domain (Disney Enterprises, Inc.), trademark of its owner |
 | divinity.svg | [Commons: Divinity.svg](https://commons.wikimedia.org/wiki/File:Divinity.svg) | Public domain (Carlitoscarlos), trademark of its owner |
+| dkiss.svg | [Commons: DKISS 2019 logo.svg](https://commons.wikimedia.org/wiki/File:DKISS_2019_logo.svg) | Public domain (Discovery, Inc.), trademark of its owner |
 | dlf.svg | own wordmark | CC0-1.0 |
 | dlfkultur.svg | own wordmark | CC0-1.0 |
 | dlfnova.svg | own wordmark | CC0-1.0 |
@@ -148,11 +162,13 @@ stays under that licence; the author is named in the table.
 | dradiodokdeb.svg | own wordmark | CC0-1.0 |
 | dreamworks.svg | [Commons: DreamWorks2016.svg](https://commons.wikimedia.org/wiki/File:DreamWorks2016.svg) | Public domain (DreamWorks Animation LLC), trademark of its owner |
 | dw.svg | own wordmark | CC0-1.0 |
+| dynsportmix.svg | own wordmark | CC0-1.0 |
 | egofm.svg | own wordmark | CC0-1.0 |
 | energy.svg | [Commons: Energy.svg](https://commons.wikimedia.org/wiki/File:Energy.svg) | Public domain (Carlitoscarlos), trademark of its owner |
 | enfamilia.svg | own wordmark | CC0-1.0 |
 | equidia.svg | [fr.wikipedia: Equidia_logo_2018.svg](https://fr.wikipedia.org/wiki/File:Equidia_logo_2018.svg) | marque déposée (Dragon Rouge), trademark of its owner |
 | esports1.svg | own wordmark | CC0-1.0 |
+| etb1.svg | [Commons: Logo_ETB1_2026.svg](https://commons.wikimedia.org/wiki/File:Logo_ETB1_2026.svg) | CC BY 4.0 (EiTB), trademark of its owner |
 | euronews.svg | [Commons: Euronews 2022.svg](https://commons.wikimedia.org/wiki/File:Euronews_2022.svg) | Public domain (Euronews S.A.), trademark of its owner |
 | europe1.svg | own wordmark | CC0-1.0 |
 | europe2.svg | own wordmark | CC0-1.0 |
@@ -193,6 +209,7 @@ stays under that licence; the author is named in the table.
 | historia.svg | own wordmark | CC0-1.0 |
 | historychannel.svg | [Commons: History (2021).svg](https://commons.wikimedia.org/wiki/File:History_%282021%29.svg) | Public domain (A&amp;E Networks), trademark of its owner |
 | hitradiooe3.svg | own wordmark | CC0-1.0 |
+| hoehenrausch.svg | own wordmark | CC0-1.0 |
 | hollywood.svg | own wordmark | CC0-1.0 |
 | hopetv.svg | own wordmark | CC0-1.0 |
 | hr.svg | https://www.hr.de/ | logo of the broadcaster, trademark of its owner |
@@ -204,6 +221,7 @@ stays under that licence; the author is named in the table.
 | hse.svg | own wordmark | CC0-1.0 |
 | hseextra.svg | own wordmark | CC0-1.0 |
 | hsetrend.svg | own wordmark | CC0-1.0 |
+| ib3.svg | [Commons: IB3.svg](https://commons.wikimedia.org/wiki/File:IB3.svg) | Public domain (IB3 Govern de les Illes Balears), trademark of its owner |
 | iberaliatv.svg | own wordmark | CC0-1.0 |
 | immeretwasneuestv.svg | own wordmark | CC0-1.0 |
 | infosportplus.svg | [fr.wikipedia: Infosport+ (2016).svg](https://fr.wikipedia.org/wiki/File:Infosport%2B_%282016%29.svg) | marque déposée (Ramon + Pedro), trademark of its owner |
@@ -226,6 +244,7 @@ stays under that licence; the author is named in the table.
 | l_tv.svg | own wordmark | CC0-1.0 |
 | la1.svg | [Commons: La 1 2026.svg](https://commons.wikimedia.org/wiki/File:La_1_2026.svg) | Public domain (RTVE), trademark of its owner |
 | la2.svg | [Commons: La 2 2026.svg](https://commons.wikimedia.org/wiki/File:La_2_2026.svg) | Public domain (RTVE), trademark of its owner |
+| la7castillayleon.svg | [Commons: Logo La 7.svg](https://commons.wikimedia.org/wiki/File:Logo_La_7.svg) | CC BY-SA 4.0 (AytoEru), trademark of its owner |
 | lachainemeteo.svg | [Commons: La chaine méteo (logo).svg](https://commons.wikimedia.org/wiki/File:La_chaine_m%C3%A9teo_%28logo%29.svg) | Public domain (METEO CONSULT - la chaîne météo), trademark of its owner |
 | laligatvbar.svg | own wordmark | CC0-1.0 |
 | laligatvhypermotion.svg | [Commons: LaLiga TV Hypermotion 2023 Logo.svg](https://commons.wikimedia.org/wiki/File:LaLiga_TV_Hypermotion_2023_Logo.svg) | Public domain (LaLiga), trademark of its owner |
@@ -249,6 +268,7 @@ stays under that licence; the author is named in the table.
 | mdrsputnik.svg | [de.wikipedia: MDR Sputnik Logo 2017.svg](https://de.wikipedia.org/wiki/File:MDR_Sputnik_Logo_2017.svg) | Logo (Mitteldeutscher Rundfunk), trademark of its owner |
 | mdrthuermittew.svg | https://www.mdr.de/ | logo of the broadcaster, trademark of its owner |
 | mediashop.svg | own wordmark | CC0-1.0 |
+| mega.svg | own wordmark | CC0-1.0 |
 | megaradiomix.svg | own wordmark | CC0-1.0 |
 | meintvshop.svg | own wordmark | CC0-1.0 |
 | melodietv.svg | own wordmark | CC0-1.0 |
@@ -267,13 +287,17 @@ stays under that licence; the author is named in the table.
 | mplusdocumentales.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mplusdrama.svg | own wordmark | CC0-1.0 |
 | mplusellasv.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
+| mplusestrenos.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mplusgolf.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
+| mplushits.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mplusindie.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mpluslaligatv.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mpluslaresistencia.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mplusligadecampeones.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mplusoriginales.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
+| mplusromance.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mplusseries.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
+| mplusterror.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mplusvacaciones.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mplusvamos.svg | [Commons: Movistar Plus+ 2022 logo.svg](https://commons.wikimedia.org/wiki/File:Movistar_Plus%2B_2022_logo.svg) | Public domain (Movistar Plus+), trademark of its owner |
 | mtv.svg | [Commons: MTV 2021 (brand version).svg](https://commons.wikimedia.org/wiki/File:MTV_2021_%28brand_version%29.svg) | Public domain (CillBill - Loyalkaspar), trademark of its owner |
@@ -319,6 +343,7 @@ stays under that licence; the author is named in the table.
 | nostalgie.svg | own wordmark | CC0-1.0 |
 | nova.svg | own wordmark | CC0-1.0 |
 | novelastv.svg | own wordmark | CC0-1.0 |
+| novo19.svg | [Commons: Logo NOVO19 - 2025.svg](https://commons.wikimedia.org/wiki/File:Logo_NOVO19_-_2025.svg) | Public domain (Groupe SIPA Ouest-France - Agence Dream On), trademark of its owner |
 | nrj.svg | own wordmark | CC0-1.0 |
 | nrj12.svg | [Commons: NRJ12 logo 2015.svg](https://commons.wikimedia.org/wiki/File:NRJ12_logo_2015.svg) | Public domain (NRJ Group - Agence Dream On), trademark of its owner |
 | nrjhits.svg | [fr.wikipedia: NRJ Hits 2017.svg](https://fr.wikipedia.org/wiki/File:NRJ_Hits_2017.svg) | marque déposée, trademark of its owner |
@@ -382,6 +407,7 @@ stays under that licence; the author is named in the table.
 | rbb.svg | https://www.rbb24.de/ | logo of the broadcaster, trademark of its owner |
 | rbb24inforadio.svg | [Commons: Rbb24 Inforadio Logo 2022.svg](https://commons.wikimedia.org/wiki/File:Rbb24_Inforadio_Logo_2022.svg) | Public domain (Rundfunk Berlin-Brandenburg), trademark of its owner |
 | rbb88.8.svg | [Commons: Rbb 88.8 Logo 2019.svg](https://commons.wikimedia.org/wiki/File:Rbb_88.8_Logo_2019.svg) | Public domain (Rundfunk Berlin Brandenburg), trademark of its owner |
+| realmadridtv.svg | own wordmark | CC0-1.0 |
 | redadventure.svg | own wordmark | CC0-1.0 |
 | regio_tv.svg | own wordmark | CC0-1.0 |
 | rfiinternational.svg | own wordmark | CC0-1.0 |
@@ -392,6 +418,8 @@ stays under that licence; the author is named in the table.
 | ric.svg | own wordmark | CC0-1.0 |
 | rireetchansons.svg | [fr.wikipedia: RIRECHANSONS.svg](https://fr.wikipedia.org/wiki/File:RIRECHANSONS.svg) | marque déposée (NRJ Group), trademark of its owner |
 | rmcdecouverte.svg | own wordmark | CC0-1.0 |
+| rmclife.svg | own wordmark | CC0-1.0 |
+| rmcsport.svg | own wordmark | CC0-1.0 |
 | rmcstory.svg | [Commons: RMC 2025.svg](https://commons.wikimedia.org/wiki/File:RMC_2025.svg) | Public domain (RMC BFM - Agence Barjabulle), trademark of its owner |
 | rockantenne.svg | [Commons: Rock Antenne Logo 2017.svg](https://commons.wikimedia.org/wiki/File:Rock_Antenne_Logo_2017.svg) | Public domain (Rock Antenne), trademark of its owner |
 | romancetv.svg | [Commons: Romance TV Logo 10.2019.svg](https://commons.wikimedia.org/wiki/File:Romance_TV_Logo_10.2019.svg) | Public domain (Romance TV GmbH &amp; Co.), trademark of its owner |
@@ -417,10 +445,12 @@ stays under that licence; the author is named in the table.
 | sixx.svg | [Commons: Sixx Logo.svg](https://commons.wikimedia.org/wiki/File:Sixx_Logo.svg) | Public domain (ProSiebenSat.1 Media SE), trademark of its owner |
 | skyatlantic.svg | [Commons: Sky Atlantic 2026.svg](https://commons.wikimedia.org/wiki/File:Sky_Atlantic_2026.svg) | Public domain (Sky UK / Sky Group), trademark of its owner |
 | skycinemaaction.svg | own wordmark | CC0-1.0 |
+| skycinemablockbuster.svg | own wordmark | CC0-1.0 |
 | skycinemaclassics.svg | own wordmark | CC0-1.0 |
 | skycinemafamily.svg | own wordmark | CC0-1.0 |
 | skycinemahighlights.svg | own wordmark | CC0-1.0 |
 | skycinemapremiere.svg | own wordmark | CC0-1.0 |
+| skycinemaspooky.svg | own wordmark | CC0-1.0 |
 | skycrime.svg | own wordmark | CC0-1.0 |
 | skydocumentaries.svg | own wordmark | CC0-1.0 |
 | skykrimi.svg | [de.wikipedia: Sky Krimi Logo 2026.svg](https://de.wikipedia.org/wiki/File:Sky_Krimi_Logo_2026.svg) | Logo (Sky Deutschland), trademark of its owner |
@@ -429,6 +459,7 @@ stays under that licence; the author is named in the table.
 | skyone.svg | [Commons: Sky One 2026.svg](https://commons.wikimedia.org/wiki/File:Sky_One_2026.svg) | Public domain (CillBill), trademark of its owner |
 | skyreplay.svg | own wordmark | CC0-1.0 |
 | skyrock.svg | [fr.wikipedia: Logo Skyrock FM (1997).svg](https://fr.wikipedia.org/wiki/File:Logo_Skyrock_FM_%281997%29.svg) | marque déposée (Skyrock), trademark of its owner |
+| skyscifi.svg | own wordmark | CC0-1.0 |
 | skyshowcase.svg | own wordmark | CC0-1.0 |
 | skysport.svg | own wordmark | CC0-1.0 |
 | skysportbundesliga.svg | own wordmark | CC0-1.0 |
@@ -440,8 +471,10 @@ stays under that licence; the author is named in the table.
 | skysporttennis.svg | own wordmark | CC0-1.0 |
 | skysporttopevent.svg | own wordmark | CC0-1.0 |
 | sonnenklar.tv.svg | [Commons: Logo sonnenklar.TV.svg](https://commons.wikimedia.org/wiki/File:Logo_sonnenklar.TV.svg) | Public domain (Unknown authorUnknown author), trademark of its owner |
+| spirittv.svg | own wordmark | CC0-1.0 |
 | sport1.svg | [Commons: Sport1 Logo 2024.svg](https://commons.wikimedia.org/wiki/File:Sport1_Logo_2024.svg) | Public domain (Sport1 GmbH), trademark of its owner |
 | sport1plus.svg | [Commons: Sport1 Logo 2024.svg](https://commons.wikimedia.org/wiki/File:Sport1_Logo_2024.svg) | Public domain (Sport1 GmbH), trademark of its owner |
+| sportdigital1plus.svg | [Commons: Sportdigital1+ Logo 2025.svg](https://commons.wikimedia.org/wiki/File:Sportdigital1%2B_Logo_2025.svg) | Public domain (sportdigital.tv Sende- und Produktions GmbH), trademark of its owner |
 | sportdigitaledge.svg | [Commons: Sportdigital Fußball Logo 2019.svg](https://commons.wikimedia.org/wiki/File:Sportdigital_Fu%C3%9Fball_Logo_2019.svg) | Public domain (Sportainment Media Group), trademark of its owner |
 | sportdigitalfussball.svg | [Commons: Sportdigital Fußball Logo 2019.svg](https://commons.wikimedia.org/wiki/File:Sportdigital_Fu%C3%9Fball_Logo_2019.svg) | Public domain (Sportainment Media Group), trademark of its owner |
 | sr.svg | own wordmark | CC0-1.0 |
@@ -469,9 +502,11 @@ stays under that licence; the author is named in the table.
 | telecinco.svg | [Commons: Telecinco 2024 Logo.svg](https://commons.wikimedia.org/wiki/File:Telecinco_2024_Logo.svg) | Public domain (Carlitoscarlos), trademark of its owner |
 | teledeporte.svg | [Commons: TDP 2026.svg](https://commons.wikimedia.org/wiki/File:TDP_2026.svg) | Public domain (RTVE), trademark of its owner |
 | telegold.svg | own wordmark | CC0-1.0 |
+| telemadrid.svg | [Commons: TeleMadrid.svg](https://commons.wikimedia.org/wiki/File:TeleMadrid.svg) | Public domain (Telemadrid), trademark of its owner |
 | telesur.svg | [Commons: TeleSUR-Logo.svg](https://commons.wikimedia.org/wiki/File:TeleSUR-Logo.svg) | Public domain (Designer: Manuelozky; Contributor: Manuel Alejandro), trademark of its owner |
 | telesurenglish.svg | [Commons: TeleSUR-Logo.svg](https://commons.wikimedia.org/wiki/File:TeleSUR-Logo.svg) | Public domain (Designer: Manuelozky; Contributor: Manuel Alejandro), trademark of its owner |
 | teletoonplus.svg | own wordmark | CC0-1.0 |
+| televisioncanaria.svg | [Commons: Logo de Televisión Canaria.svg](https://commons.wikimedia.org/wiki/File:Logo_de_Televisi%C3%B3n_Canaria.svg) | Public domain (Ente Público Radio Televisión Canaria), trademark of its owner |
 | teva.svg | [Commons: Téva_logo_2021.svg](https://commons.wikimedia.org/wiki/File:T%C3%A9va_logo_2021.svg) | Public domain (Gédéon), trademark of its owner |
 | tf1.svg | [Commons: Logo TF1 2013.svg](https://commons.wikimedia.org/wiki/File:Logo_TF1_2013.svg) | Public domain (Patrick Delobelle (Naked Compagnie) for TF1), trademark of its owner |
 | tf1seriesfilms.svg | [fr.wikipedia: TF1 Séries Films logo 2020.svg](https://fr.wikipedia.org/wiki/File:TF1_S%C3%A9ries_Films_logo_2020.svg) | marque déposée (Agence inconnue), trademark of its owner |
@@ -483,13 +518,17 @@ stays under that licence; the author is named in the table.
 | toggoplus.svg | [Commons: ToggoPlus Logo 2019.svg](https://commons.wikimedia.org/wiki/File:ToggoPlus_Logo_2019.svg) | Public domain (Super RTL), trademark of its owner |
 | toggoradio.svg | [Commons: Toggo Radio Logo 2020.svg](https://commons.wikimedia.org/wiki/File:Toggo_Radio_Logo_2020.svg) | Public domain (Super RTL Fernsehen GmbH &amp; Co. KG), trademark of its owner |
 | toutelhistoire.svg | [fr.wikipedia: Toute l'Histoire (2013).svg](https://fr.wikipedia.org/wiki/File:Toute_l%27Histoire_%282013%29.svg) | marque déposée (Mediawan Thematics - Agence Télévision), trademark of its owner |
+| tpa.svg | [Commons: A7 2024 Logo.svg](https://commons.wikimedia.org/wiki/File:A7_2024_Logo.svg) | Public domain (Radiotelevisión del Principado de Asturias), trademark of its owner |
 | traceurban.svg | own wordmark | CC0-1.0 |
+| trece.svg | [Commons: Trece.svg](https://commons.wikimedia.org/wiki/File:Trece.svg) | Public domain (13 TV), trademark of its owner |
 | trigger.fm.svg | own wordmark | CC0-1.0 |
 | trtworld.svg | [Commons: TRT_World.svg](https://commons.wikimedia.org/wiki/File:TRT_World.svg) | Public domain (TRT), trademark of its owner |
 | tsfjazz.svg | own wordmark | CC0-1.0 |
 | tv1ooe.svg | own wordmark | CC0-1.0 |
+| tv3.svg | [Commons: TV3.svg](https://commons.wikimedia.org/wiki/File:TV3.svg) | Public domain (Generalitat de Catalunya), trademark of its owner |
 | tv5monde.svg | [Commons: Logo TV5Monde 2025.svg](https://commons.wikimedia.org/wiki/File:Logo_TV5Monde_2025.svg) | Public domain (Gédéon), trademark of its owner |
 | tvbreizh.svg | [Commons: TV Breizh logo 2019.svg](https://commons.wikimedia.org/wiki/File:TV_Breizh_logo_2019.svg) | Public domain (Agence W), trademark of its owner |
+| tvg.svg | own wordmark | CC0-1.0 |
 | tvgaeuropa.svg | own wordmark | CC0-1.0 |
 | tvmonaco.svg | [Commons: TVMonaco 2023.svg](https://commons.wikimedia.org/wiki/File:TVMonaco_2023.svg) | Public domain (TVMonaco – Gédéon), trademark of its owner |
 | tvriworld.svg | [Commons: TVRI-World.svg](https://commons.wikimedia.org/wiki/File:TVRI-World.svg) | Public domain (Unknown authorUnknown author), trademark of its owner |
@@ -517,6 +556,7 @@ stays under that licence; the author is named in the table.
 | wdrevent.svg | [Commons: WDR Event Logo 2016.svg](https://commons.wikimedia.org/wiki/File:WDR_Event_Logo_2016.svg) | CC BY-SA 4.0 (WDR), trademark of its owner |
 | wedomovies.svg | own wordmark | CC0-1.0 |
 | welt.svg | [Commons: Welt TV Logo 2016.svg](https://commons.wikimedia.org/wiki/File:Welt_TV_Logo_2016.svg) | Public domain (WeltN24 GmbH / Axel Springer SE), trademark of its owner |
+| wotsch.svg | own wordmark | CC0-1.0 |
 | xplore.svg | own wordmark | CC0-1.0 |
 | xxl.svg | own wordmark | CC0-1.0 |
 | youfm.svg | [Commons: You FM Logo 2020.svg](https://commons.wikimedia.org/wiki/File:You_FM_Logo_2020.svg) | Public domain (Hessischer Rundfunk (HR)), trademark of its owner |
