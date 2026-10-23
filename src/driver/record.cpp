@@ -1673,7 +1673,7 @@ int CRecordManager::handleMsg(const neutrino_msg_t msg, neutrino_msg_data_t data
 	else if ((msg == NeutrinoMessages::EVT_ZAP_COMPLETE && !IS_WEBCHAN(*(t_channel_id *) data)) ||
 		 msg == NeutrinoMessages::EVT_WEBTV_ZAP_COMPLETE) {
 		g_RCInput->killTimer (shift_timer);
-		if (g_settings.timeshift_auto) {
+		if (g_settings.timeshift_auto && CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_standby) {
 			int delay = g_settings.timeshift_auto;
 			shift_timer = g_RCInput->addTimer(delay*1000*1000, true);
 			g_InfoViewer->handleMsg(NeutrinoMessages::EVT_RECORDMODE, 1);
@@ -1682,7 +1682,7 @@ int CRecordManager::handleMsg(const neutrino_msg_t msg, neutrino_msg_data_t data
 	else if ((msg == NeutrinoMessages::EVT_TIMER)) {
 		if(data == shift_timer) {
 			shift_timer = 0;
-			if (!FindTimeshift())
+			if (CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_standby && !FindTimeshift())
 				StartAutoRecord(true);
 			return messages_return::handled;
 		}
