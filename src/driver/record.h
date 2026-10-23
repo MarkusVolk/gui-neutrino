@@ -100,6 +100,7 @@ class CRecordInstance
 		CZapitClient::responseGetPIDs allpids;
 		int		recording_id;
 		bool		autoshift;
+		bool		failed;		/* the recording thread gave up, set from that thread */
 
 		std::string	Directory;
 		char		filename[FILENAMEBUFFERSIZE];
@@ -146,6 +147,7 @@ class CRecordInstance
 		void GetRecordString(std::string& str, std::string &dur);
 		const char * GetFileName() { return filename; };
 		bool Timeshift() { return autoshift; };
+		void SetFailed() { failed = true; };
 		int tshift_mode;
 		void SetStopMessage(const char* text) {rec_stop_msg = text;} ;
 		int  GetStatus();

@@ -154,6 +154,7 @@ CRecordInstance::CRecordInstance(const CTimerd::RecordingInfo * const eventinfo,
 
 	Directory = dir;
 	autoshift = timeshift;
+	failed = false;
 	numpids = 0;
 
 	cMovieInfo = new CMovieInfo();
@@ -200,6 +201,7 @@ void CRecordInstance::WaitRecMsg(time_t StartTime, time_t WaitTime)
 void recordingFailureHelper(void *data)
 {
 	CRecordInstance *inst = (CRecordInstance *) data;
+	inst->SetFailed();
 	std::string errormsg = std::string(g_Locale->getText(LOCALE_RECORDING_FAILED)) + "\n" + std::string(inst->GetFileName());
 	CHintBox hintBox(LOCALE_MESSAGEBOX_INFO, errormsg.c_str());
 	hintBox.paint();
@@ -510,6 +512,15 @@ bool CRecordInstance::Stop(bool remove_event)
 
 	if (autoshift)
 		CMoviePlayerGui::getInstance().deleteTimeshift();
+
+	/* the player deletes only a timeshift it played; a broken one,
+	 * e.g. at the file size limit of the disk, would stay */
+	if (autoshift && failed) {
+		snprintf(buf, sizeof(buf), "%s.ts", filename);
+		unlink(buf);
+		snprintf(buf, sizeof(buf), "%s.xml", filename);
+		unlink(buf);
+	}
 
 	if(recording_id && remove_event) {
 		g_Timerd->stopTimerEvent(recording_id);
