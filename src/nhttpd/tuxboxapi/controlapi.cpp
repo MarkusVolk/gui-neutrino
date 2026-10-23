@@ -2755,6 +2755,7 @@ void CControlAPI::SendTimersPlain(CyhookHandler *hh)
 
 	timerlist.clear();
 	NeutrinoAPI->Timerd->getTimerList(timerlist);
+	CRecordManager::getInstance()->RemoveTimeshiftTimers(timerlist);
 
 	CTimerd::TimerList::iterator timer = timerlist.begin();
 
@@ -2842,6 +2843,7 @@ void CControlAPI::SendTimers(CyhookHandler *hh)
 	CTimerd::TimerList timerlist;			// List of timers
 	timerlist.clear();
 	NeutrinoAPI->Timerd->getTimerList(timerlist);
+	CRecordManager::getInstance()->RemoveTimeshiftTimers(timerlist);
 	sort(timerlist.begin(), timerlist.end());		// sort timer
 	CTimerd::TimerList::iterator timer = timerlist.begin();
 	std::string result = "";

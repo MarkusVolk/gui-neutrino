@@ -26,6 +26,7 @@
 #include <neutrino.h>
 #include <driver/fontrenderer.h>
 #include <driver/rcinput.h>
+#include <driver/record.h>
 #include <driver/screen_max.h>
 #include <driver/pictureviewer/pictureviewer.h>
 #include <system/httptool.h>
@@ -632,6 +633,7 @@ void CNeutrinoAPI::SendAllTimers(std::string url, bool force)
 	CTimerd::TimerList timerlist;
 	timerlist.clear();
 	Timerd->getTimerList(timerlist);
+	CRecordManager::getInstance()->RemoveTimeshiftTimers(timerlist);
 	sort(timerlist.begin(), timerlist.end());
 
 	int pre = 0,post = 0;

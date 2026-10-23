@@ -713,6 +713,7 @@ void CTimerList::updateEvents(void)
 {
 	timerlist.clear();
 	Timer->getTimerList(timerlist);
+	CRecordManager::getInstance()->RemoveTimeshiftTimers(timerlist);
 	RemoteBoxTimerList(timerlist);
 	sort(timerlist.begin(), timerlist.end());
 

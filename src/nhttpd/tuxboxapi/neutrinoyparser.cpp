@@ -16,6 +16,7 @@
 
 #include <global.h>
 #include <neutrino.h>
+#include <driver/record.h>
 #include <neutrinoMessages.h>
 #include <system/settings.h>
 // yhttpd
@@ -989,6 +990,7 @@ std::string  CNeutrinoYParser::func_get_timer_list(CyhookHandler *, std::string 
 
 	timerlist.clear();
 	NeutrinoAPI->Timerd->getTimerList(timerlist);
+	CRecordManager::getInstance()->RemoveTimeshiftTimers(timerlist);
 	sort(timerlist.begin(), timerlist.end());
 
 	CZapitClient::BouquetChannelList channellist_tv;

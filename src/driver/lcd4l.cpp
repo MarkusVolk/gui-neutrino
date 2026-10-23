@@ -692,6 +692,7 @@ void CLCD4l::ParseInfo(uint64_t parseID, bool newID, bool firstRun)
 
 	timerList.clear();
 	TimerdClient.getTimerList(timerList);
+	CRecordManager::getInstance()->RemoveTimeshiftTimers(timerList);
 
 	CTimerd::TimerList::iterator timer = timerList.begin();
 

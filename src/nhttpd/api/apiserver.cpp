@@ -81,6 +81,7 @@
 #include <zapit/bouquets.h>
 #include <eitd/sectionsd.h>
 #include <driver/screenshot.h>
+#include <driver/record.h>
 #include <hardware/video.h>
 #include <system/main_call.h>
 #include <src/tools/rcsim.h>
@@ -1312,6 +1313,7 @@ bool timer_list(Call &c, CTimerd::TimerList &list)
 		problem(c.out, 503, "timer-list-unavailable", "the timer daemon does not answer");
 		return false;
 	}
+	CRecordManager::getInstance()->RemoveTimeshiftTimers(list);
 	return true;
 }
 

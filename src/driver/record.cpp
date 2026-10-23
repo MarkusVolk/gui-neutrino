@@ -1242,6 +1242,21 @@ CRecordInstance * CRecordManager::FindTimeshift()
 	return NULL;
 }
 
+/* the timeshift runs on an immediate record timer; a list of the timers
+ * shows the recordings only */
+void CRecordManager::RemoveTimeshiftTimers(CTimerd::TimerList &list)
+{
+	mutex.lock();
+	for (CTimerd::TimerList::iterator it = list.begin(); it != list.end();) {
+		CRecordInstance * inst = it->eventType == CTimerd::TIMER_RECORD ? FindInstanceID(it->eventID) : NULL;
+		if (inst && inst->Timeshift())
+			it = list.erase(it);
+		else
+			++it;
+	}
+	mutex.unlock();
+}
+
 bool CRecordManager::CheckRecordingId_if_Timeshift(int recid)
 {
 	if(recid > 0){

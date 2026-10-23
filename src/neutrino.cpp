@@ -4174,6 +4174,7 @@ bool CNeutrinoApp::hasPendingRecording(void)
 		return false;
 	CTimerd::TimerList tl;
 	g_Timerd->getTimerList(tl);
+	CRecordManager::getInstance()->RemoveTimeshiftTimers(tl);
 	time_t now = time(NULL);
 	for (CTimerd::TimerList::iterator it = tl.begin(); it != tl.end(); ++it) {
 		if (it->eventType != CTimerd::TIMER_RECORD)
