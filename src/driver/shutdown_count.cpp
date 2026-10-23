@@ -31,6 +31,7 @@
 
 #include <global.h>
 #include <neutrino.h>
+#include <driver/record.h>
 #include <system/settings.h>
 #include <system/helpers.h>
 
@@ -122,7 +123,7 @@ void SHTDCNT::shutdown_counter()
 		if(sleep_cnt > 0) {
 			sleeptimer_active = true;
 			sleep_cnt--;
-		} else if(sleeptimer_active && !CNeutrinoApp::getInstance ()->recordingstatus) {
+		} else if(sleeptimer_active && !CRecordManager::getInstance()->RecordingRunning()) {
 			sleeptimer_active = false;
 
 			exec_controlscript(NEUTRINO_ENTER_INACTIVITY_SCRIPT);

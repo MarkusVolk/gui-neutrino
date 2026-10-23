@@ -6041,9 +6041,10 @@ int CNeutrinoApp::exec(CMenuTarget* parent, const std::string & actionKey)
 		//cleanup progress bar cache
 		CProgressBarCache::pbcClear();
 
-		if (recordingstatus)
+		if (CRecordManager::getInstance()->RecordingRunning())
 			DisplayErrorMessage(g_Locale->getText(LOCALE_SERVICEMENU_RESTART_REFUSED_RECORDING));
 		else {
+			CRecordManager::getInstance()->StopAutoRecord();
 			CHint * hint = new CHint(LOCALE_SERVICEMENU_RESTART_HINT);
 			hint->paint();
 

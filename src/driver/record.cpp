@@ -1776,7 +1776,12 @@ int CRecordManager::exec(CMenuTarget* parent, const std::string & actionKey )
 	{
 		char rec_msg[256];
 		char rec_msg1[256];
-		int records = recmap.size();
+		int records = 0;
+		mutex.lock();
+		for (recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++)
+			if (!it->second->Timeshift())
+				records++;
+		mutex.unlock();
 
 		snprintf(rec_msg1, sizeof(rec_msg1)-1, "%s", g_Locale->getText(LOCALE_RECORDINGMENU_MULTIMENU_ASK_STOP_ALL));
 		snprintf(rec_msg, sizeof(rec_msg)-1, rec_msg1, records);
@@ -1790,6 +1795,8 @@ int CRecordManager::exec(CMenuTarget* parent, const std::string & actionKey )
 			for(recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++)
 			{
 				CRecordInstance * inst = it->second;
+				if (inst->Timeshift())
+					continue;
 				t_channel_id channel_id = inst->GetChannelId();
 
 				snprintf(rec_msg, sizeof(rec_msg)-1, rec_msg1, records-i, records);
@@ -1847,7 +1854,7 @@ int CRecordManager::exec(CMenuTarget* parent, const std::string & actionKey )
 		return menu_return::RETURN_EXIT_ALL;
 	} else if(actionKey == "Stop_record")
 	{
-		if(!CRecordManager::getInstance()->RecordingStatus()) {
+		if(!RecordingRunning()) {
 			ShowHint(LOCALE_MAINMENU_RECORDING_STOP, g_Locale->getText(LOCALE_RECORDINGMENU_RECORD_IS_NOT_RUNNING), 450, 2);
 			return menu_return::RETURN_EXIT_ALL;
 		}
@@ -1862,13 +1869,21 @@ int CRecordManager::exec(CMenuTarget* parent, const std::string & actionKey )
 
 bool CRecordManager::ShowMenu(void)
 {
-	int select = -1, rec_count = recmap.size();
+	int select = -1, rec_count = 0;
 	char cnt[5];
 	CMenuForwarder * item;
 	CMenuForwarder * iteml;
 	t_channel_id channel_ids[RECORD_MAX_COUNT] = { 0 };	/* initialization avoids false "might */
 	int recording_ids[RECORD_MAX_COUNT] = { 0 };		/* be used uninitialized" warning */
 	durations.clear();
+
+	/* the timeshift ends with a zap and starts by itself or with play/pause,
+	   so the menu shows only the recordings */
+	mutex.lock();
+	for (recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++)
+		if (!it->second->Timeshift())
+			rec_count++;
+	mutex.unlock();
 
 	CMenuSelectorTarget * selector = new CMenuSelectorTarget(&select);
 
@@ -1877,23 +1892,11 @@ bool CRecordManager::ShowMenu(void)
 		menu.addKey(CRCInput::RC_stop, this, "Exit");
 	menu.addIntroItems(NONEXISTANT_LOCALE, NONEXISTANT_LOCALE, CMenuWidget::BTN_TYPE_CANCEL);
 
-	// Record / Timeshift
-	t_channel_id live_channel_id = CZapit::getInstance()->GetCurrentChannelID();
-
-	int rec_mode		= GetRecordMode(live_channel_id);
-	bool status_ts		= rec_mode & RECMODE_TSHIFT;
-	//bool status_rec		= rec_mode & RECMODE_REC;
-
 	//record item
 	iteml = new CMenuForwarder(LOCALE_RECORDINGMENU_MULTIMENU_REC_AKT, true /*!status_rec*/, NULL,
 			this, "Record", CRCInput::RC_red);
 	//if no recordings are running, set the focus to the record menu item
 	menu.addItem(iteml, rec_count == 0 ? true: false);
-
-	//timeshift item
-	iteml = new CMenuForwarder(LOCALE_RECORDINGMENU_MULTIMENU_TIMESHIFT, !status_ts, NULL,
-			this, "Timeshift", CRCInput::RC_yellow);
-	menu.addItem(iteml, false);
 
 	if(rec_count > 0)
 	{
@@ -1903,6 +1906,8 @@ bool CRecordManager::ShowMenu(void)
 		int i = 0 , shortcut = 1;
 		for(recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++) {
 			CRecordInstance * inst = it->second;
+			if (inst->Timeshift())
+				continue;
 
 			channel_ids[i] = inst->GetChannelId();
 			recording_ids[i] = inst->GetRecordingId();
@@ -1912,8 +1917,6 @@ bool CRecordManager::ShowMenu(void)
 			durations.push_back(duration);
 
 			const char* mode_icon = NEUTRINO_ICON_MARKER_RECORD;
-			if (inst->Timeshift())
-				mode_icon = NEUTRINO_ICON_MARKER_TIMESHIFT;
 
 			snprintf(cnt, sizeof(cnt), "%d", i);
 			//define stop key if only one record is running, otherwise define shortcuts

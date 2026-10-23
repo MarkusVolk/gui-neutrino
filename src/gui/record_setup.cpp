@@ -194,7 +194,7 @@ int CRecordSetup::showRecordSetup()
 	CMenuWidget recordingTimerSettings(LOCALE_MAINSETTINGS_RECORDING, NEUTRINO_ICON_SETTINGS, width, MN_WIDGET_ID_RECORDSETUP_TIMERSETTINGS);
 	showRecordTimerSetup(&recordingTimerSettings);
 
-	bool recstatus = CNeutrinoApp::getInstance()->recordingstatus;
+	bool recstatus = CRecordManager::getInstance()->RecordingRunning();
 	//record dir
 	CMenuForwarder* fRecDir;
 	fRecDir = new CMenuForwarder(LOCALE_RECORDINGMENU_DEFDIR, !recstatus, g_settings.network_nfs_recordingdir, this, "recordingdir");
@@ -384,7 +384,7 @@ void CRecordSetup::showRecordTimeShiftSetup(CMenuWidget *menu_ts)
 	menu_ts->addIntroItems(LOCALE_RECORDINGMENU_TIMESHIFT);
 
 	//timeshift dir
-	bool recstatus = CNeutrinoApp::getInstance()->recordingstatus;
+	bool recstatus = CRecordManager::getInstance()->RecordingRunning();
 	CMenuForwarder* fTsDir = new CMenuForwarder(LOCALE_RECORDINGMENU_TSDIR, !recstatus, g_settings.timeshiftdir, this, "timeshiftdir");
 	fTsDir->setHint("", LOCALE_MENU_HINT_RECORD_TDIR);
 	menu_ts->addItem(fTsDir);
