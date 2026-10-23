@@ -84,6 +84,8 @@ class CInfoViewer : public sigc::trackable
 	int            ChanHeight;
 	int            numbox_offset;
 	int            numbox_maxtxtwidth;
+	bool           event_in_header;
+	int            header_event_x;
 
 	CSectionsdClient::CurrentNextInfo info_CurrentNext;
 	CSectionsdClient::CurrentNextInfo oldinfo;

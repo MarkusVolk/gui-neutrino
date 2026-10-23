@@ -152,6 +152,8 @@ CInfoViewer::CInfoViewer ()
 	ChanHeight = 0;
 	numbox_offset = 0;
 	numbox_maxtxtwidth = 0;
+	event_in_header = false;
+	header_event_x = 0;
 	time_width = 0;
 	time_height = header_height = 0;
 	lastsnr = 0;
@@ -676,7 +678,7 @@ void CInfoViewer::showTitle(CZapitChannel * channel, const bool calledFromNumZap
 		}
 
 		/* TODO: the logic will get much easier once we decouple channellogo and signal bars */
-		if ((!logo_ok && g_settings.infobar_show_channellogo < 2) || g_settings.infobar_show_channellogo == 2 || g_settings.infobar_show_channellogo == 4) // no logo in numberbox
+		if ((!logo_ok && (g_settings.infobar_show_channellogo < 2 || g_settings.infobar_show_channellogo == 7)) || g_settings.infobar_show_channellogo == 2 || g_settings.infobar_show_channellogo == 4) // no logo in numberbox
 		{
 			// show number in numberbox
 			int h_tmp = numbox->getHeight();
@@ -697,13 +699,18 @@ void CInfoViewer::showTitle(CZapitChannel * channel, const bool calledFromNumZap
 		}
 		if (ChannelLogoMode == 1 || (g_settings.infobar_show_channellogo == 3 && !logo_ok) || g_settings.infobar_show_channellogo == 6 ) /* channel number besides channel name */
 		{
+			int num_x = ChanNameX + OFFSET_INNER_MID;
+			if (g_settings.infobar_show_channellogo == 7 && logo_ok)
+				num_x += OFFSET_INNER_MID;
 			ChanNumWidth = g_Font[SNeutrinoSettings::FONT_TYPE_INFOBAR_CHANNAME]->getRenderWidth(strChanNum);
 			g_Font[SNeutrinoSettings::FONT_TYPE_INFOBAR_CHANNAME]->RenderString(
-				ChanNameX + OFFSET_INNER_MID, ChanNameY + header_height,
+				num_x, ChanNameY + header_height,
 				ChanNumWidth, strChanNum, col_NumBoxText, 0, renderFlag);
 		}
 	}
 
+	event_in_header = (ChanNum && logo_ok && g_settings.infobar_show_channellogo == 7);
+	header_event_x = ChanNameX + 2*OFFSET_INNER_MID + ChanNumWidth + OFFSET_INNER_LARGE;
 	if (g_settings.infobar_show_channellogo < 5 || !logo_ok)
 	{
 		if (ChannelLogoMode != 2)
@@ -823,7 +830,7 @@ void CInfoViewer::showMovieTitle(const int playState, const t_channel_id &Channe
 
 	int renderFlag = ((g_settings.theme.infobar_gradient_top) ? Font::FULLBG : 0) | Font::IS_UTF8;
 	int ChannelLogoMode = 0;
-	if (g_settings.infobar_show_channellogo > 1)
+	if (g_settings.infobar_show_channellogo > 1 && g_settings.infobar_show_channellogo != 7)
 		ChannelLogoMode = showChannelLogo(current_channel_id, 0);
 	if (ChannelLogoMode == 0 || ChannelLogoMode == 3 || ChannelLogoMode == 4)
 		g_Font[SNeutrinoSettings::FONT_TYPE_INFOBAR_CHANNAME]->RenderString(ChanNameX + OFFSET_INNER_MID, ChanNameY + header_height,BoxEndX - (ChanNameX + 2*OFFSET_INNER_MID) - time_width - OFFSET_INNER_MID, ChannelName, COL_INFOBAR_TEXT, 0, renderFlag);
@@ -1864,20 +1871,36 @@ void CInfoViewer::display_Info(const char *current, const char *next,
 	bool colored_event_C = (g_settings.theme.colored_events_infobar == 1);
 	bool colored_event_N = (g_settings.theme.colored_events_infobar == 2);
 
+	/* option 7: the current event and its times take the place of the channel name */
+	Font *curr_font = g_Font[SNeutrinoSettings::FONT_TYPE_INFOBAR_INFO];
+	int currEventX = xStart, currEventY = CurrInfoY - height, currEventH = height;
+	if (event_in_header) {
+		curr_font = g_Font[SNeutrinoSettings::FONT_TYPE_INFOBAR_CHANNAME];
+		currEventX = header_event_x;
+		currEventY = ChanNameY;
+		currEventH = header_height;
+		currTimeW = runningRest ? curr_font->getRenderWidth("000 / 000 min") + OFFSET_INNER_MID : 0;
+		currTimeX = BoxEndX - OFFSET_INNER_MID - time_width - OFFSET_INNER_MID - currTimeW;
+		NextInfoY = (BoxEndY + ChanNameY + header_height) / 2 - height / 2;
+	}
+
+	if (event_in_header && txt_curr_start && txt_curr_start->isPainted())
+		txt_curr_start->hide();
+
 	//current event
 	if (current && update_current){
 		if (txt_curr_event == NULL)
-			txt_curr_event = new CComponentsTextTransp(NULL, xStart, CurrInfoY - height, currTimeX - xStart, height);
+			txt_curr_event = new CComponentsTextTransp(NULL, currEventX, currEventY, currTimeX - currEventX, currEventH);
 		else {
 			if (txt_curr_event->isPainted())
 				txt_curr_event->hide();
-			txt_curr_event->setDimensionsAll(xStart, CurrInfoY - height, currTimeX - xStart, height);
+			txt_curr_event->setDimensionsAll(currEventX, currEventY, currTimeX - currEventX, currEventH);
 		}
 		txt_curr_event->setItemName("txt_curr_event");
-		txt_curr_event->setText(current, CTextBox::NO_AUTO_LINEBREAK, g_Font[SNeutrinoSettings::FONT_TYPE_INFOBAR_INFO], colored_event_C ? COL_COLORED_EVENTS_TEXT : COL_INFOBAR_TEXT);
+		txt_curr_event->setText(current, CTextBox::NO_AUTO_LINEBREAK, curr_font, colored_event_C ? COL_COLORED_EVENTS_TEXT : COL_INFOBAR_TEXT);
 		txt_curr_event->paint(CC_SAVE_SCREEN_YES);
 
-		if (runningStart && starttimes){
+		if (runningStart && starttimes && !event_in_header){
 			if (txt_curr_start == NULL)
 				txt_curr_start = new CComponentsTextTransp(NULL, InfoX, CurrInfoY - height, info_time_width, height);
 			else {
@@ -1894,14 +1917,14 @@ void CInfoViewer::display_Info(const char *current, const char *next,
 	if (runningRest)
 	{
 		if (txt_curr_rest == NULL)
-			txt_curr_rest = new CComponentsTextTransp(NULL, currTimeX, CurrInfoY - height, currTimeW, height);
+			txt_curr_rest = new CComponentsTextTransp(NULL, currTimeX, currEventY, currTimeW, currEventH);
 		else {
 			if (txt_curr_rest->isPainted())
 				txt_curr_rest->hide();
-			txt_curr_rest->setDimensionsAll(currTimeX, CurrInfoY - height, currTimeW, height);
+			txt_curr_rest->setDimensionsAll(currTimeX, currEventY, currTimeW, currEventH);
 		}
 		txt_curr_rest->setItemName("txt_curr_rest");
-		txt_curr_rest->setText(runningRest, CTextBox::RIGHT, g_Font[SNeutrinoSettings::FONT_TYPE_INFOBAR_INFO], colored_event_C ? COL_COLORED_EVENTS_TEXT : COL_INFOBAR_TEXT);
+		txt_curr_rest->setText(runningRest, CTextBox::RIGHT, curr_font, colored_event_C ? COL_COLORED_EVENTS_TEXT : COL_INFOBAR_TEXT);
 		txt_curr_rest->paint(CC_SAVE_SCREEN_YES);
 	}
 
@@ -2260,7 +2283,7 @@ int CInfoViewer::showChannelLogo(const t_channel_id logo_channel_id, const int c
 	}
 	int y_mid;
 
-	if (g_settings.infobar_show_channellogo == 1) // paint logo in numberbox
+	if (g_settings.infobar_show_channellogo == 1 || g_settings.infobar_show_channellogo == 7) // paint logo in numberbox
 	{
 		// calculate mid of numberbox
 		int satNameHeight = g_settings.infobar_sat_display ? g_SignalFont->getHeight() : 0;
