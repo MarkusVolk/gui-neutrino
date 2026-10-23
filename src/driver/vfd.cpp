@@ -380,7 +380,7 @@ void CVFD::showTime(bool force)
 		}
 	}
 
-	int tmp_recstatus = CNeutrinoApp::getInstance()->recordingstatus;
+	int tmp_recstatus = CRecordManager::getInstance()->RecordingRunning();
 	if (tmp_recstatus) {
 		if(clearClock) {
 			clearClock = 0;

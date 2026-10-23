@@ -34,6 +34,7 @@
 
 #include <global.h>
 #include <neutrino.h>
+#include <driver/record.h>
 #include <system/settings.h>
 #include <system/debug.h>
 #include <system/helpers.h>
@@ -555,7 +556,7 @@ void CLCD::showTime()
 		}
 		else
 		{
-			if (CNeutrinoApp::getInstance()->recordingstatus && clearClock == 1)
+			if (CRecordManager::getInstance()->RecordingRunning() && clearClock == 1)
 			{
 				if (!invert)
 					strftime((char *) &timestr, 20, "%H:%M", t);

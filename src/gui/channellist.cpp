@@ -2116,8 +2116,6 @@ void CChannelList::paintItem(int pos, const bool firstpaint)
 		const char *record_icon = NULL;
 		if (rec_mode & CRecordManager::RECMODE_REC)
 			record_icon = NEUTRINO_ICON_MARKER_RECORD;
-		else if (rec_mode & CRecordManager::RECMODE_TSHIFT)
-			record_icon = NEUTRINO_ICON_MARKER_TIMESHIFT;
 
 #if ENABLE_PIP
 		//set pip icon

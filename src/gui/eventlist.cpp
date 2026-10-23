@@ -810,11 +810,6 @@ void CEventList::paintItem(unsigned int pos, t_channel_id channel_idI)
 			icontype = NEUTRINO_ICON_MARKER_RECORD;
 		else if (etype == CTimerd::TIMER_REMOTEBOX)
 			icontype = NEUTRINO_ICON_MARKER_RECORD_GRAY; // do we need another icon for remote timers?
-		else
-		{
-			if (timerID > 0 && CRecordManager::getInstance()->CheckRecordingId_if_Timeshift(timerID))
-				icontype = NEUTRINO_ICON_MARKER_TIMESHIFT;
-		}
 		int iw = 0, ih = 0;
 		if (icontype != NULL)
 		{

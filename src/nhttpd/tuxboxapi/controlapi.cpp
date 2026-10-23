@@ -39,6 +39,7 @@
 #include <system/fsmounter.h>
 #include <driver/display.h>
 #include <driver/screenshot.h>
+#include <driver/record.h>
 #include <gui/rc_lock.h>
 #include <src/tools/rcsim.h> // rcsim.h is located in $(top_builddir)
 #include <driver/pictureviewer/pictureviewer.h>
@@ -421,7 +422,7 @@ void CControlAPI::SetModeCGI(CyhookHandler *hh)
 	{
 		if (hh->ParamList["1"] == "status")	// display recoding status
 		{
-			if (NeutrinoAPI->Zapit->isRecordModeActive())
+			if (CRecordManager::getInstance()->RecordingRunning())
 				hh->WriteLn("on");
 			else
 				hh->WriteLn("off");

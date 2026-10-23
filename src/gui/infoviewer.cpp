@@ -320,7 +320,7 @@ void CInfoViewer::initClock()
 void CInfoViewer::showRecordIcon (const bool show)
 {
 	CRecordManager *crm = CRecordManager::getInstance();
-	recordModeActive = crm->RecordingStatus();
+	recordModeActive = crm->RecordingRunning();
 
 	if (!recordModeActive)
 	{

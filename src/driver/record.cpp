@@ -1390,6 +1390,7 @@ bool CRecordManager::Record(const CTimerd::RecordingInfo * const eventinfo, cons
 			recmap.insert(recmap_pair_t(inst->GetRecordingId(), inst));
 			if(timeshift)
 				autoshift = true;
+			ShowRecordIcon();
 		} else {
 			delete inst;
 		}
@@ -1405,6 +1406,7 @@ bool CRecordManager::Record(const CTimerd::RecordingInfo * const eventinfo, cons
 				recmap.insert(recmap_pair_t(inst->GetRecordingId(), inst));
 				if(timeshift)
 					autoshift = true;
+				ShowRecordIcon();
 #if 0
 				// mimic old behavior for start/stop menu option chooser, still actual ?
 				t_channel_id live_channel_id = CZapit::getInstance()->GetCurrentChannelID();
@@ -1569,6 +1571,27 @@ void CRecordManager::StopInstance(CRecordInstance * inst, bool remove_event)
 		autoshift = false;
 
 	delete inst;
+	ShowRecordIcon();
+}
+
+/* a recording other than the timeshift; the caller holds mutex */
+bool CRecordManager::RecordingRunningLocked()
+{
+	return (!autoshift && !recmap.empty()) || recmap.size() > 1;
+}
+
+bool CRecordManager::RecordingRunning()
+{
+	mutex.lock();
+	bool running = RecordingRunningLocked();
+	mutex.unlock();
+	return running;
+}
+
+/* the record symbol of the front display is for recordings, not for a timeshift */
+void CRecordManager::ShowRecordIcon()
+{
+	CVFD::getInstance()->ShowIcon(FP_ICON_CAM1, RecordingRunningLocked());
 }
 
 bool CRecordManager::Stop(const t_channel_id channel_id)
@@ -1793,7 +1816,10 @@ int CRecordManager::exec(CMenuTarget* parent, const std::string & actionKey )
 			if (res == CMsgBox::mbrCancel)
 				return menu_return::RETURN_EXIT_ALL;
 			if (res == CMsgBox::mbrYes && inst->KeepTimeshift()) {
+				mutex.lock();
 				autoshift = false;
+				ShowRecordIcon();
+				mutex.unlock();
 				if (CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_ts && !g_InfoViewer->is_visible)
 					CNeutrinoApp::getInstance()->showInfo();
 				return menu_return::RETURN_EXIT_ALL;

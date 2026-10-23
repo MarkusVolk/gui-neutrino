@@ -305,23 +305,9 @@ void cGLCD::Exec()
 			;
 	}
 
-	switch (CRecordManager::getInstance()->GetRecordMode())
-	{
-		case CRecordManager::RECMODE_REC_TSHIFT:
-			recLocked = true;
-			tsLocked = true;
-			break;
-		case CRecordManager::RECMODE_REC:
-			recLocked = true;
-			break;
-		case CRecordManager::RECMODE_TSHIFT:
-			tsLocked = true;
-			break;
-		default:
-			recLocked = false;
-			tsLocked = false;
-			break;
-	}
+	/* a timeshift is not shown as a recording */
+	recLocked = CRecordManager::getInstance()->RecordingRunning();
+	tsLocked = false;
 
 	int icon_start_width = 0, icon_start_height = 0;
 	g_PicViewer->getSize(Logo.c_str(), &icon_start_width, &icon_start_height);

@@ -4671,7 +4671,7 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		CEpgScan::getInstance()->Next();
 		standbyToStandby();
 		autoshift = CRecordManager::getInstance()->TimeshiftOnly();
-		CVFD::getInstance()->ShowIcon(FP_ICON_CAM1, recordingstatus != 0);
+		CVFD::getInstance()->ShowIcon(FP_ICON_CAM1, CRecordManager::getInstance()->RecordingRunning());
 
 		if( ( !g_InfoViewer->is_visible ) && data && !autoshift)
 			g_RCInput->postMsg( NeutrinoMessages::SHOW_INFOBAR, 0 );

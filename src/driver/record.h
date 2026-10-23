@@ -189,6 +189,8 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		void StartNextRecording();
 		void StopPostProcess();
 		void StopInstance(CRecordInstance * inst, bool remove_event = true);
+		bool RecordingRunningLocked();
+		void ShowRecordIcon();
 		CRecordInstance * FindInstance(t_channel_id);
 		CRecordInstance * FindInstanceID(int recid);
 		CRecordInstance * FindTimeshift();
@@ -239,6 +241,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		void SetTimeshiftDirectory(std::string directory) { TimeshiftDirectory	= directory; };
 		bool RecordingStatus(const t_channel_id channel_id = 0);
 		bool TimeshiftOnly();
+		bool RecordingRunning();
 		bool Timeshift() { return (autoshift || shift_timer); };
 		bool SameTransponder(const t_channel_id channel_id);
 		int  handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data);
