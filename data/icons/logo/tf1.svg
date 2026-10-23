@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="100" viewBox="0 0 300 100">
+  <g transform="matrix(0.75407 0 0 0.75407 46.561 12.297)">
+    <g transform="matrix(0.670943 0 0 0.670943 0.0000 0.0000)"><defs>
+    <linearGradient id="f634_linear-gradient-1" x1="0" y1="74.62" x2="408.9" y2="74.62" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#01168b"/>
+      <stop offset="0.1" stop-color="#001b9c"/>
+      <stop offset="0.2" stop-color="#021d9e"/>
+      <stop offset="0.3" stop-color="#06198f"/>
+      <stop offset="0.4" stop-color="#31127a"/>
+      <stop offset="0.5" stop-color="#500b64"/>
+      <stop offset="0.6" stop-color="#77054d"/>
+      <stop offset="0.7" stop-color="#960234"/>
+      <stop offset="0.8" stop-color="#bb0221"/>
+      <stop offset="0.9" stop-color="#b00005"/>
+      <stop offset="1" stop-color="#9a0003"/>
+    </linearGradient>
+    <linearGradient id="f634_linear-gradient-2" x1="0" y1="47.02" x2="408.9" y2="47.02" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f30b3" stop-opacity="0.47"/>
+      <stop offset="0.1" stop-color="#1c45cf" stop-opacity="0.66"/>
+      <stop offset="0.2" stop-color="#2b53d7"/>
+      <stop offset="0.3" stop-color="#3757c6"/>
+      <stop offset="0.4" stop-color="#665cb2"/>
+      <stop offset="0.5" stop-color="#87539b"/>
+      <stop offset="0.6" stop-color="#a44080"/>
+      <stop offset="0.7" stop-color="#b4325e"/>
+      <stop offset="0.8" stop-color="#c42038"/>
+      <stop offset="0.9" stop-color="#bd1016"/>
+      <stop offset="1" stop-color="#99060c"/>
+    </linearGradient>
+  </defs>
+  
+  <g id="f634_svg2">
+    <g>
+      <path id="f634_path2998" d="M0 149.25 L0 0 L408.9 0 L408.9 149.25 Z" fill="url(#f634_linear-gradient-1)" fill-rule="evenodd"/>
+      <path id="f634_path3006" d="M0 94.05 L0 0 L408.9 0 L408.9 42.12 C408.9 42.12 372.6 41.02 353.09 41.02 C241.99 41.01 108.11 62.66 0 94.05 Z" fill="url(#f634_linear-gradient-2)"/>
+      <path d="M101.41 127.17 L55.61 127.17 L55.61 58.88 L31.89 58.88 L31.89 22.9 L125.12 22.9 L125.12 58.88 L101.4 58.88 L101.4 127.17 Z M181.14 127.17 L181.14 22.9 L266.19 22.9 L266.19 49.07 L226.94 49.07 L226.94 67.88 L255.15 67.88 L255.15 94.05 L226.94 94.05 L226.94 127.17 Z M320.17 127.17 L320.17 35.57 L367.6 22.08 L367.6 127.17 Z" fill="#ffffff"/>
+    </g>
+  </g></g>
+  </g>
+</svg>

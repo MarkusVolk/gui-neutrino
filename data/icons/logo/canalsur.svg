@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="100" viewBox="0 0 300 100">
+  <g transform="matrix(0.88000 0 0 0.88000 105.978 6.000)">
+    <g transform="matrix(0.219264 0 0 0.219264 0.0000 0.0000)"><defs>
+    <linearGradient id="f391_linear-gradient-1" x1="240.436" y1="103.618" x2="456.326" y2="103.618" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#26a9e0"/>
+      <stop offset="1" stop-color="#0099d8"/>
+    </linearGradient>
+    <linearGradient id="f391_linear-gradient-2" x1="47.475" y1="224.077" x2="431.888" y2="224.077" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#26a9e0"/>
+      <stop offset="1" stop-color="#0099d8"/>
+    </linearGradient>
+  </defs>
+  
+  <g id="f391_Layer_1">
+    <path d="M433.3 207.2 L456.3 0 L240.4 14.4 Z" fill="url(#f391_linear-gradient-1)"/>
+    <path d="M402.7 18.6 L387 18.6 L351.6 41.1 L354.3 62.7 L376 50.2 L376 114.6 L358.4 114.6 L358.4 132.3 L363.7 137.7 L420 137.7 L420 114.6 L402.7 114.6 Z" fill="#ffffff"/>
+    <path d="M227.3 15.3 L95.6 24 L47.5 360.7 L408.2 432.9 L431.9 219.9 Z" fill="url(#f391_linear-gradient-2)" opacity="0.65"/>
+    <g>
+      <path d="M226.1 278.3 C216.7 308.7 187.8 307.5 187.8 307.5 C165.9 307.5 148.2 289.8 148.2 267.9 C148.2 246 165.9 228.3 187.8 228.3 C187.8 228.3 216.7 227.2 226.1 257.5 L262.6 240.8 C241 186.6 187.8 188.6 187.8 188.6 C144 188.6 108.5 224.1 108.5 267.9 C108.5 311.7 144 347.2 187.8 347.2 C187.8 347.2 241 349.3 262.6 295.1 Z" fill="#ffffff"/>
+      <path d="M207.6 169.8 L207.6 80.1 L168 80.1 L168 169.8 C187.7 165.1 207.6 169.8 207.6 169.8 Z" fill="#ffffff"/>
+      <path d="M167.9 365.9 L167.9 455.6 L207.5 455.6 L207.5 365.9 C187.7 370.6 167.9 365.9 167.9 365.9 Z" fill="#ffffff"/>
+      <path d="M89.7 248 L0 248 L0 287.6 L89.7 287.6 C85 267.9 89.7 248 89.7 248 Z" fill="#ffffff"/>
+      <path d="M285.8 248 C290.5 267.8 285.8 287.6 285.8 287.6 L375.5 287.6 L375.5 248 Z" fill="#ffffff"/>
+      <path d="M271.1 212.6 L334.5 149.2 L306.5 121.2 L243.1 184.6 C260.4 195.2 271.1 212.6 271.1 212.6 Z" fill="#ffffff"/>
+      <path d="M104.4 323.2 L41 386.6 L69 414.6 L132.4 351.2 C115.1 340.5 104.4 323.2 104.4 323.2 Z" fill="#ffffff"/>
+      <path d="M132.4 184.5 L69 121.1 L41 149.1 L104.4 212.5 C115.1 195.2 132.4 184.5 132.4 184.5 Z" fill="#ffffff"/>
+      <path d="M243.1 351.2 L306.5 414.6 L334.5 386.6 L271.1 323.2 C260.4 340.5 243.1 351.2 243.1 351.2 Z" fill="#ffffff"/>
+    </g>
+  </g></g>
+  </g>
+</svg>

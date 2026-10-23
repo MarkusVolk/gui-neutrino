@@ -10,4 +10,8 @@ subdir('slider')
 subdir('status')
 subdir('various')
 subdir('weather')
-install_emptydir(iconsdir / 'logo')
+install_subdir('logo',
+	install_dir : iconsdir,
+	exclude_files : ['README.md', 'SOURCES.md'],
+	follow_symlinks : false,
+)

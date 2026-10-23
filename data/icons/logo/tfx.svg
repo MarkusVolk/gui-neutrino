@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="100" viewBox="0 0 300 100">
+  <g transform="matrix(0.75562 0 0 0.75562 46.773 12.219)">
+    <g transform="matrix(0.273224 0 0 0.273224 0.0000 0.0000)"><defs>
+    <linearGradient id="f480_linear-gradient-1" x1="1.572" y1="13.616" x2="1000.124" y2="13.616" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fa4700"/>
+      <stop offset="0.1" stop-color="#fe5e25"/>
+      <stop offset="0.2" stop-color="#fd6f34"/>
+      <stop offset="0.3" stop-color="#ff743e"/>
+      <stop offset="0.4" stop-color="#fe763f"/>
+      <stop offset="0.5" stop-color="#ff7239"/>
+      <stop offset="0.6" stop-color="#fe6d31"/>
+      <stop offset="0.7" stop-color="#ff6526"/>
+      <stop offset="0.8" stop-color="#fe5c1a"/>
+      <stop offset="0.9" stop-color="#fe530e"/>
+      <stop offset="1" stop-color="#ff4700"/>
+    </linearGradient>
+    <linearGradient id="f480_linear-gradient-2" x1="-0.347" y1="361.707" x2="999.937" y2="361.707" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fa4700"/>
+      <stop offset="0.1" stop-color="#fe4a00"/>
+      <stop offset="0.2" stop-color="#fe4a00"/>
+      <stop offset="0.3" stop-color="#fe4a00"/>
+      <stop offset="0.4" stop-color="#fe4a00"/>
+      <stop offset="0.5" stop-color="#fe4a00"/>
+      <stop offset="0.6" stop-color="#fe4a00"/>
+      <stop offset="0.7" stop-color="#fe4a00"/>
+      <stop offset="0.8" stop-color="#fe4a00"/>
+      <stop offset="0.9" stop-color="#fe4a00"/>
+      <stop offset="1" stop-color="#ff4700"/>
+    </linearGradient>
+  </defs>
+  
+  <g id="f480_Layer_1" data-name="Layer 1">
+    <g id="f480_g1006">
+      <path id="f480_path3102" d="M0 233.929 L0 0 L1000 0 L1000 107.143 L675.24 292.857 L126.786 292.857 Z" fill="url(#f480_linear-gradient-1)" fill-rule="evenodd"/>
+      <path id="f480_path3100" d="M0 366.096 L0 233.955 C0 233.955 383.978 101.786 853.759 101.786 C932.25 101.786 1000 107.169 1000 107.169 L1000 366.096 Z" fill="url(#f480_linear-gradient-2)"/>
+    </g>
+    <g id="f480_g1002">
+      <path id="f480_Fill-2" d="M492.157 309.519 L492.157 248.071 L562.777 248.071 L562.777 160.891 L492.157 160.891 L492.157 142.541 L599.202 142.541 L599.202 55.357 L386.415 55.357 L386.415 309.519 Z" fill="#ffffff"/>
+      <path id="f480_Fill-3" d="M103.571 142.541 L176.161 142.541 L176.161 309.519 L281.899 309.519 L281.899 142.541 L354.488 142.541 L354.488 55.357 L103.571 55.357 Z" fill="#ffffff"/>
+      <g id="f480_g994">
+        <path id="f480_Fill-4" d="M890.049 309.518 L766.219 309.518 L618.242 55.36 L742.073 55.36 Z" fill="#ffffff"/>
+        <path id="f480_Fill-5" d="M753.379 309.518 L610.593 309.518 L681.988 187.129 Z" fill="#ffffff"/>
+        <path id="f480_Fill-6" d="M754.914 55.667 L897.7 55.667 L826.312 178.046 Z" fill="#ffffff"/>
+      </g>
+    </g>
+  </g></g>
+  </g>
+</svg>

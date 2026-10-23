@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="100" viewBox="0 0 300 100">
+  <g transform="matrix(0.77719 0 0 0.77719 49.638 11.141)">
+    <g transform="matrix(0.416771 0 0 0.416771 0.0000 0.0000)"><defs>
+    <linearGradient id="f609_linear-gradient-1" x1="0" y1="120" x2="619.554" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111e9b"/>
+      <stop offset="0.239" stop-color="#002dc0"/>
+      <stop offset="0.644" stop-color="#7e0839"/>
+      <stop offset="0.9993" stop-color="#c00509"/>
+    </linearGradient>
+    <radialGradient id="f609_radial-gradient-1" cx="0" cy="0" r="157.718" gradientTransform="matrix(0 1 -1.696 0 279 0.05)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.992" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  
+  <g id="f609_Layer_1" data-name="Layer 1">
+    <g>
+      <path d="M620 0 L310.29 0 L309.71 0 L0 0 L0 240 L309.71 240 L310.29 240 L620 240 L620 0" fill="url(#f609_linear-gradient-1)"/>
+      <path d="M0 0 L0 177.965 C0 177.965 247.375 67.744 620 36.536 L620 0 L0 0" fill="url(#f609_radial-gradient-1)" fill-opacity="0.7" fill-rule="evenodd" opacity="0.6"/>
+      <path d="M466.37 35.44 L523.56 35.44 L523.56 203.28 L466.37 203.28 Z" fill="#ffffff"/>
+      <path d="M201.06 203.28 L201.06 152.47 L155.35 152.47 L155.35 35.44 L98.16 35.44 L98.16 203.28 Z" fill="#ffffff"/>
+      <path d="M379.515 96.097 C370.515 86.844 358.305 81.72 345.624 81.875 C325.856 81.875 309.31 96.284 309.31 119.296 C309.31 143.423 326.79 157.555 347.63 157.555 C358.75 157.831 369.51 153.458 377.484 145.424 L403.693 186.069 C387.474 201.462 368.621 207.762 342.519 207.762 C292.19 207.762 253.643 172.378 253.643 119.361 C253.643 66.344 291.502 30.96 341.828 30.96 C365.132 30.96 387.278 37.02 403.002 51.937 Z" fill="#ffffff"/>
+    </g>
+  </g></g>
+  </g>
+</svg>
