@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <memory.h>
+#include <string.h>
 #include <math.h>
 #include <endian.h>
 
@@ -229,11 +230,19 @@ CFrameBuffer* CFrameBuffer::getInstance()
 	return frameBuffer;
 }
 
+int openFbDevice(int flags)
+{
+	int fb = open(FB_DEVICE, flags);
+	if (fb < 0)
+		fb = open(FB_DEVICE_DEVFS, flags);
+	return fb;
+}
+
 void CFrameBuffer::init(const char * const fbDevice)
 {
 	int tr = 0xFF;
 
-	fd = open(fbDevice, O_RDWR|O_CLOEXEC);
+	fd = strcmp(fbDevice, FB_DEVICE) ? open(fbDevice, O_RDWR|O_CLOEXEC) : openFbDevice(O_RDWR|O_CLOEXEC);
 
 	if (fd<0) {
 		perror(fbDevice);

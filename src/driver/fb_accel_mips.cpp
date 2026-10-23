@@ -257,7 +257,7 @@ CFbAccelMIPS::CFbAccelMIPS()
 	blit_thread = false;
 #endif
 	fb_name  = "mipsbox framebuffer";
-	fb_fd = open(FB_DEVICE, O_RDWR);
+	fb_fd = openFbDevice(O_RDWR);
 	if (fb_fd < 0)
 	{
 		printf(LOGTAG "[bcm] %s %m", FB_DEVICE);

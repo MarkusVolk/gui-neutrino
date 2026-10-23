@@ -82,6 +82,10 @@ typedef struct gradientData_t
 #define WINDOW_SIZE_SMALL	80 // %
 
 #define FB_DEVICE		"/dev/fb0"
+#define FB_DEVICE_DEVFS		"/dev/fb/0"
+
+/* FB_DEVICE, else FB_DEVICE_DEVFS: udev names the framebuffer /dev/fb0, mdev images /dev/fb/0 */
+int openFbDevice(int flags);
 
 /** Ausfuehrung als Singleton */
 class CFrameBuffer : public sigc::trackable
