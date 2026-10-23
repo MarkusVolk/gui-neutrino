@@ -3523,6 +3523,25 @@ void CNeutrinoApp::quickZap(int msg)
 	}
 }
 
+/* the timeshift back key in the live picture: into the running timeshift,
+ * a minute back, and further with more presses. Not while a PiP is open,
+ * whose keys may be set to the same. */
+bool CNeutrinoApp::timeshiftJumpBack(void)
+{
+	t_channel_id live_channel_id = CZapit::getInstance()->GetCurrentChannelID();
+	if (!(CRecordManager::getInstance()->GetRecordMode(live_channel_id) & CRecordManager::RECMODE_TSHIFT))
+		return false;
+#if ENABLE_PIP
+	if (CZapit::getInstance()->GetPipChannelID())
+		return false;
+#endif
+	CMoviePlayerGui &mp = CMoviePlayerGui::getInstance();
+	int jump = mp.timeshiftJump(true);
+	mp.setTimeshiftDelay((CMoviePlayerGui::LiveHeld() ? mp.LiveDelay() : 0) + jump);
+	CRecordManager::getInstance()->StartTimeshift();
+	return true;
+}
+
 void CNeutrinoApp::numericZap(int msg)
 {
 	StopSubtitles();
@@ -3752,6 +3771,8 @@ void CNeutrinoApp::RealRun()
 				}
 			}
 #endif
+			else if (msg == (neutrino_msg_t) g_settings.key_timeshift_back && timeshiftJumpBack()) {
+			}
 			else if ((msg == (neutrino_msg_t) g_settings.key_timeshift || msg == CRCInput::RC_playpause) && CMoviePlayerGui::LiveHeld()) {
 				/* the held picture plays on, from the timeshift when the
 				 * stream's buffer does not reach that far */
@@ -6400,6 +6421,8 @@ void CNeutrinoApp::loadKeys(const char *fname)
 	if (g_info.hw_caps->rc_has_playpause)
 		timeshift_default = g_info.hw_caps->rc_has_separate_play ? CRCInput::RC_playpause : CRCInput::RC_nokey;
 	g_settings.key_timeshift = tconfig->getInt32("key_timeshift", timeshift_default);
+	g_settings.key_timeshift_back = tconfig->getInt32("key_timeshift_back", CRCInput::RC_previoussong);
+	g_settings.key_timeshift_forward = tconfig->getInt32("key_timeshift_forward", CRCInput::RC_nextsong);
 	g_settings.key_tvradio_mode = tconfig->getInt32("key_tvradio_mode", g_info.hw_caps->rc_tvradio_combined ? CRCInput::RC_tv : CRCInput::RC_nokey);
 	g_settings.key_unlock = tconfig->getInt32("key_unlock", CRCInput::RC_setup);
 	g_settings.key_volumedown = tconfig->getInt32("key_volumedown", CRCInput::RC_minus);
@@ -6501,6 +6524,8 @@ void CNeutrinoApp::saveKeys(const char *fname)
 	tconfig->setInt32("key_subchannel_up", g_settings.key_subchannel_up);
 	tconfig->setInt32("key_switchformat", g_settings.key_switchformat);
 	tconfig->setInt32("key_timeshift", g_settings.key_timeshift);
+	tconfig->setInt32("key_timeshift_back", g_settings.key_timeshift_back);
+	tconfig->setInt32("key_timeshift_forward", g_settings.key_timeshift_forward);
 	tconfig->setInt32("key_tvradio_mode", g_settings.key_tvradio_mode);
 	tconfig->setInt32("key_unlock", g_settings.key_unlock);
 	tconfig->setInt32("key_volumedown", g_settings.key_volumedown);

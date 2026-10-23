@@ -80,6 +80,8 @@ class CKeybindSetup : public CMenuTarget, public CChangeObserver
 			MPKEY_NEXT_REPEAT_MODE,
 			MPKEY_PLUGIN,
 			NKEY_TIMESHIFT,
+			NKEY_TIMESHIFT_BACK,
+			NKEY_TIMESHIFT_FORWARD,
 			NKEY_UNLOCK,
 			NKEY_HELP,
 			NKEY_NEXT43MODE,

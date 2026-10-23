@@ -997,6 +997,9 @@ void CMoviePlayerGui::Init(void)
 	speed = 1;
 	timeshift = TSHIFT_MODE_OFF;
 	timeshift_delay = -1;
+	ts_jump_back = true;
+	ts_jump_last = 0;
+	ts_jump_count = 0;
 	timeshift_zap = 0;
 	m_ThisMode = NeutrinoModes::mode_unknown;
 	numpida = 0;
@@ -2979,6 +2982,22 @@ void CMoviePlayerGui::stopPlayBack(bool keep_webtv_failure)
 	printf("%s: stopped\n", __func__);
 }
 
+/* a press of a timeshift jump key: the presses of a row, each within two
+ * seconds of the last in the same direction, jump 1, 3 and 10 minutes in
+ * all, then 10 minutes more each; returns this press's jump in ms */
+int CMoviePlayerGui::timeshiftJump(bool back)
+{
+	static const int minutes[] = { 1, 2, 7 };
+	int64_t now = time_monotonic_ms();
+	if (back != ts_jump_back || now - ts_jump_last > 2000)
+		ts_jump_count = 0;
+	ts_jump_back = back;
+	ts_jump_last = now;
+	int jump = ts_jump_count < 3 ? minutes[ts_jump_count] : 10;
+	ts_jump_count++;
+	return jump * 60 * 1000;
+}
+
 void CMoviePlayerGui::stopTimeshift(void)
 {
 	if (timeshift && playback)
@@ -3478,21 +3497,25 @@ void CMoviePlayerGui::PlayFileLoop(void)
 				CNeutrinoApp::getInstance()->allowChannelList(false);
 				g_RCInput->clearRCMsg();
 			}
-			bool timeshift_stopped = false;
-
-			if (timeshift != TSHIFT_MODE_OFF)
-			{
-				if (CRecordManager::getInstance()->Timeshift())
-					timeshift_stopped = CRecordManager::getInstance()->ShowMenu();
-				else // timeshift playback still active, but recording already stopped
-					timeshift_stopped = true;
-			}
-
-			if (timeshift == TSHIFT_MODE_OFF || timeshift_stopped)
-			{
+			/* in the timeshift back to the live picture; the timeshift
+			 * records on and ends with the next zap */
+			playstate = CMoviePlayerGui::STOPPED;
+			keyPressed = CMoviePlayerGui::PLUGIN_PLAYSTATE_STOP;
+			ClearQueue();
+		} else if (timeshift != TSHIFT_MODE_OFF &&
+			   (msg == (neutrino_msg_t) g_settings.key_timeshift_back || msg == (neutrino_msg_t) g_settings.key_timeshift_forward)) {
+			bool back = msg == (neutrino_msg_t) g_settings.key_timeshift_back;
+			int jump = timeshiftJump(back);
+			playback->GetPosition(position, duration, isWebChannel);
+			if (!back && position + jump >= duration - 5000) {
+				/* forward up to the live picture: back to live */
 				playstate = CMoviePlayerGui::STOPPED;
 				keyPressed = CMoviePlayerGui::PLUGIN_PLAYSTATE_STOP;
 				ClearQueue();
+			} else if (back && position < jump) {
+				SetPosition(0, true);
+			} else {
+				SetPosition(back ? -jump : jump);
 			}
 		} else if (msg == CRCInput::RC_left || msg == CRCInput::RC_right) {
 			bool reset_vzap_it = true;

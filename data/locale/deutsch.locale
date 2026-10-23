@@ -627,6 +627,8 @@ extra.key_screenshot Screenshot
 extra.key_sleep Sleeptimer
 extra.key_switchformat Nächste Auflösung
 extra.key_timeshift Timeshift
+extra.key_timeshift_back Timeshift zurück
+extra.key_timeshift_forward Timeshift vor
 extra.key_unlock Entsperren
 extra.ladirection Breitengrad-Ausrichtung
 extra.latitude Breitengrad
@@ -1607,6 +1609,7 @@ menu.hint_key_standbyoff_add Weisen Sie eine zusätzliche Taste zum Beenden des 
 menu.hint_key_subchanneldown Weisen Sie eine Taste für das Zurückschalten in den Unterkanälen zu
 menu.hint_key_subchannelup Weisen Sie eine Taste für das Weiterschalten in den Unterkanälen zu
 menu.hint_key_timeshift Weisen Sie eine Taste für das Starten von Timeshift zu
+menu.hint_key_timeshift_jump Springt im Timeshift zurück oder vor, mit mehrmaligem Drücken 1, 3 und 10 Minuten; zurück startet im Live-Bild den laufenden Timeshift
 menu.hint_key_transponder Weisen Sie eine Taste für das Anzeigen der Transponder in der Kanalliste zu
 menu.hint_key_tvradiomode Wählen Sie eine Taste für das Umschalten zwischen TV- und Radio-Modus
 menu.hint_key_unlock Weisen Sie eine Taste zum Entriegeln zu, \nbetätigen Sie die Taste 'Rot' für 5 Sekunden

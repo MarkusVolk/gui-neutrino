@@ -1358,6 +1358,8 @@ struct SNeutrinoSettings
 	int key_subchannel_up;
 	int key_switchformat;
 	int key_timeshift;
+	int key_timeshift_back;
+	int key_timeshift_forward;
 	int key_tvradio_mode;
 	int key_unlock;
 	int key_volumedown;

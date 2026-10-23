@@ -216,6 +216,8 @@ const key_settings_struct_t key_settings[CKeybindSetup::KEYBINDS_COUNT] =
 	{LOCALE_MPKEY_NEXT_REPEAT_MODE,		&g_settings.mpkey_next_repeat_mode,	NONEXISTANT_LOCALE },
 	{LOCALE_MPKEY_PLUGIN,			&g_settings.mpkey_plugin,		LOCALE_MENU_HINT_KEY_MPPLUGIN },
 	{LOCALE_EXTRA_KEY_TIMESHIFT,		&g_settings.key_timeshift,		LOCALE_MENU_HINT_KEY_TIMESHIFT },
+	{LOCALE_EXTRA_KEY_TIMESHIFT_BACK,	&g_settings.key_timeshift_back,		LOCALE_MENU_HINT_KEY_TIMESHIFT_JUMP },
+	{LOCALE_EXTRA_KEY_TIMESHIFT_FORWARD,	&g_settings.key_timeshift_forward,	LOCALE_MENU_HINT_KEY_TIMESHIFT_JUMP },
 	{LOCALE_EXTRA_KEY_UNLOCK,		&g_settings.key_unlock,			LOCALE_MENU_HINT_KEY_UNLOCK},
 	{LOCALE_EXTRA_KEY_HELP,			&g_settings.key_help,			NONEXISTANT_LOCALE },
 	{LOCALE_EXTRA_KEY_NEXT43MODE,		&g_settings.key_next43mode,		NONEXISTANT_LOCALE },
@@ -455,6 +457,11 @@ void CKeybindSetup::showKeyBindSetup(CMenuWidget *bindSettings)
 	mf = new CMenuForwarder(key_settings[NKEY_TIMESHIFT].keydescription, true, keychooser[NKEY_TIMESHIFT]->getKeyName(), keychooser[NKEY_TIMESHIFT]);
 	mf->setHint("", key_settings[NKEY_TIMESHIFT].hint);
 	bindSettings->addItem(mf);
+	for (int i = NKEY_TIMESHIFT_BACK; i <= NKEY_TIMESHIFT_FORWARD; i++) {
+		mf = new CMenuForwarder(key_settings[i].keydescription, true, keychooser[i]->getKeyName(), keychooser[i]);
+		mf->setHint("", key_settings[i].hint);
+		bindSettings->addItem(mf);
+	}
 	// unlock
 	mf = new CMenuForwarder(key_settings[NKEY_UNLOCK].keydescription, true, keychooser[NKEY_UNLOCK]->getKeyName(), keychooser[NKEY_UNLOCK]);
 	mf->setHint("", key_settings[NKEY_UNLOCK].hint);

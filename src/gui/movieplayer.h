@@ -257,6 +257,9 @@ class CMoviePlayerGui : public CMenuTarget
 	bool timeshift_deletion;
 	t_channel_id timeshift_zap;	/* channel to switch to once the timeshift playback has ended */
 	int timeshift_delay;	/* ms behind the end of the timeshift to start at, -1: the usual start */
+	bool ts_jump_back;	/* the timeshift jump keys: direction, last press and count of the row */
+	int64_t ts_jump_last;
+	int ts_jump_count;
 	//std::vector<livestream_info_t> liveStreamList;
 
 	/* playback from bookmark */
@@ -374,6 +377,7 @@ class CMoviePlayerGui : public CMenuTarget
 	tshift_mode timeshift;
 	void deleteTimeshift() { timeshift_deletion = true; }
 	void setTimeshiftDelay(int ms) { timeshift_delay = ms; }
+	int timeshiftJump(bool back);
 	void zapAfterTimeshift(t_channel_id channel_id);
 	/* the live picture held while the timeshift records on */
 	bool HoldLive();
