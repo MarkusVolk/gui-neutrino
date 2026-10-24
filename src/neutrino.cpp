@@ -3350,7 +3350,9 @@ TIMER_START();
 	my_system(3, "mount", "/dev/sda1", "/media/sda1");
 	my_system(3, "mount", "/dev/sdb1", "/media/sdb1");
 #endif
-	udev_hotplug::start();
+	/* as a desktop session (not root) the host's drives are left alone */
+	if (!geteuid())
+		udev_hotplug::start();
 
 	CFSMounter::automount();
 	g_Plugins = new CPlugins;
