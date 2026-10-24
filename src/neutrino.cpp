@@ -848,11 +848,20 @@ int CNeutrinoApp::loadSetup(const char *fname)
 		setSettingsText(g_settings.network_nfs[i].password, configfile.getString("network_nfs_password_" + i_str, ""));
 	}
 
-	setSettingsText(g_settings.network_nfs_audioplayerdir, configfile.getString("network_nfs_audioplayerdir", TARGET_ROOT "/media/sda1/music"));
-	setSettingsText(g_settings.network_nfs_moviedir, configfile.getString("network_nfs_moviedir", TARGET_ROOT "/media/sda1/movies"));
-	setSettingsText(g_settings.network_nfs_picturedir, configfile.getString("network_nfs_picturedir", TARGET_ROOT "/media/sda1/pictures"));
-	setSettingsText(g_settings.network_nfs_recordingdir, configfile.getString("network_nfs_recordingdir", TARGET_ROOT "/media/sda1/movies"));
-	setSettingsText(g_settings.network_nfs_streamripperdir, configfile.getString("network_nfs_streamripperdir", TARGET_ROOT "/media/sda1/music/streamripper"));
+	std::string music_dir = TARGET_ROOT "/media/sda1/music";
+	std::string movie_dir = TARGET_ROOT "/media/sda1/movies";
+	std::string picture_dir = TARGET_ROOT "/media/sda1/pictures";
+	const char *home = getenv("HOME");
+	if (g_info.hw_caps->media_in_home && home && *home) {
+		music_dir = std::string(home) + "/Music";
+		movie_dir = std::string(home) + "/Videos";
+		picture_dir = std::string(home) + "/Pictures";
+	}
+	setSettingsText(g_settings.network_nfs_audioplayerdir, configfile.getString("network_nfs_audioplayerdir", music_dir));
+	setSettingsText(g_settings.network_nfs_moviedir, configfile.getString("network_nfs_moviedir", movie_dir));
+	setSettingsText(g_settings.network_nfs_picturedir, configfile.getString("network_nfs_picturedir", picture_dir));
+	setSettingsText(g_settings.network_nfs_recordingdir, configfile.getString("network_nfs_recordingdir", movie_dir));
+	setSettingsText(g_settings.network_nfs_streamripperdir, configfile.getString("network_nfs_streamripperdir", music_dir + "/streamripper"));
 
 	setSettingsText(g_settings.downloadcache_dir, configfile.getString("downloadcache_dir", g_settings.network_nfs_recordingdir.c_str()));
 	setSettingsText(g_settings.logo_hdd_dir, configfile.getString("logo_hdd_dir", TARGET_ROOT "/media/sda1/logos"));
@@ -1037,7 +1046,7 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	setSettingsText(g_settings.movieplayer_plugin, configfile.getString("movieplayer_plugin", "---"));
 
 	// screenshot
-	setSettingsText(g_settings.screenshot_dir, configfile.getString("screenshot_dir", TARGET_ROOT "/media/sda1/movies"));
+	setSettingsText(g_settings.screenshot_dir, configfile.getString("screenshot_dir", movie_dir));
 	g_settings.screenshot_count = configfile.getInt32("screenshot_count", 1);
 	g_settings.screenshot_cover = configfile.getInt32("screenshot_cover", 0);
 	g_settings.screenshot_format = configfile.getInt32("screenshot_format", 1);
