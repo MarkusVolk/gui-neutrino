@@ -1184,6 +1184,11 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	// fonts
 	setSettingsText(g_settings.font_file, configfile.getString("font_file", FONTDIR"/neutrino.ttf"));
 	setSettingsText(g_settings.font_file_monospace, configfile.getString("font_file_monospace", FONTDIR"/tuxtxt.ttf"));
+	if (access(g_settings.font_file, F_OK) != 0)
+	{
+		setSettingsText(g_settings.font_file, FONTDIR "/neutrino.ttf");
+		configfile.setUnknownKeyQueryedFlag(true); // force saving config
+	}
 	if (access(g_settings.font_file_monospace, F_OK) != 0)
 	{
 		setSettingsText(g_settings.font_file_monospace, FONTDIR "/tuxtxt.ttf");

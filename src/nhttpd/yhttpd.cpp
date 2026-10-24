@@ -410,6 +410,9 @@ void Cyhttpd::ReadConfig(void) {
 
 	// MainSite
 	ConfigList["WebsiteMain.directory"] = Config->getString("WebsiteMain.directory", PRIVATEDOCUMENTROOT);
+	/* a directory the installation moved away falls back to its own */
+	if (access(ConfigList["WebsiteMain.directory"], R_OK) != 0)
+		ConfigList["WebsiteMain.directory"] = PRIVATEDOCUMENTROOT;
 	ConfigList["WebsiteMain.override_directory"] = Config->getString("WebsiteMain.override_directory", PUBLICDOCUMENTROOT);
 	ConfigList["WebsiteMain.hosted_directory"] = Config->getString("WebsiteMain.hosted_directory", HOSTEDDOCUMENTROOT);
 
