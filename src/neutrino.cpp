@@ -33,6 +33,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <filesystem>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -787,7 +788,14 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	setSettingsText(g_settings.timezone, configfile.getString("timezone", "(GMT+01:00) Amsterdam, Berlin, Bern, Rome, Vienna"));
 
 	// epg
-	setSettingsText(g_settings.epg_dir, configfile.getString("epg_dir", TARGET_ROOT "/media/sda1/epg"));
+	const char *home = getenv("HOME");
+	const char *cache = getenv("XDG_CACHE_HOME");
+	std::string epg_dir = TARGET_ROOT "/media/sda1/epg";
+	if (g_info.hw_caps->media_in_home && cache && *cache)
+		epg_dir = std::string(cache) + "/neutrino/epg";
+	else if (g_info.hw_caps->media_in_home && home && *home)
+		epg_dir = std::string(home) + "/.cache/neutrino/epg";
+	setSettingsText(g_settings.epg_dir, configfile.getString("epg_dir", epg_dir));
 	g_settings.epg_cache = configfile.getInt32("epg_cache_time", 7);
 	g_settings.epg_extendedcache = configfile.getInt32("epg_extendedcache_time", 168);
 	g_settings.epg_max_events = configfile.getInt32("epg_max_events", 30000);
@@ -851,7 +859,6 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	std::string music_dir = TARGET_ROOT "/media/sda1/music";
 	std::string movie_dir = TARGET_ROOT "/media/sda1/movies";
 	std::string picture_dir = TARGET_ROOT "/media/sda1/pictures";
-	const char *home = getenv("HOME");
 	if (g_info.hw_caps->media_in_home && home && *home) {
 		music_dir = std::string(home) + "/Music";
 		movie_dir = std::string(home) + "/Videos";
@@ -5449,6 +5456,11 @@ void CNeutrinoApp::ExitRun(int exit_code, bool ask)
 void CNeutrinoApp::saveEpg(int _mode)
 {
 	struct stat my_stat;
+	/* a box saves only to a mounted drive, a PC into its own cache */
+	if (g_info.hw_caps->media_in_home) {
+		std::error_code ec;
+		std::filesystem::create_directories(g_settings.epg_dir, ec);
+	}
 	if (stat(g_settings.epg_dir.c_str(), &my_stat) == 0)
 	{
 		if (_mode == NeutrinoModes::mode_standby)
