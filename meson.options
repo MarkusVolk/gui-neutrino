@@ -55,7 +55,6 @@ option('mpris', type : 'boolean', value : false, description : 'Let desktop medi
 option('tray', type : 'boolean', value : false, description : 'Show an icon in the tray of the desktop')
 option('xkbcommon', type : 'boolean', value : false, description : 'Type text with a keyboard in its layout through libxkbcommon')
 option('terminal', type : 'boolean', value : false, description : 'Run plugins with a text user interface in a terminal on the OSD')
-option('udisks', type : 'boolean', value : false, description : 'Mount drives through udisksctl when not running as root')
 option('xmltv-xz', type : 'boolean', value : false, description : 'Read XMLTV files packed with xz')
 option('assistant', type : 'boolean', value : false, description : 'Ask a language model that operates the box')
 option('assistant-voice', type : 'boolean', value : false, description : 'Ask the assistant by voice')

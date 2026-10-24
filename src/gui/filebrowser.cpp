@@ -566,6 +566,16 @@ bool CFileBrowser::readDir_std(const std::string & dirname, CFileList* flist)
 	{
 		std::string scn_err = "Filebrowser scandir: " + to_scan_dir + " ";
 		to_scan_dir = "/media/";
+		if (g_info.hw_caps->media_in_home) {
+			/* the drives a desktop mounts for the user, else the home */
+			const char *user = getenv("USER");
+			const char *home = getenv("HOME");
+			std::string run_media = std::string("/run/media/") + (user ? user : "");
+			if (user && *user && !access(run_media.c_str(), R_OK))
+				to_scan_dir = run_media + "/";
+			else if (home && *home)
+				to_scan_dir = std::string(home) + "/";
+		}
 		dprintf(DEBUG_NORMAL, "\033[33m[CFileBrowser]\[%s - %d], %s failed, %s, try fallback to [%s]\033[0m\n", __func__, __LINE__, scn_err.c_str(), strerror(errno), to_scan_dir.c_str());
 		n = scandir64(to_scan_dir.c_str(), &namelist, 0, alphasort64);
 		name = to_scan_dir;

@@ -441,6 +441,8 @@ bool CUserMenu::showUserMenu(neutrino_msg_t msg)
 			}
 			case SNeutrinoSettings::ITEM_HDDMENU:
 			{
+				if (geteuid())
+					break;
 				keyhelper.get(&key, &icon);
 				menu_item = new CMenuForwarder(LOCALE_HDD_SETTINGS, true, NULL, CHDDMenuHandler::getInstance(), NULL, key, icon);
 				menu_item->setHint(NEUTRINO_ICON_HINT_HDD, LOCALE_MENU_HINT_HDD);

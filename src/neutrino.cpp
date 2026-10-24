@@ -1155,7 +1155,7 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	g_settings.flashupdate_createimage_add_uldr = configfile.getInt32("flashupdate_createimage_add_uldr", 1);
 	g_settings.flashupdate_createimage_add_var = configfile.getInt32("flashupdate_createimage_add_var", 1);
 
-	setSettingsText(g_settings.backup_dir, configfile.getString("backup_dir", TARGET_ROOT "/media"));
+	setSettingsText(g_settings.backup_dir, configfile.getString("backup_dir", g_info.hw_caps->media_in_home && home && *home ? std::string(home) : std::string(TARGET_ROOT "/media")));
 	setSettingsText(g_settings.update_dir, configfile.getString("update_dir", "/tmp"));
 	setSettingsText(g_settings.update_dir_opkg, configfile.getString("update_dir_opkg", g_settings.update_dir));
 

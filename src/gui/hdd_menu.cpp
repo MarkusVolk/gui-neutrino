@@ -376,66 +376,42 @@ bool CHDDMenuHandler::mount_dev(std::string name)
 		sleep(3);
 	}
 	std::string cmd;
-#ifdef ENABLE_UDISKS
-	if (geteuid())
-		cmd = "udisksctl mount -b /dev/" + name;
-	else
-#endif
-	{
 #ifdef ASSUME_MDEV
-		cmd = std::string("ACTION=add") + " MDEV=" + name + " " + MDEV_MOUNT;
+	cmd = std::string("ACTION=add") + " MDEV=" + name + " " + MDEV_MOUNT;
 #else
-		std::string dst = MOUNT_BASE + name;
-		safe_mkdir(dst.c_str());
-		cmd = std::string("mount ") + "/dev/" + name + " " + dst;
+	std::string dst = MOUNT_BASE + name;
+	safe_mkdir(dst.c_str());
+	cmd = std::string("mount ") + "/dev/" + name + " " + dst;
 #endif
-	}
 	printf("CHDDMenuHandler::mount_dev: mount cmd [%s]\n", cmd.c_str());
-#ifdef ENABLE_UDISKS
-	if (geteuid())
-		my_system(4, "udisksctl", "mount", "-b", ("/dev/" + name).c_str());
-	else
-#endif
-	{
 #ifdef ASSUME_MDEV
-		setenv("ACTION", "add", 1);
-		setenv("MDEV", name.c_str(), 1);
-		my_system(1, MDEV_MOUNT);
-		unsetenv("ACTION");
-		unsetenv("MDEV");
+	setenv("ACTION", "add", 1);
+	setenv("MDEV", name.c_str(), 1);
+	my_system(1, MDEV_MOUNT);
+	unsetenv("ACTION");
+	unsetenv("MDEV");
 #else
-		my_system(3, "mount", ("/dev/" + name).c_str(), (MOUNT_BASE + name).c_str());
+	my_system(3, "mount", ("/dev/" + name).c_str(), (MOUNT_BASE + name).c_str());
 #endif
-	}
 	lock_refresh = true;
 	return is_mounted(name.c_str());
 }
 
 bool CHDDMenuHandler::umount_dev(std::string name)
 {
-#ifdef ENABLE_UDISKS
-	if (geteuid()) {
-		std::string cmd = "udisksctl unmount -b /dev/" + name;
-		printf("CHDDMenuHandler::umount_dev: umount cmd [%s]\n", cmd.c_str());
-		if (my_system(4, "udisksctl", "unmount", "-b", ("/dev/" + name).c_str()))
-			return false;
-	} else
-#endif
-	{
 #ifdef ASSUME_MDEV
-		std::string cmd = std::string("ACTION=remove") + " MDEV=" + name + " " + MDEV_MOUNT;
-		printf("CHDDMenuHandler::umount_dev: umount cmd [%s]\n", cmd.c_str());
-		setenv("ACTION", "remove", 1);
-		setenv("MDEV", name.c_str(), 1);
-		my_system(1, MDEV_MOUNT);
-		unsetenv("ACTION");
-		unsetenv("MDEV");
+	std::string cmd = std::string("ACTION=remove") + " MDEV=" + name + " " + MDEV_MOUNT;
+	printf("CHDDMenuHandler::umount_dev: umount cmd [%s]\n", cmd.c_str());
+	setenv("ACTION", "remove", 1);
+	setenv("MDEV", name.c_str(), 1);
+	my_system(1, MDEV_MOUNT);
+	unsetenv("ACTION");
+	unsetenv("MDEV");
 #else
-		std::string path = MOUNT_BASE + name;
-		if (::umount(path.c_str()))
-			return false;
+	std::string path = MOUNT_BASE + name;
+	if (::umount(path.c_str()))
+		return false;
 #endif
-	}
 	std::string dev = name.substr(0, 2);
 	std::string eject = find_executable("eject");
 	printf("CHDDMenuHandler::umount_dev: eject = %s\n", eject.c_str());
@@ -997,10 +973,8 @@ _show_menu:
 				enabled = false;
 			else if (kernel_fs_list.find(it->fmt) == kernel_fs_list.end())
 				enabled = false;
-#ifndef ENABLE_UDISKS
 			else if (geteuid())
 				enabled = false;
-#endif
 			it->cmf = new CMenuForwarder(it->desc, enabled, it->mounted ? umount : mount , this,
 					key.c_str(), CRCInput::convertDigitToKey(shortcut++), NULL, rec_icon);
 			hddmenu->addItem(it->cmf);

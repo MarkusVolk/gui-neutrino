@@ -390,8 +390,8 @@ void CNeutrinoApp::InitMenuSettings()
 	mf->setHint(NEUTRINO_ICON_HINT_VFD, LOCALE_MENU_HINT_VFD);
 	personalize.addItem(MENU_SETTINGS, mf, &g_settings.personalize[SNeutrinoSettings::P_MSET_VFD]);
 
-	// drive settings
-	if (g_settings.recording_type != CNeutrinoApp::RECORDING_OFF)
+	// drive settings, in a desktop session the desktop mounts the drives
+	if (g_settings.recording_type != CNeutrinoApp::RECORDING_OFF && !geteuid())
 	{
 		mf = new CMenuForwarder(LOCALE_HDD_SETTINGS, true, NULL, CHDDMenuHandler::getInstance());
 		mf->setHint(NEUTRINO_ICON_HINT_HDD, LOCALE_MENU_HINT_HDD);

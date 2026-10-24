@@ -217,7 +217,6 @@ foreach def : [
 	['ENABLE_MPRIS', enable_mpris],
 	['ENABLE_TRAY', enable_tray],
 	['ENABLE_TERMINAL', enable_terminal],
-	['ENABLE_UDISKS', get_option('udisks')],
 	['ENABLE_XMLTV_XZ', enable_xmltv_xz],
 	['ENABLE_ASSISTANT', enable_assistant],
 	['ENABLE_ASSISTANT_VOICE', enable_assistant_voice],
