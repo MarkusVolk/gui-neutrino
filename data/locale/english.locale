@@ -1609,7 +1609,7 @@ menu.hint_key_standbyoff_add Assign additional button to leave standby mode
 menu.hint_key_subchanneldown Assign button for fast switch\n to previous subchannel
 menu.hint_key_subchannelup Assign button for fast switch\n to next subchannel
 menu.hint_key_timeshift Assign button to start timeshift
-menu.hint_key_timeshift_jump Jumps back or forward in the timeshift, pressed again 1, 3 and 10 minutes; back starts the running timeshift from the live picture
+menu.hint_key_timeshift_jump Jumps back or forward in the timeshift, pressed again 1, 3 and 10 minutes; back starts the running timeshift from the live picture. The rewind and forward keys jump the same way in the timeshift
 menu.hint_key_transponder Assign button to show channel list\nfor current transponder
 menu.hint_key_tvradiomode Assign button to switch TV <> Radio mode
 menu.hint_key_unlock Assign button to unlock box if locked\nTo unlock press 'red', then in next 5 seconds this key

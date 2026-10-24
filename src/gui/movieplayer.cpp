@@ -3503,8 +3503,10 @@ void CMoviePlayerGui::PlayFileLoop(void)
 			keyPressed = CMoviePlayerGui::PLUGIN_PLAYSTATE_STOP;
 			ClearQueue();
 		} else if (timeshift != TSHIFT_MODE_OFF &&
-			   (msg == (neutrino_msg_t) g_settings.key_timeshift_back || msg == (neutrino_msg_t) g_settings.key_timeshift_forward)) {
-			bool back = msg == (neutrino_msg_t) g_settings.key_timeshift_back;
+			   (msg == (neutrino_msg_t) g_settings.key_timeshift_back || msg == (neutrino_msg_t) g_settings.key_timeshift_forward ||
+			    msg == (neutrino_msg_t) g_settings.mpkey_rewind || msg == (neutrino_msg_t) g_settings.mpkey_forward)) {
+			/* in the timeshift the rewind and forward keys jump as well */
+			bool back = msg == (neutrino_msg_t) g_settings.key_timeshift_back || msg == (neutrino_msg_t) g_settings.mpkey_rewind;
 			int jump = timeshiftJump(back);
 			playback->GetPosition(position, duration, isWebChannel);
 			if (!back && position + jump >= duration - 5000) {

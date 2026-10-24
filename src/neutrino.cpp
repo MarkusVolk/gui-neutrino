@@ -3782,7 +3782,7 @@ void CNeutrinoApp::RealRun()
 				}
 			}
 #endif
-			else if (msg == (neutrino_msg_t) g_settings.key_timeshift_back && timeshiftJumpBack()) {
+			else if ((msg == (neutrino_msg_t) g_settings.key_timeshift_back || msg == (neutrino_msg_t) g_settings.mpkey_rewind) && timeshiftJumpBack()) {
 			}
 			else if ((msg == (neutrino_msg_t) g_settings.key_timeshift || msg == CRCInput::RC_playpause) && CMoviePlayerGui::LiveHeld()) {
 				/* the held picture plays on, from the timeshift when the
