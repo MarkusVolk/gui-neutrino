@@ -129,6 +129,15 @@ async function record(channel, ev) {
 	toast(`Recording set: ${ev.title}`);
 }
 
+/* the browser runs on the box itself, where a stream would only play
+ * what the TV plays already */
+const onBox = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(location.hostname);
+
+async function zap(ch) {
+	await api("zap", { method: "POST", body: { channel_id: ch.id, stop_playback: true } });
+	toast(`Zapped to ${ch.name}`);
+}
+
 /* An Android phone hands the stream to a video player app; elsewhere an
  * mpv: link starts mpv, where a handler for it is set up (mpv-url.desktop).
  * The address goes to the clipboard as well, for when nothing opens. */
@@ -237,11 +246,11 @@ async function viewChannels(main) {
 				h("div", { class: "actions" },
 					may("write") && nowEv ? h("button", { class: "btn icon", title: "Record this programme", html: icon("record"),
 						onclick: (ev) => { ev.stopPropagation(); record(ch.id, nowEv).catch(fail); } }) : null,
-					h("button", { class: "btn icon", title: "Watch as stream", html: icon("stream"),
+					onBox ? null : h("button", { class: "btn icon", title: "Watch as stream", html: icon("stream"),
 						onclick: (ev) => { ev.stopPropagation(); stream(ch.id).catch(fail); } })));
 			row.addEventListener("click", async () => {
 				try {
-					await api("zap", { method: "POST", body: { channel_id: ch.id } });
+					await api("zap", { method: "POST", body: { channel_id: ch.id, stop_playback: true } });
 					list.querySelector(".channel.current")?.classList.remove("current");
 					row.classList.add("current");
 					toast(`Zapped to ${ch.name}`);
@@ -266,6 +275,8 @@ function eventDialog(ch, ev) {
 		ev.description ? h("p", {}, ev.description) : null,
 		h("div", { class: "buttons" },
 			h("button", { class: "btn", onclick: () => d.close() }, "Close"),
+			onBox ? null : h("button", { class: "btn", onclick: () => { stream(ch.id).catch(fail); d.close(); } }, "Stream"),
+			may("write") ? h("button", { class: "btn", onclick: () => { zap(ch).catch(fail); d.close(); } }, "Zap") : null,
 			may("write") ? h("button", { class: "btn primary", onclick: () => { record(ch.id, ev).catch(fail); d.close(); } }, "Record") : null));
 	d.addEventListener("close", () => d.remove());
 	document.body.append(d);
