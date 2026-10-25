@@ -2,10 +2,10 @@
 // NHTTPD
 // NeutrionAPI
 //
-// Aggregates: NeutrinoYParser, NeutrinoControlAPI
+// Aggregates: NeutrinoControlAPI
 // Defines Interfaces to:CControldClient, CSectionsdClient, CZapitClient,
 //			CTimerdClient,CLCDAPI
-// Place for common used Neutrino-functions used by NeutrinoYParser, NeutrinoControlAPI
+// Place for common used Neutrino-functions used by NeutrinoControlAPI and the REST API
 //=============================================================================
 
 // C
@@ -135,7 +135,6 @@ CNeutrinoAPI::CNeutrinoAPI()
 	Zapit = new CZapitClient();
 	Timerd = new CTimerdClient();
 
-	NeutrinoYParser = new CNeutrinoYParser(this);
 	ControlAPI = new CControlAPI(this);
 
 	UpdateBouquets();
@@ -167,8 +166,6 @@ CNeutrinoAPI::CNeutrinoAPI()
 
 CNeutrinoAPI::~CNeutrinoAPI(void)
 {
-	if (NeutrinoYParser)
-		delete NeutrinoYParser;
 	if (ControlAPI)
 		delete ControlAPI;
 	if (Sectionsd)

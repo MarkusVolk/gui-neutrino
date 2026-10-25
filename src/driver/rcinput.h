@@ -293,6 +293,9 @@ class CRCInput
 		int messageLoop(bool anyKeyCancels = false, int timeout = -1);
 
 		int translateRevert(int c) { return translate_revert(c); };
+		/* the input device of fd knows the key code; true for one that is
+		 * no input device, such as the FIFO of a desktop session */
+		static bool deviceHasKey(int fd, int code);
 		void setLongPressAny(bool b) { longPressAny = b; };
 		void setKeyRepeatDelay(unsigned int start_ms, unsigned int repeat_ms);
 };

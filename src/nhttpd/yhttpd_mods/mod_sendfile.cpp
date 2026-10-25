@@ -49,6 +49,7 @@
 #include <inttypes.h>
 #include <map>
 #include <tuple>
+#include <vector>
 #include <system/helpers.h>
 // yhttpd
 #include <yconfig.h>
@@ -148,21 +149,15 @@ THandleStatus CmodSendfile::Hook_PrepareResponse(CyhookHandler *hh) {
 
 	log_level_printf(4, "mod_sendfile prepare hook start url:%s\n", hh->UrlData["fullurl"].c_str());
 
-#ifdef Y_CONFIG_USE_HOSTEDWEB
-	// for hosted webs: rewrite URL
-	std::string _hosted=HOSTEDDOCUMENTURL;
-	if((hh->UrlData["path"]).compare(0,_hosted.length(),HOSTEDDOCUMENTURL) == 0) // hosted Web ?
-		hh->UrlData["path"]=hh->WebserverConfigList["WebsiteMain.hosted_directory"]+(hh->UrlData["path"]).substr(_hosted.length()-1);
-#endif //Y_CONFIG_USE_HOSTEDWEB
-
 	std::string mime = sendfileTypes[hh->UrlData["fileext"]];
-	if (((!mime.empty()) || (hh->WebserverConfigList["mod_sendfile.sendAll"] == "true"))
-			&& !(hh->UrlData["fileext"] == "yhtm" || hh->UrlData["fileext"] == "yjs" || hh->UrlData["fileext"] == "ysh")) {
-		//TODO: Check allowed directories / actually in GetFileName
-		// build filename
+	if (!mime.empty()) {
 		std::string fullfilename = GetFileName(hh, hh->UrlData["path"],
 				hh->UrlData["filename"]);
 		int filed;
+		const std::string &own = hh->WebserverConfigList["WebsiteMain.directory"];
+		if (!own.empty() && fullfilename.compare(0, own.size() + 1, own + "/") == 0)
+			hh->HookVarList["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: blob:; "
+				"style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 		if ((filed = OpenFile(hh, fullfilename)) != -1) //can access file?
 		{
 			struct stat statbuf;
@@ -241,8 +236,6 @@ THandleStatus CmodSendfile::Hook_ReadConfig(CConfigFile *Config,
 	std::string exttypes = Config->getString("mod_sendfile.mime_types",
 			HTTPD_SENDFILE_EXT);
 	ConfigList["mod_sendfile.mime_types"] = exttypes;
-	ConfigList["mod_sendfile.sendAll"] = Config->getString(
-			"mod_sendfile.sendAll", HTTPD_SENDFILE_ALL);
 
 	bool ende = false;
 	std::string item, ext, mime;
@@ -260,30 +253,49 @@ THandleStatus CmodSendfile::Hook_ReadConfig(CConfigFile *Config,
 
 //-----------------------------------------------------------------------------
 // Send File: Build Filename
-// First Look at PublicDocumentRoot than PrivateDocumentRoot than pure path
+// Only below the web directories: /hosted/ from the hosted directory, every
+// other path from the override directory, else from the web interface
+// itself. A path with a ".." part names nothing.
 //-----------------------------------------------------------------------------
+static bool SafePath(const std::string &path)
+{
+	if (path.find('\\') != std::string::npos || path.find('\0') != std::string::npos)
+		return false;
+	std::string rest = path, part;
+	while (!rest.empty()) {
+		ySplitStringExact(rest, "/", part, rest);
+		if (part == "..")
+			return false;
+	}
+	return true;
+}
+
 std::string CmodSendfile::GetFileName(CyhookHandler *hh, std::string path, std::string filename) {
 	std::string tmpfilename;
-	if (path[path.length() - 1] != '/')
+	if (path.empty() || path[path.length() - 1] != '/')
 		tmpfilename = path + "/" + filename;
 	else
 		tmpfilename = path + filename;
-	if (access(hh->WebserverConfigList["WebsiteMain.override_directory"] + tmpfilename, R_OK) == 0)
-		tmpfilename = hh->WebserverConfigList["WebsiteMain.override_directory"] + tmpfilename;
-	else if (access(hh->WebserverConfigList["WebsiteMain.override_directory"] + tmpfilename + ".gz", R_OK) == 0)
-		tmpfilename = hh->WebserverConfigList["WebsiteMain.override_directory"] + tmpfilename + ".gz";
-	else if (access(hh->WebserverConfigList["WebsiteMain.directory"] + tmpfilename, R_OK) == 0)
-		tmpfilename = hh->WebserverConfigList["WebsiteMain.directory"] + tmpfilename;
-	else if (access(hh->WebserverConfigList["WebsiteMain.directory"] + tmpfilename + ".gz", R_OK) == 0)
-		tmpfilename = hh->WebserverConfigList["WebsiteMain.directory"] + tmpfilename + ".gz";
-#ifdef Y_CONFIG_FEATUE_SENDFILE_CAN_ACCESS_ALL
-	else if(access(tmpfilename,R_OK) == 0)
-	;
-#endif
-	else {
+	if (!SafePath(tmpfilename))
 		return "";
+	std::vector<std::string> roots;
+	std::string hosted = HOSTEDDOCUMENTURL;
+	if (tmpfilename.compare(0, hosted.length(), hosted) == 0) {
+		tmpfilename = tmpfilename.substr(hosted.length() - 1);
+		roots.push_back(hh->WebserverConfigList["WebsiteMain.hosted_directory"]);
+	} else {
+		roots.push_back(hh->WebserverConfigList["WebsiteMain.override_directory"]);
+		roots.push_back(hh->WebserverConfigList["WebsiteMain.directory"]);
 	}
-	return tmpfilename;
+	for (size_t i = 0; i < roots.size(); i++) {
+		if (roots[i].empty())
+			continue;
+		if (access(roots[i] + tmpfilename, R_OK) == 0)
+			return roots[i] + tmpfilename;
+		if (access(roots[i] + tmpfilename + ".gz", R_OK) == 0)
+			return roots[i] + tmpfilename + ".gz";
+	}
+	return "";
 }
 //-----------------------------------------------------------------------------
 // Send File: Open File and check file type

@@ -51,22 +51,29 @@
 #endif
 
 #include "apiserver.h"
+#include "pairing.h"
 
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <linux/input.h>
+#include <poll.h>
 #include <pthread.h>
+#include <signal.h>
+#include <spawn.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/sysinfo.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <set>
@@ -87,6 +94,8 @@
 #include <src/tools/rcsim.h>
 
 #include <yhttpd.h>
+#include <mod_auth.h>
+#include <ycert.h>
 #include <helper.h>
 #include <neutrinoapi.h>
 #ifdef ENABLE_ASSISTANT
@@ -95,11 +104,16 @@
 
 extern cVideo *videoDecoder;
 extern CBouquetManager *g_bouquetManager;
+extern unsigned int yhttpd_https_port();
 
 namespace
 {
 
-enum Level { L_PUBLIC, L_READ, L_WRITE, L_SYSTEM };
+typedef yapi::Level Level;
+using yapi::L_PUBLIC;
+using yapi::L_READ;
+using yapi::L_WRITE;
+using yapi::L_SYSTEM;
 
 const char *level_name(Level l)
 {
@@ -452,7 +466,7 @@ std::string bearer(const yapi::Request &in)
 	return trim(it->second.substr(7));
 }
 
-std::string session_cookie(const yapi::Request &in)
+std::string cookie(const yapi::Request &in, const char *wanted)
 {
 	CStringList::const_iterator it = in.headers.find("Cookie");
 	if (it == in.headers.end())
@@ -460,10 +474,29 @@ std::string session_cookie(const yapi::Request &in)
 	std::string rest = it->second, part, name, value;
 	while (!rest.empty()) {
 		ySplitStringExact(rest, ";", part, rest);
-		if (ySplitStringExact(trim(part), "=", name, value) && name == kSessionCookie)
+		if (ySplitStringExact(trim(part), "=", name, value) && name == wanted)
 			return value;
 	}
 	return "";
+}
+
+std::string session_cookie(const yapi::Request &in)
+{
+	return cookie(in, kSessionCookie);
+}
+
+std::string device_cookie(const yapi::Request &in)
+{
+	return cookie(in, pairing::cookie_name);
+}
+
+/* a paired device keeps its cookie as long as browsers let one live, and
+ * gets it anew whenever it asks for its session */
+std::string device_cookie_header(const std::string &token)
+{
+	return std::string(pairing::cookie_name) + "=" + token
+		+ (token.empty() ? "; Max-Age=0" : "; Max-Age=34560000")
+		+ "; Path=/; HttpOnly; Secure; SameSite=Strict";
 }
 
 bool live_session(const std::string &token, Session *s)
@@ -499,16 +532,7 @@ const char *proxy_headers[] = {
 
 bool from_internet(const yapi::Request &in)
 {
-	for (size_t i = 0; i < sizeof(proxy_headers) / sizeof(proxy_headers[0]); i++) {
-		CStringList::const_iterator it = in.headers.find(proxy_headers[i]);
-		if (it != in.headers.end() && !it->second.empty())
-			return true;
-	}
-#ifdef ENABLE_ASSISTANT
-	if (mcp_oauth::viaPublicAddress(in.headers))
-		return true;
-#endif
-	return false;
+	return yapi::from_internet(in.headers);
 }
 
 bool private_address(const std::string &a)
@@ -523,6 +547,22 @@ bool private_address(const std::string &a)
 	if (inet_pton(AF_INET6, a.c_str(), &v6) == 1)
 		return IN6_IS_ADDR_LOOPBACK(&v6) || (v6.s6_addr[0] & 0xfe) == 0xfc || IN6_IS_ADDR_LINKLOCAL(&v6);
 	return false;
+}
+
+/* The name and the password of nhttpd.conf in an "Authorization: Basic"
+ * header, which old clients of /control send; only once authentication
+ * is on and a password is set. */
+bool basic_sign_in(const CStringList &headers)
+{
+	CStringList::const_iterator it = headers.find("Authorization");
+	if (it == headers.end() || it->second.size() <= 6 || strncasecmp(it->second.c_str(), "basic ", 6))
+		return false;
+	if (config("mod_auth.authenticate") != "true" || config("mod_auth.password").empty())
+		return false;
+	std::string pair = CmAuth::decodeBase64(trim(it->second.substr(6)).c_str()), user, password;
+	if (!ySplitStringExact(pair, ":", user, password))
+		return false;
+	return equal_secret(user, config("mod_auth.username")) & equal_secret(password, config("mod_auth.password"));
 }
 
 /* What the network alone grants: public to a request that came through a
@@ -544,10 +584,12 @@ Level network_level(const yapi::Request &in)
 	return private_address(in.client) ? L_READ : L_PUBLIC;
 }
 
-// The level of a token, else of a session, else of the network
-Level granted(const yapi::Request &in, bool &by_token, bool &by_session)
+/* The level of a token, else of a session, else of a paired device or
+ * the network, whichever grants more; a paired device counts over HTTPS
+ * only, where its cookie lives. */
+Level granted(const yapi::Request &in, bool &by_token, bool &by_session, bool &by_device)
 {
-	by_token = by_session = false;
+	by_token = by_session = by_device = false;
 	Level l = L_PUBLIC;
 	std::string t = bearer(in);
 	if (!t.empty() && token_level(t, l)) {
@@ -558,7 +600,13 @@ Level granted(const yapi::Request &in, bool &by_token, bool &by_session)
 		by_session = true;
 		return L_SYSTEM;
 	}
-	return network_level(in);
+	l = network_level(in);
+	pairing::Device d;
+	if (in.secure && pairing::device_of(device_cookie(in), d)) {
+		by_device = true;
+		l = std::max(l, L_WRITE);
+	}
+	return l;
 }
 
 //-----------------------------------------------------------------------------
@@ -1006,6 +1054,53 @@ void ep_standby_post(Call &c)
 	send_empty(c.out, 202);
 }
 
+/* A message on the screen: popup is a window that waits for OK, else a
+ * short note that goes by itself, after timeout seconds if given. */
+void ep_message(Call &c)
+{
+	static const char *members[] = { "text", "popup", "timeout", NULL };
+	std::string text;
+	bool popup;
+	int64_t timeout;
+	if (!read_body(c, members) || !body_string(c, "text", true, 1024, text)
+			|| !body_bool(c, "popup", false, false, popup) || !body_int(c, "timeout", false, 0, timeout))
+		return;
+	if (trim(text).empty()) {
+		problem(c.out, 400, "bad-string", "text is empty");
+		return;
+	}
+	if (timeout < 0 || timeout > 3600) {
+		problem(c.out, 400, "out-of-range", "timeout is not between 0 and 3600 seconds");
+		return;
+	}
+	if (timeout > 0)
+		text += "&timeout=" + std::to_string((int) timeout);
+	neutrino_api->EventServer->sendEvent(popup ? NeutrinoMessages::EVT_POPUP : NeutrinoMessages::EVT_EXTMSG,
+		CEventServer::INITID_HTTPD, (void *) text.c_str(), text.length() + 1);
+	send_empty(c.out, 202);
+}
+
+void ep_power(Call &c)
+{
+	static const char *members[] = { "action", NULL };
+	std::string action;
+	if (!read_body(c, members) || !body_string(c, "action", true, 16, action))
+		return;
+	unsigned int event;
+	if (action == "restart")
+		event = NeutrinoMessages::RESTART;
+	else if (action == "reboot")
+		event = NeutrinoMessages::REBOOT;
+	else if (action == "shutdown")
+		event = NeutrinoMessages::SHUTDOWN;
+	else {
+		problem(c.out, 400, "bad-string", "action is not restart, reboot or shutdown");
+		return;
+	}
+	neutrino_api->EventServer->sendEvent(event, CEventServer::INITID_HTTPD);
+	send_empty(c.out, 202);
+}
+
 std::string file_value(const char *file, const std::string &key)
 {
 	std::ifstream in(file);
@@ -1061,6 +1156,21 @@ void ep_system_info(Call &c)
 //-----------------------------------------------------------------------------
 // remote control and screen
 //-----------------------------------------------------------------------------
+/* The drawing of the remote control the web interface shows, in the
+ * format of neutrino-remote, for other clients to draw the same one */
+void ep_remote_layout(Call &c)
+{
+	std::ifstream in((config("WebsiteMain.directory") + "/remote-layout.json").c_str());
+	if (!in) {
+		problem(c.out, 404, "no-layout", "the web interface is not installed");
+		return;
+	}
+	std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	c.out.status = 200;
+	c.out.content_type = "application/json";
+	c.out.body = text;
+}
+
 void ep_remote_keys(Call &c)
 {
 	Json::Value v(Json::objectValue);
@@ -1110,10 +1220,18 @@ void ep_remote_key(Call &c)
 		problem(c.out, 501, "no-remote-input", "the box takes no keys from here");
 		return;
 	}
-	code = g_RCInput->translateRevert(code);
-	input_event(fd, EV_KEY, code, 1);
+	long dev_code = g_RCInput->translateRevert(code);
+	/* a key the remote control of the box does not have, which its input
+	 * device would drop, goes to neutrino's own queue */
+	if (!CRCInput::deviceHasKey(fd, dev_code)) {
+		close(fd);
+		g_RCInput->postMsg((neutrino_msg_t) code, 0);
+		send_empty(c.out, 202);
+		return;
+	}
+	input_event(fd, EV_KEY, dev_code, 1);
 	input_event(fd, EV_SYN, SYN_REPORT, 0);
-	input_event(fd, EV_KEY, code, 0);
+	input_event(fd, EV_KEY, dev_code, 0);
 	input_event(fd, EV_SYN, SYN_REPORT, 0);
 	close(fd);
 	send_empty(c.out, 202);
@@ -1522,13 +1640,16 @@ void ep_stream(Call &c)
 //-----------------------------------------------------------------------------
 // signing in
 //-----------------------------------------------------------------------------
-Json::Value session_state(Call &c, const Session *s)
+Json::Value session_state(Call &c, const Session *s, const pairing::Device *d = NULL, const std::string &device_token = "")
 {
 	Json::Value v(Json::objectValue);
 	v["authenticated"] = s != NULL;
-	v["level"] = level_name(s ? L_SYSTEM : c.level);
+	v["level"] = level_name(s ? L_SYSTEM : d ? std::max(c.level, L_WRITE) : c.level);
 	v["user"] = s ? s->user : "";
-	v["csrf"] = s ? s->csrf : "";
+	v["device"] = d ? d->name : "";
+	v["secure"] = c.in.secure;
+	v["https_port"] = Cyhttpd::ConfigList["WebsiteMain.https"] == "true" ? (Json::UInt) yhttpd_https_port() : 0;
+	v["csrf"] = s ? s->csrf : d ? pairing::csrf_of(device_token) : "";
 	v["csrf_header"] = kCsrfHeaderName;
 	v["expires_in"] = s ? (Json::UInt) std::max((time_t) 0, s->expires - time(NULL)) : 0;
 	return v;
@@ -1540,6 +1661,10 @@ void ep_login(Call &c)
 	 * authentication is on; before that they are the shipped defaults */
 	if (config("mod_auth.authenticate") != "true") {
 		problem(c.out, 401, "authentication-off", "signing in needs mod_auth.authenticate in nhttpd.conf; the API is open to the home network");
+		return;
+	}
+	if (config("mod_auth.password").empty()) {
+		problem(c.out, 401, "no-password", "no password is set for the web interface");
 		return;
 	}
 	static const char *members[] = { "user", "password", NULL };
@@ -1606,14 +1731,430 @@ void ep_login(Call &c)
 	pthread_mutex_unlock(&session_mutex);
 	send_json(c.out, 200, session_state(c, &s));
 	c.out.headers.push_back(std::make_pair("Set-Cookie",
-		std::string(kSessionCookie) + "=" + token + "; HttpOnly; SameSite=Lax; Path=/"));
+		std::string(kSessionCookie) + "=" + token + "; HttpOnly; SameSite=Lax; Path=/" + (c.in.secure ? "; Secure" : "")));
 }
 
 void ep_session(Call &c)
 {
 	Session s;
 	bool live = live_session(session_cookie(c.in), &s);
-	send_json(c.out, 200, session_state(c, live ? &s : NULL));
+	pairing::Device d;
+	std::string token = device_cookie(c.in);
+	bool paired = !live && c.in.secure && pairing::device_of(token, d);
+	send_json(c.out, 200, session_state(c, live ? &s : NULL, paired ? &d : NULL, token));
+	if (paired)
+		c.out.headers.push_back(std::make_pair("Set-Cookie", device_cookie_header(token)));
+}
+
+//-----------------------------------------------------------------------------
+// pairing a phone
+//-----------------------------------------------------------------------------
+bool needs_https(Call &c)
+{
+	if (c.in.secure)
+		return false;
+	problem(c.out, 403, "needs-https", "pairing works over HTTPS only");
+	return true;
+}
+
+void paired(Call &c, const std::string &token)
+{
+	pairing::Device d;
+	if (!pairing::device_of(token, d)) {
+		problem(c.out, 500, "not-stored", "the box could not keep the device");
+		return;
+	}
+	send_json(c.out, 200, session_state(c, NULL, &d, token));
+	c.out.headers.push_back(std::make_pair("Set-Cookie", device_cookie_header(token)));
+}
+
+/* with the one-time code of the address the TV shows */
+void ep_pair(Call &c)
+{
+	if (needs_https(c))
+		return;
+	static const char *members[] = { "code", "name", NULL };
+	std::string code, name;
+	if (!read_body(c, members) || !body_string(c, "code", true, 64, code) || !body_string(c, "name", false, 64, name))
+		return;
+	if (!pairing::take_code(code)) {
+		printf("[yapi] pairing of %s (%s) refused: wrong or old code\n", name.c_str(), c.in.client.c_str());
+		problem(c.out, 403, "bad-code", "the code is wrong or no longer valid; show a new one on the TV");
+		return;
+	}
+	printf("[yapi] %s (%s) paired with the code of the TV\n", name.c_str(), c.in.client.c_str());
+	std::string token = pairing::add(name);
+	if (token.empty()) {
+		problem(c.out, 500, "not-stored", "the box could not keep the device");
+		return;
+	}
+	paired(c, token);
+}
+
+/* asks the TV, where OK allows it */
+void ep_pair_request(Call &c)
+{
+	if (needs_https(c))
+		return;
+	static const char *members[] = { "name", NULL };
+	std::string name, id, digits;
+	if (!read_body(c, members) || !body_string(c, "name", false, 64, name))
+		return;
+	if (!pairing::ask(name, c.in.client, id, digits)) {
+		problem(c.out, 429, "busy", "the TV is asking already or was just told no; try again in a little while");
+		c.out.headers.push_back(std::make_pair("Retry-After", "30"));
+		return;
+	}
+	Json::Value v(Json::objectValue);
+	v["id"] = id;
+	v["digits"] = digits;
+	send_json(c.out, 202, v);
+}
+
+void ep_pair_wait(Call &c)
+{
+	if (needs_https(c))
+		return;
+	std::string token;
+	switch (pairing::answer(c.args[0], token)) {
+	case pairing::PENDING: {
+		Json::Value v(Json::objectValue);
+		v["state"] = "pending";
+		send_json(c.out, 202, v);
+		break;
+	}
+	case pairing::ALLOWED:
+		paired(c, token);
+		break;
+	case pairing::REFUSED:
+		problem(c.out, 403, "refused", "the box was not told yes");
+		break;
+	default:
+		problem(c.out, 404, "no-such-request", "no such request");
+	}
+}
+
+/* a device ends its own pairing */
+void ep_pair_forget(Call &c)
+{
+	pairing::Device d;
+	if (!c.in.secure || !pairing::device_of(device_cookie(c.in), d)) {
+		problem(c.out, 403, "not-paired", "this browser is not paired");
+		return;
+	}
+	pairing::remove(d.id);
+	send_empty(c.out, 204);
+	c.out.headers.push_back(std::make_pair("Set-Cookie", device_cookie_header("")));
+}
+
+void ep_devices(Call &c)
+{
+	Json::Value v(Json::objectValue);
+	v["items"] = Json::Value(Json::arrayValue);
+	std::vector<pairing::Device> list = pairing::devices();
+	for (size_t i = 0; i < list.size(); i++) {
+		Json::Value d(Json::objectValue);
+		d["id"] = list[i].id;
+		d["name"] = list[i].name;
+		d["created"] = (Json::Int64) list[i].created;
+		d["last_used"] = (Json::Int64) list[i].last_used;
+		v["items"].append(d);
+	}
+	send_json(c.out, 200, v);
+}
+
+void ep_device_delete(Call &c)
+{
+	if (!pairing::remove(c.args[0])) {
+		problem(c.out, 404, "no-such-device", "no such device");
+		return;
+	}
+	send_empty(c.out, 204);
+}
+
+//-----------------------------------------------------------------------------
+// extensions of the web interface
+//-----------------------------------------------------------------------------
+/* A plugin adds a page to the web interface with ext/<id>/ext.json and
+ * ext/<id>/page.js below the web directory of the box (not the override
+ * directory, which is writable):
+ *   {"title": "Cloud", "icon": "cloud", "command": "/usr/bin/neutrino-cloud",
+ *    "level": "system"}
+ * The page runs the one command named there, with arguments of its own
+ * but without a shell, at the level given (write at least, system when
+ * none is given). */
+struct Extension
+{
+	std::string id, title, icon, command;
+	Level level;
+};
+
+bool valid_ext_id(const std::string &id)
+{
+	return !id.empty() && id.size() <= 32 && id.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_-") == std::string::npos;
+}
+
+bool load_extension(const std::string &id, Extension &e)
+{
+	if (!valid_ext_id(id))
+		return false;
+	std::ifstream in((config("WebsiteMain.directory") + "/ext/" + id + "/ext.json").c_str());
+	Json::CharReaderBuilder b;
+	Json::Value v;
+	std::string errs;
+	if (!in || !Json::parseFromStream(b, in, &v, &errs) || !v.isObject())
+		return false;
+	e.id = id;
+	e.title = v["title"].isString() ? v["title"].asString() : id;
+	e.icon = v["icon"].isString() ? v["icon"].asString() : "";
+	e.command = v["command"].isString() ? v["command"].asString() : "";
+	std::string level = v["level"].isString() ? v["level"].asString() : "system";
+	e.level = level == "write" ? L_WRITE : L_SYSTEM;
+	return true;
+}
+
+void ep_ext_list(Call &c)
+{
+	Json::Value v(Json::objectValue);
+	v["items"] = Json::Value(Json::arrayValue);
+	DIR *d = opendir((config("WebsiteMain.directory") + "/ext").c_str());
+	std::vector<std::string> ids;
+	if (d) {
+		while (struct dirent *de = readdir(d))
+			if (valid_ext_id(de->d_name))
+				ids.push_back(de->d_name);
+		closedir(d);
+	}
+	std::sort(ids.begin(), ids.end());
+	for (size_t i = 0; i < ids.size(); i++) {
+		Extension e;
+		if (!load_extension(ids[i], e))
+			continue;
+		Json::Value ev(Json::objectValue);
+		ev["id"] = e.id;
+		ev["title"] = e.title;
+		ev["icon"] = e.icon;
+		ev["level"] = level_name(e.level);
+		v["items"].append(ev);
+	}
+	send_json(c.out, 200, v);
+}
+
+/* runs argv without a shell; its output and exit status, or false when it
+ * could not be started; it is killed after timeout seconds */
+bool run_command(const std::vector<std::string> &args, int timeout, std::string &output, int &status)
+{
+	int fds[2];
+	if (pipe2(fds, O_CLOEXEC) != 0)
+		return false;
+	posix_spawn_file_actions_t fa;
+	posix_spawn_file_actions_init(&fa);
+	posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0);
+	posix_spawn_file_actions_adddup2(&fa, fds[1], 1);
+	posix_spawn_file_actions_adddup2(&fa, fds[1], 2);
+	posix_spawn_file_actions_addclosefrom_np(&fa, 3);
+	std::vector<char *> argv;
+	for (size_t i = 0; i < args.size(); i++)
+		argv.push_back(const_cast<char *>(args[i].c_str()));
+	argv.push_back(NULL);
+	pid_t pid;
+	int err = posix_spawn(&pid, args[0].c_str(), &fa, NULL, &argv[0], environ);
+	posix_spawn_file_actions_destroy(&fa);
+	close(fds[1]);
+	if (err != 0) {
+		close(fds[0]);
+		return false;
+	}
+	time_t end = time(NULL) + timeout;
+	char buf[4096];
+	bool killed = false;
+	for (;;) {
+		int left = (int) (end - time(NULL));
+		if (left <= 0) {
+			kill(pid, SIGKILL);
+			killed = true;
+			break;
+		}
+		struct pollfd p = { fds[0], POLLIN, 0 };
+		int r = poll(&p, 1, left * 1000);
+		if (r < 0 && errno == EINTR)
+			continue;
+		if (r <= 0)
+			continue;
+		ssize_t n = read(fds[0], buf, sizeof(buf));
+		if (n <= 0)
+			break;
+		if (output.size() < 256 * 1024)
+			output.append(buf, n);
+	}
+	close(fds[0]);
+	int st = 0;
+	while (waitpid(pid, &st, 0) < 0 && errno == EINTR)
+		;
+	status = killed ? -1 : WIFEXITED(st) ? WEXITSTATUS(st) : -1;
+	return true;
+}
+
+void ep_ext_run(Call &c)
+{
+	Extension e;
+	if (!load_extension(c.args[0], e)) {
+		problem(c.out, 404, "no-such-extension", "no such extension");
+		return;
+	}
+	if (c.level < e.level) {
+		problem(c.out, 403, "not-permitted", "this extension is not open to this caller");
+		return;
+	}
+	if (e.command.empty() || e.command[0] != '/' || access(e.command.c_str(), X_OK) != 0) {
+		problem(c.out, 404, "no-command", "the command of this extension is not installed");
+		return;
+	}
+	/* {"args": ["...", ...]}, the one body here that carries a list */
+	Json::CharReaderBuilder b;
+	b["rejectDupKeys"] = true;
+	std::unique_ptr<Json::CharReader> reader(b.newCharReader());
+	Json::Value v;
+	std::string errs;
+	const std::string &text = c.in.body;
+	if (!reader->parse(text.data(), text.data() + text.size(), &v, &errs) || !v.isObject()
+			|| v.getMemberNames().size() != 1 || !v["args"].isArray() || v["args"].size() > 32) {
+		problem(c.out, 400, "bad-body", "the body is {\"args\": [up to 32 strings]}");
+		return;
+	}
+	std::vector<std::string> args(1, e.command);
+	for (const Json::Value &a : v["args"]) {
+		if (!a.isString() || a.asString().size() > 4096 || a.asString().find('\0') != std::string::npos) {
+			problem(c.out, 400, "bad-body", "every argument is a string of at most 4096 bytes");
+			return;
+		}
+		args.push_back(a.asString());
+	}
+	std::string output;
+	int status;
+	if (!run_command(args, 120, output, status)) {
+		problem(c.out, 500, "not-started", "the command did not start");
+		return;
+	}
+	Json::Value out(Json::objectValue);
+	out["status"] = status;
+	out["output"] = output;
+	send_json(c.out, 200, out);
+}
+
+//-----------------------------------------------------------------------------
+// the MCP server of the assistant
+//-----------------------------------------------------------------------------
+/* The token is shown shortened: without authentication the home network
+ * has the system level. A new one is handed out once, in the answer that
+ * made it. */
+Json::Value mcp_state(Call &c)
+{
+	Json::Value v(Json::objectValue);
+#ifdef ENABLE_ASSISTANT
+	v["available"] = true;
+	v["enabled"] = g_settings.assistant_box_server != 0;
+	const std::string &t = g_settings.assistant_box_server_token;
+	v["token"] = t.size() > 8 ? t.substr(0, 4) + "\u2026" + t.substr(t.size() - 4) : std::string(t.empty() ? "" : "\u2026");
+	CStringList::const_iterator host = c.in.headers.find("Host");
+	v["address"] = host == c.in.headers.end() ? "" : std::string(c.in.secure ? "https://" : "http://") + host->second + "/mcp";
+	v["public_url"] = g_settings.assistant_box_server_url;
+	v["clients"] = Json::Value(Json::arrayValue);
+	std::vector<mcp_oauth::Client> list = mcp_oauth::client_list();
+	for (size_t i = 0; i < list.size(); i++) {
+		Json::Value cl(Json::objectValue);
+		cl["id"] = list[i].id;
+		cl["name"] = list[i].name;
+		cl["host"] = list[i].host;
+		cl["created"] = (Json::Int64) list[i].created;
+		cl["signed_in_until"] = (Json::Int64) list[i].expires;
+		v["clients"].append(cl);
+	}
+#else
+	(void) c;
+	v["available"] = false;
+#endif
+	return v;
+}
+
+void ep_mcp_get(Call &c)
+{
+	send_json(c.out, 200, mcp_state(c));
+}
+
+#ifdef ENABLE_ASSISTANT
+void ep_mcp_set(Call &c)
+{
+	static const char *members[] = { "enabled", "public_url", "new_token", NULL };
+	if (!read_body(c, members))
+		return;
+	bool has_enabled = !c.body["enabled"].isNull(), has_url = !c.body["public_url"].isNull();
+	bool enabled, new_token;
+	std::string url;
+	if (!body_bool(c, "enabled", false, false, enabled) || !body_string(c, "public_url", false, 256, url)
+			|| !body_bool(c, "new_token", false, false, new_token))
+		return;
+	url = trim(url);
+	if (!url.empty() && url.compare(0, 8, "https://") != 0) {
+		problem(c.out, 400, "bad-string", "public_url is empty or an https:// address");
+		return;
+	}
+	std::string token;
+	if (new_token || (has_enabled && enabled && g_settings.assistant_box_server_token.empty())) {
+		token = random_hex(16);
+		if (token.empty()) {
+			problem(c.out, 500, "no-token", "no random numbers for a token");
+			return;
+		}
+	}
+	/* the settings belong to the main loop, which also saves them */
+	bool done = main_call::run([&] {
+		if (has_enabled)
+			g_settings.assistant_box_server = enabled ? 1 : 0;
+		if (has_url)
+			g_settings.assistant_box_server_url = url;
+		if (!token.empty())
+			g_settings.assistant_box_server_token = token;
+		CNeutrinoApp::getInstance()->saveSetup(NEUTRINO_SETTINGS_FILE);
+	}, 5000);
+	if (!done) {
+		problem(c.out, 503, "busy", "the box did not take the change in time");
+		return;
+	}
+	Json::Value v = mcp_state(c);
+	if (!token.empty())
+		v["new_token"] = token;
+	send_json(c.out, 200, v);
+}
+
+void ep_mcp_client_delete(Call &c)
+{
+	if (!mcp_oauth::revoke(c.args[0])) {
+		problem(c.out, 404, "no-such-client", "no such client");
+		return;
+	}
+	send_empty(c.out, 204);
+}
+
+void ep_mcp_clients_delete(Call &c)
+{
+	mcp_oauth::revokeAll();
+	send_empty(c.out, 204);
+}
+#endif
+
+/* the certificate of the box's own CA, for a phone to trust */
+void ep_ca(Call &c)
+{
+	std::string pem = ycert::ca_pem();
+	if (pem.empty()) {
+		problem(c.out, 404, "no-certificate", "HTTPS has not made its certificate yet");
+		return;
+	}
+	c.out.status = 200;
+	c.out.content_type = "application/x-x509-ca-cert";
+	c.out.body = pem;
+	c.out.headers.push_back(std::make_pair("Content-Disposition", "attachment; filename=\"neutrino-ca.crt\""));
 }
 
 void ep_logout(Call &c)
@@ -1642,6 +2183,8 @@ const Route routes[] = {
 	{ "GET",	"/api/v1/system/info",		L_READ,		ep_system_info },
 	{ "GET",	"/api/v1/system/standby",	L_READ,		ep_standby_get },
 	{ "POST",	"/api/v1/system/standby",	L_SYSTEM,	ep_standby_post },
+	{ "POST",	"/api/v1/system/message",	L_WRITE,	ep_message },
+	{ "POST",	"/api/v1/system/power",		L_SYSTEM,	ep_power },
 	{ "GET",	"/api/v1/channels",		L_READ,		ep_channels },
 	{ "GET",	"/api/v1/channels/current",	L_READ,		ep_channel_current },
 	{ "GET",	"/api/v1/channels/{}",		L_READ,		ep_channel },
@@ -1649,6 +2192,7 @@ const Route routes[] = {
 	{ "GET",	"/api/v1/bouquets",		L_READ,		ep_bouquets },
 	{ "POST",	"/api/v1/zap",			L_WRITE,	ep_zap },
 	{ "GET",	"/api/v1/osd/remote/keys",	L_READ,		ep_remote_keys },
+	{ "GET",	"/api/v1/osd/remote/layout",	L_READ,		ep_remote_layout },
 	{ "POST",	"/api/v1/osd/remote/key",	L_WRITE,	ep_remote_key },
 	{ "GET",	"/api/v1/osd/screenshot",	L_READ,		ep_screenshot },
 	{ "GET",	"/api/v1/epg/current",		L_READ,		ep_epg_current },
@@ -1660,6 +2204,21 @@ const Route routes[] = {
 	{ "POST",	"/api/v1/login",		L_PUBLIC,	ep_login },
 	{ "GET",	"/api/v1/session",		L_PUBLIC,	ep_session },
 	{ "POST",	"/api/v1/logout",		L_WRITE,	ep_logout },
+	{ "POST",	"/api/v1/pair",			L_PUBLIC,	ep_pair },
+	{ "POST",	"/api/v1/pair/request",		L_PUBLIC,	ep_pair_request },
+	{ "GET",	"/api/v1/pair/wait/{}",		L_PUBLIC,	ep_pair_wait },
+	{ "POST",	"/api/v1/pair/forget",		L_PUBLIC,	ep_pair_forget },
+	{ "GET",	"/api/v1/pair/devices",		L_SYSTEM,	ep_devices },
+	{ "DELETE",	"/api/v1/pair/devices/{}",	L_SYSTEM,	ep_device_delete },
+	{ "GET",	"/api/v1/system/ca",		L_PUBLIC,	ep_ca },
+	{ "GET",	"/api/v1/ext",			L_READ,		ep_ext_list },
+	{ "GET",	"/api/v1/mcp",			L_SYSTEM,	ep_mcp_get },
+#ifdef ENABLE_ASSISTANT
+	{ "POST",	"/api/v1/mcp",			L_SYSTEM,	ep_mcp_set },
+	{ "DELETE",	"/api/v1/mcp/clients",		L_SYSTEM,	ep_mcp_clients_delete },
+	{ "DELETE",	"/api/v1/mcp/clients/{}",	L_SYSTEM,	ep_mcp_client_delete },
+#endif
+	{ "POST",	"/api/v1/ext/{}/run",		L_WRITE,	ep_ext_run },
 };
 
 std::vector<std::string> segments(const std::string &path)
@@ -1759,6 +2318,54 @@ bool yapi::handles(const std::string &path)
 	return path == "/api" || path.compare(0, 5, "/api/") == 0;
 }
 
+bool yapi::from_internet(const CStringList &headers)
+{
+	for (size_t i = 0; i < sizeof(proxy_headers) / sizeof(proxy_headers[0]); i++) {
+		CStringList::const_iterator it = headers.find(proxy_headers[i]);
+		if (it != headers.end() && !it->second.empty())
+			return true;
+	}
+#ifdef ENABLE_ASSISTANT
+	if (mcp_oauth::viaPublicAddress(headers))
+		return true;
+#endif
+	return false;
+}
+
+bool yapi::open_to_internet(const std::string &path)
+{
+#ifdef ENABLE_ASSISTANT
+	return path == "/mcp" || mcp_oauth::handles(path);
+#else
+	(void) path;
+	return false;
+#endif
+}
+
+yapi::Level yapi::level_of(const std::string &client, const CStringList &headers)
+{
+	Request in;
+	in.client = client;
+	in.headers = headers;
+	Level l = L_PUBLIC;
+	std::string t = bearer(in);
+	if (!t.empty() && token_level(t, l))
+		return l;
+	if (basic_sign_in(headers))
+		return L_SYSTEM;
+	return network_level(in);
+}
+
+bool yapi::foreign_page(const CStringList &headers)
+{
+	CStringList::const_iterator it = headers.find("Sec-Fetch-Site");
+	if (it == headers.end() || it->second == "same-origin" || it->second == "none")
+		return false;
+	Request in;
+	in.headers = headers;
+	return bearer(in).empty();
+}
+
 void yapi::dispatch(const Request &in, Response &out)
 {
 	Call c(in, out);
@@ -1785,17 +2392,24 @@ void yapi::dispatch(const Request &in, Response &out)
 		return;
 	}
 
-	bool by_token, by_session;
-	c.level = granted(in, by_token, by_session);
+	if (foreign_page(in.headers)) {
+		problem(out, 403, "not-permitted", "the page of another site cannot use this API");
+		return;
+	}
+
+	bool by_token, by_session, by_device;
+	c.level = granted(in, by_token, by_session, by_device);
 	if (c.level < r->level) {
 		problem(out, 403, "not-permitted", "this endpoint is not open to this caller");
 		return;
 	}
 	bool safe = in.method == "GET" || in.method == "HEAD" || in.method == "OPTIONS";
-	if (by_session && !safe) {
+	if ((by_session || by_device) && !safe) {
 		Session s;
 		CStringList::const_iterator it = in.headers.find(kCsrfHeader);
-		if (!live_session(session_cookie(in), &s) || it == in.headers.end() || !equal_secret(it->second, s.csrf)) {
+		std::string expected = by_session ? (live_session(session_cookie(in), &s) ? s.csrf : "")
+			: pairing::csrf_of(device_cookie(in));
+		if (expected.empty() || it == in.headers.end() || !equal_secret(it->second, expected)) {
 			problem(out, 403, "not-permitted", "this request changes something and carries no matching token");
 			return;
 		}

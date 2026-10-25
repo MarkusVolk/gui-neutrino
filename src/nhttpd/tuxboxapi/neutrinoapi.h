@@ -13,7 +13,6 @@
 
 // nhttpd
 #include <helper.h>
-#include "neutrinoyparser.h"
 #include "controlapi.h"
 #include <OpenThreads/ScopedLock>
 
@@ -90,7 +89,6 @@ public:
 	CNeutrinoAPI();
 	~CNeutrinoAPI(void);
 
-	CNeutrinoYParser	*NeutrinoYParser;
 	CControlAPI		*ControlAPI;
 	void Lock() { pmutex->lock(); }
 	void Unlock() { pmutex->unlock(); }
@@ -98,7 +96,6 @@ public:
 	// the keys of the events GetChannelEvents found, as GetChannelEvent looks them up
 	void GetChannelsWithEvent(std::set<t_channel_id> &epg_ids);
 
-	//friend class CNeutrinoYParser; // Backreference
 	//friend class CControlAPI;
 };
 

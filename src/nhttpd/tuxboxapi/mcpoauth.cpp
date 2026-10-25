@@ -437,6 +437,53 @@ void mcp_oauth::revokeAll()
 	store(text, generation);
 }
 
+std::vector<mcp_oauth::Client> mcp_oauth::client_list()
+{
+	std::lock_guard<std::mutex> l(lock);
+	load();
+	std::vector<Client> out;
+	for (std::map<std::string, client>::const_iterator it = clients.begin(); it != clients.end(); ++it)
+	{
+		Client c = { it->first, it->second.name, it->second.redirects.empty() ? "" : host_of(it->second.redirects[0]),
+			     it->second.created, 0 };
+		for (std::map<std::string, grant>::const_iterator g = refreshes.begin(); g != refreshes.end(); ++g)
+			if (g->second.client == it->first && g->second.expires > c.expires)
+				c.expires = g->second.expires;
+		out.push_back(c);
+	}
+	return out;
+}
+
+bool mcp_oauth::revoke(const std::string &id)
+{
+	std::string text;
+	unsigned generation;
+	{
+	std::lock_guard<std::mutex> l(lock);
+	load();
+	if (!clients.erase(id))
+		return false;
+	for (std::map<std::string, grant>::iterator it = refreshes.begin(); it != refreshes.end();)
+		if (it->second.client == id)
+			refreshes.erase(it++);
+		else
+			++it;
+	for (std::map<std::string, grant>::iterator it = accesses.begin(); it != accesses.end();)
+		if (it->second.client == id)
+			accesses.erase(it++);
+		else
+			++it;
+	for (std::map<std::string, code>::iterator it = codes.begin(); it != codes.end();)
+		if (it->second.client == id)
+			codes.erase(it++);
+		else
+			++it;
+	text = snapshot(generation);
+	}
+	store(text, generation);
+	return true;
+}
+
 static void metadata(CyhookHandler *hh, bool resource)
 {
 	std::string base = mcp_oauth::baseUrl(hh);

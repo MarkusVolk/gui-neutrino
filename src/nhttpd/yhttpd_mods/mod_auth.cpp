@@ -9,72 +9,16 @@
 #include <helper.h>
 
 //-----------------------------------------------------------------------------
-// HOOK: response_hook
-//-----------------------------------------------------------------------------
-THandleStatus CmAuth::Hook_PrepareResponse(CyhookHandler *hh) {
-	THandleStatus status = HANDLED_CONTINUE;
-
-	// dont check local calls or calls from NoAuthClient
-	// the MCP server and its OAuth sign-in check tokens of their own;
-	// exact paths only, so that no other page rides along with them
-	static const char *mcp_paths[] = {
-		"/mcp",
-		"/.well-known/oauth-protected-resource",
-		"/.well-known/oauth-protected-resource/mcp",
-		"/.well-known/oauth-authorization-server",
-		"/oauth/register",
-		"/oauth/authorize",
-		"/oauth/wait",
-		"/oauth/token"
-	};
-	const std::string &url = hh->UrlData["url"];
-	bool mcp = false;
-	for (size_t i = 0; i < sizeof(mcp_paths) / sizeof(mcp_paths[0]); i++)
-		mcp |= url == mcp_paths[i];
-	if (authenticate && !mcp) {
-		if ((hh->UrlData["clientaddr"]).find(IADDR_LOCAL) > 0
-			&& (no_auth_client.empty() || (hh->UrlData["clientaddr"]).compare(no_auth_client) != 0))
-		{
-			if (!CheckAuth(hh)) {
-				hh->SetError(HTTP_UNAUTHORIZED);
-				status = HANDLED_ERROR;
-			}
-		}
-	}
-	return status;
-}
-
-//-----------------------------------------------------------------------------
 // HOOK: webserver_readconfig_hook Handler
 // This hook ist called from ReadConfig
 //-----------------------------------------------------------------------------
 THandleStatus CmAuth::Hook_ReadConfig(CConfigFile *Config,
 		CStringList &ConfigList) {
-	username = Config->getString("mod_auth.username", AUTHUSER);
-	password = Config->getString("mod_auth.password", AUTHPASSWORD);
-	no_auth_client = Config->getString("mod_auth.no_auth_client", "");
-	authenticate = Config->getBool("mod_auth.authenticate", false);
-	ConfigList["mod_auth.username"] = username;
-	ConfigList["mod_auth.password"] = password;
-	ConfigList["mod_auth.no_auth_client"] = no_auth_client;
-	ConfigList["mod_auth.authenticate"] = Config->getString(
-			"mod_auth.authenticate", "false");
+	ConfigList["mod_auth.username"] = Config->getString("mod_auth.username", AUTHUSER);
+	ConfigList["mod_auth.password"] = Config->getString("mod_auth.password", AUTHPASSWORD);
+	ConfigList["mod_auth.no_auth_client"] = Config->getString("mod_auth.no_auth_client", "");
+	ConfigList["mod_auth.authenticate"] = Config->getBool("mod_auth.authenticate", false) ? "true" : "false";
 	return HANDLED_CONTINUE;
-}
-
-//-----------------------------------------------------------------------------
-// check if given username an pssword are valid
-//-----------------------------------------------------------------------------
-bool CmAuth::CheckAuth(CyhookHandler *hh) {
-	if (hh->HeaderList["Authorization"].empty())
-		return false;
-	std::string encodet = hh->HeaderList["Authorization"].substr(6,
-			hh->HeaderList["Authorization"].length() - 6);
-	std::string decodet = decodeBase64(encodet.c_str());
-	int pos = decodet.find_first_of(':');
-	std::string user = decodet.substr(0, pos);
-	std::string passwd = decodet.substr(pos + 1, decodet.length() - pos - 1);
-	return (user.compare(username) == 0 && passwd.compare(password) == 0);
 }
 
 //-----------------------------------------------------------------------------

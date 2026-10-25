@@ -1,5 +1,6 @@
 libyapi = static_library('yapi',
 	'apiserver.cpp',
+	'pairing.cpp',
 	rcsim_h,
 	include_directories : nt_inc,
 	implicit_include_directories : false,

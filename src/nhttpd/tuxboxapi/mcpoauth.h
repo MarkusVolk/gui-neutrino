@@ -21,8 +21,11 @@
 #ifndef __nhttpd_mcpoauth__
 #define __nhttpd_mcpoauth__
 
+#include <time.h>
+
 #include <map>
 #include <string>
+#include <vector>
 
 class CyhookHandler;
 
@@ -43,6 +46,19 @@ namespace mcp_oauth
 	bool viaPublicAddress(const std::map<std::string, std::string> &headers);
 	/* signs every client out */
 	void revokeAll();
+
+	struct Client
+	{
+		std::string	id;
+		std::string	name;
+		std::string	host;		/* of the address it returns to */
+		time_t		created;
+		time_t		expires;	/* of its last sign-in, 0 when signed out */
+	};
+	/* the registered clients, signed in or not */
+	std::vector<Client> client_list();
+	/* signs one client out and forgets it */
+	bool revoke(const std::string &id);
 }
 
 #endif

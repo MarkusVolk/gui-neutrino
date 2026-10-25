@@ -41,9 +41,10 @@ namespace yapi
 		std::string	query;		// as sent
 		std::string	body;
 		std::string	client;		// address of the peer
+		bool		secure;		// came over HTTPS
 		CStringList	headers;
 		bool		too_large;
-		Request() : too_large(false) {}
+		Request() : secure(false), too_large(false) {}
 	};
 
 	struct Response
@@ -58,7 +59,23 @@ namespace yapi
 		Response() : status(200), fd(-1), offset(0), length(0) {}
 	};
 
+	enum Level { L_PUBLIC, L_READ, L_WRITE, L_SYSTEM };
+
 	void init(CNeutrinoAPI *api);
+	/* What a caller of /control may do: a token, a Basic sign-in with
+	 * the name and the password of nhttpd.conf, else the network. The
+	 * cookies of the web interface do not count there, as those calls
+	 * carry no CSRF token. */
+	Level level_of(const std::string &client, const CStringList &headers);
+	/* The request came through a tunnel or proxy, which its headers show,
+	 * or to the public address of the MCP server. */
+	bool from_internet(const CStringList &headers);
+	/* What such a request may reach: MCP and its sign-in, in a build with
+	 * the assistant; nothing else of the box. */
+	bool open_to_internet(const std::string &path);
+	/* A browser sent the request for a page of another site or port and
+	 * it carries no token, which only a script of the box itself sets. */
+	bool foreign_page(const CStringList &headers);
 	// after nhttpd read its configuration: the tokens of api.tokens
 	void read_config();
 	bool handles(const std::string &path);

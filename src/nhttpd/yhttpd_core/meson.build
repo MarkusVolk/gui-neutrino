@@ -1,7 +1,7 @@
 libyhttpd = static_library('yhttpd',
 	'helper.cpp',
+	'ycert.cpp',
 	'yhook.cpp',
-	'ylanguage.cpp',
 	'ylogging.cpp',
 	'ywebserver.cpp',
 	include_directories : nt_inc,

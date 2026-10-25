@@ -1680,14 +1680,16 @@ menu.hint_net_gateway Enter gateway/router IP address
 menu.hint_net_hostname Change your box hostname
 menu.hint_net_httpd Configure the web server (nhttpd)
 menu.hint_net_httpd_auth Require login for the web interface
+menu.hint_net_httpd_devices Phones and browsers that were paired with this box
 menu.hint_net_httpd_host Bind address or host\n(leave empty or 0.0.0.0 for all)
+menu.hint_net_httpd_https Offer the web interface over HTTPS as well, with a certificate of the box
+menu.hint_net_httpd_https_port TCP port for HTTPS (443, or 8443 when 443 is not allowed)
 menu.hint_net_httpd_loglevel Set the web server log verbosity
+menu.hint_net_httpd_new_cert Make a new certificate; phones that trusted the old one have to trust the new one
 menu.hint_net_httpd_noauth Clients that may access without login\n(comma-separated IPs/hosts)
+menu.hint_net_httpd_pair Show a code for a phone to scan; the phone then works as a remote control
 menu.hint_net_httpd_pass Password for HTTP authentication
 menu.hint_net_httpd_port TCP port for the web interface (1-65535)
-menu.hint_net_httpd_ssl Enable HTTPS for the web interface
-menu.hint_net_httpd_ssl_cafile Path to CA file (optional)
-menu.hint_net_httpd_ssl_pemfile Path to PEM file with certificate and key
 menu.hint_net_httpd_threading Handle connections in separate threads
 menu.hint_net_httpd_user Username for HTTP authentication
 menu.hint_net_if Select interface to config
@@ -2380,16 +2382,29 @@ networkmenu.hostname_hint1 Enter hostname
 networkmenu.hostname_hint2 Need reboot after change
 networkmenu.httpd Web server (nhttpd)
 networkmenu.httpd_auth Authentication
+networkmenu.httpd_devices Paired devices
+networkmenu.httpd_devices_none No device is paired.
+networkmenu.httpd_devices_remove Remove this device?
+networkmenu.httpd_devices_remove_all Remove all devices
 networkmenu.httpd_host Bind address
+networkmenu.httpd_https HTTPS
+networkmenu.httpd_https_port HTTPS port
 networkmenu.httpd_loglevel Log level
+networkmenu.httpd_new_cert New certificate
+networkmenu.httpd_new_cert_ask Phones that trust the current certificate have to trust the new one, which takes effect when Neutrino restarts. Make a new certificate?
 networkmenu.httpd_noauth No-auth clients
+networkmenu.httpd_pair Pair a phone
+networkmenu.httpd_pair_ask A device asks to be paired with this box:
+networkmenu.httpd_pair_ask_code Allow it, if the phone shows this code:
+networkmenu.httpd_pair_done The phone is paired.
+networkmenu.httpd_pair_fingerprint Certificate of the box
+networkmenu.httpd_pair_hint If the page does not load: allow the browser "Nearby devices" in the app permissions of the phone (Android 17). The browser warns once about the certificate; continue, or install the certificate of the box from the web interface.
+networkmenu.httpd_pair_no_https HTTPS is not running. Switch it on, save, and restart Neutrino.
+networkmenu.httpd_pair_scan Scan the code with the phone and open the link in the browser (Chrome), not in the preview of the scanner. Or open this address there:
 networkmenu.httpd_pass Password
 networkmenu.httpd_port Port
 networkmenu.httpd_port_invalid Invalid port. Use 1-65535.
 networkmenu.httpd_save_failed Failed to save nhttpd.conf
-networkmenu.httpd_ssl Enable SSL
-networkmenu.httpd_ssl_cafile SSL CA file
-networkmenu.httpd_ssl_pemfile SSL PEM file
 networkmenu.httpd_threading Connection threading
 networkmenu.httpd_user Username
 networkmenu.inactive_network Network inactiv!
@@ -3154,8 +3169,8 @@ webradio.xml.auto Auto-load WebRadio files
 webtv.dns.blocker_suspected The stream host resolved to a block address:\n\nHost: %s\nAddress: %s\n\nThis can indicate a DNS blocker such as Pi-hole, AdGuard Home or a\nrouter filter.
 webtv.dns.diagnostics DNS diagnostics
 webtv.dns.failed DNS lookup failed for:\n%s\n\nPlease check the internet connection, DNS settings or router.
-webtv.no_teletext Web channels have no teletext.
 webtv.head WebTV
+webtv.no_teletext Web channels have no teletext.
 webtv.stream_restart_attempts Stream restarts after connection reset
 webtv.xml WebTV files
 webtv.xml.auto Auto-load WebTV files

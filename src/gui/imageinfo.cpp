@@ -446,9 +446,6 @@ void CImageInfo::initAPIVersions()
 	s_api	+= "LUA " + to_string(LUA_API_VERSION_MAJOR) + "." + to_string(LUA_API_VERSION_MINOR);
 	s_api	+= ", ";
 	#endif
-	s_api	+= "yWeb ";
-	s_api	+= getYWebVersion();
-	s_api	+= ", ";
 	s_api	+= HTTPD_NAME;
 	s_api	+= + " ";
 	s_api	+= HTTPD_VERSION;
@@ -594,17 +591,3 @@ void CImageInfo::hide()
 	}
 }
 
-string CImageInfo::getYWebVersion()
-{
-	CConfigFile yConf('=', false);
-	yConf.loadConfig(CONFIGDIR "/nhttpd.conf");
-	std::string ver = yConf.getString("WebsiteMain.directory", "n/a") + "/Y_Version.txt";
-
-	CConfigFile yV('=', false);
-	if (file_exists(ver.c_str()))
-	{
-		yV.loadConfig(ver);
-		return yV.getString("version", "n/a");
-	}
-	return "n/a";
-}

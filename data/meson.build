@@ -24,6 +24,3 @@ endif
 if enable_graphlcd
 	subdir('oled')
 endif
-if enable_webif
-	subdir('web-ui')
-endif

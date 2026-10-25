@@ -1682,9 +1682,6 @@ menu.hint_net_httpd_loglevel Logniveau van de webserver
 menu.hint_net_httpd_noauth Clients zonder login\n(komma-gescheiden IPs/hosts)
 menu.hint_net_httpd_pass Wachtwoord voor HTTP-authenticatie
 menu.hint_net_httpd_port TCP-poort voor het webinterface (1-65535)
-menu.hint_net_httpd_ssl HTTPS voor het webinterface inschakelen
-menu.hint_net_httpd_ssl_cafile Pad naar CA-bestand (optioneel)
-menu.hint_net_httpd_ssl_pemfile Pad naar PEM-bestand met certificaat en sleutel
 menu.hint_net_httpd_threading Verbindingen in aparte threads afhandelen
 menu.hint_net_httpd_user Gebruikersnaam voor HTTP-authenticatie
 menu.hint_net_if Selecteer interface om te configureren
@@ -2383,9 +2380,6 @@ networkmenu.httpd_pass Wachtwoord
 networkmenu.httpd_noauth Geen-auth clients
 networkmenu.httpd_threading Verbindings-threads
 networkmenu.httpd_loglevel Logniveau
-networkmenu.httpd_ssl SSL inschakelen
-networkmenu.httpd_ssl_pemfile SSL-PEM-bestand
-networkmenu.httpd_ssl_cafile SSL-CA-bestand
 networkmenu.httpd_port_invalid Ongeldige poort. Gebruik 1-65535.
 networkmenu.httpd_save_failed nhttpd.conf opslaan mislukt
 networkmenu.inactive_network Netwerk inactief!

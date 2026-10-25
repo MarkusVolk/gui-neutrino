@@ -310,6 +310,14 @@ std::string CyhookHandler::BuildHeader(bool cache) {
 			 * an update is seen at once, an unchanged one costs a 304 */
 			result += "Cache-Control: no-cache\r\n";
 		result += "Server: " WEBSERVERNAME "\r\n";
+		result += "X-Content-Type-Options: nosniff\r\n";
+		result += "Referrer-Policy: same-origin\r\n";
+		/* the pages of the web interface load nothing from elsewhere and
+		 * are not shown in a frame of another page */
+		if (!HookVarList["Content-Security-Policy"].empty()) {
+			result += "Content-Security-Policy: " + HookVarList["Content-Security-Policy"] + "\r\n";
+			result += "X-Frame-Options: DENY\r\n";
+		}
 		// actual date
 		strftime(timeStr, sizeof(timeStr), RFC1123FMT, gmtime(&timer));
 		result += string_printf("Date: %s\r\n", timeStr);

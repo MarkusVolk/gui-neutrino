@@ -37,17 +37,16 @@ class CNhttpdSetup : public CMenuTarget, public CChangeObserver
 		int auth_enabled;
 		int threading;
 		int loglevel;
-		int ssl_enabled;
+		int https_enabled;
+		int https_port;
 
 		std::string host;
 		std::string username;
 		std::string password;
 		std::string no_auth_client;
-		std::string ssl_pemfile;
-		std::string ssl_ca_file;
 
 		CGenericMenuActivate auth_items;
-		CGenericMenuActivate ssl_items;
+		CGenericMenuActivate https_items;
 
 		void loadConfig();
 		bool saveConfig();
@@ -59,6 +58,21 @@ class CNhttpdSetup : public CMenuTarget, public CChangeObserver
 
 		int exec(CMenuTarget* parent, const std::string &actionKey);
 		bool changeNotify(const neutrino_locale_t OptionName, void *Data);
+};
+
+/* Network > Web server > Pair a phone: the address with a one-time code as
+ * a QR code, until a phone used it or Exit */
+class CNhttpdPair : public CMenuTarget
+{
+	public:
+		int exec(CMenuTarget* parent, const std::string &actionKey);
+};
+
+/* the paired devices; OK on one removes it */
+class CNhttpdDevices : public CMenuTarget
+{
+	public:
+		int exec(CMenuTarget* parent, const std::string &actionKey);
 };
 
 #endif /* __nhttpd_setup__ */

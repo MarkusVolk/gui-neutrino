@@ -50,6 +50,7 @@ extern CPictureViewer *g_PicViewer;
 #include <ytypes_globals.h>
 #include <ylogging.h>
 #include <helper.h>
+#include <api/apiserver.h>
 // nhttpd
 #include "neutrinoapi.h"
 #include "controlapi.h"
@@ -60,7 +61,6 @@ extern cVideo * videoDecoder;
 
 extern CPlugins *g_Plugins;//for relodplugins
 extern CBouquetManager *g_bouquetManager;
-
 
 //-----------------------------------------------------------------------------
 //=============================================================================
@@ -102,7 +102,6 @@ static bool stream_bouquet(CZapitBouquet *bouquet)
 	return !bouquet->bHidden && (bouquet->bUser || bouquet->bWebtv || bouquet->bWebradio);
 }
 
-
 //=============================================================================
 // constructor und destructor
 //=============================================================================
@@ -137,7 +136,6 @@ THandleStatus CControlAPI::Hook_PrepareResponse(CyhookHandler *hh)
 
 	if(hh->UrlData["path"] == "/control/"
 			|| hh->UrlData["path"] == "/cgi-bin/"
-			|| hh->UrlData["path"] == "/fb/"
 	  )
 		return HANDLED_READY;
 	else
@@ -157,8 +155,6 @@ THandleStatus CControlAPI::Hook_SendResponse(CyhookHandler *hh)
 	if(hh->UrlData["path"] == "/control/"
 			|| hh->UrlData["path"] == "/cgi-bin/")
 		Execute(hh);
-	if(hh->UrlData["path"] == "/fb/")		// fb-compatibility for timer-calls
-		compatibility_Timer(hh);
 //	log_level_printfX(4,"CControlAPI hook ende status:%d\n",(int)hh->status);
 //	log_level_printfX(5,"CControlAPI hook result:%s\n",hh->yresult.c_str());
 
@@ -166,124 +162,112 @@ THandleStatus CControlAPI::Hook_SendResponse(CyhookHandler *hh)
 }
 
 //=============================================================================
-//-------------------------------------------------------------------------
-// timer compatibility
-// do add/modify/remove and Return (redirect) Timerlist
-//-------------------------------------------------------------------------
-void CControlAPI::compatibility_Timer(CyhookHandler *hh)
-{
-	log_level_printf(4,"CControlAPI Compatibility Timer Start url:%s\n",hh->UrlData["url"].c_str());
-	if(NeutrinoAPI->Timerd->isTimerdAvailable() && !hh->ParamList.empty() )
-	{
-		if(hh->ParamList["action"] == "remove")
-		{
-			unsigned removeId = atoi(hh->ParamList["id"].c_str());
-			NeutrinoAPI->Timerd->removeTimerEvent(removeId);
-		}
-		else if(hh->ParamList["action"] == "modify")
-			doModifyTimer(hh);
-		else if(hh->ParamList["action"] == "new")
-			doNewTimer(hh);
-	}
-	hh->SendRedirect("/Y_Timer_List.yhtm");
-}
-
-//=============================================================================
 // Main Dispatcher / Call definitions
 //=============================================================================
+// a call that only reads while it has no parameters and changes something
+// with them, e.g. zapto: the current channel, zapto?<id>: zap
+#define LEVEL_READ_BARE -1
+
+// the parameters choose no more than the output format
+static bool only_format(CStringList &params)
+{
+	for (CStringList::iterator it = params.begin(); it != params.end(); ++it) {
+		bool positional = !it->first.empty() && it->first.find_first_not_of("0123456789") == std::string::npos;
+		const std::string &name = positional ? it->second : it->first;
+		if (name != "format" && !(positional && (name == "json" || name == "xml")))
+			return false;
+	}
+	return true;
+}
+
 const CControlAPI::TyCgiCall CControlAPI::yCgiCallList[]=
 {
 	// channel & bouquet & epg & zapping handling
-	{"getservicesxml",	&CControlAPI::GetServicesxmlCGI,	""},
-	{"getbouquetsxml",	&CControlAPI::GetBouquetsxmlCGI,	""},
-	{"getubouquetsxml",	&CControlAPI::GetUBouquetsxmlCGI,	""},
-	{"channellist",		&CControlAPI::ChannellistCGI,		"text/plain"},
-	{"logolist",		&CControlAPI::LogolistCGI,		"text/plain"},
-	{"getbouquet",		&CControlAPI::GetBouquetCGI,		"+xml"},
-	{"getchannel",		&CControlAPI::GetChannelCGI,		""},
-	{"getbouquets",		&CControlAPI::GetBouquetsCGI,		"+xml"},
-	{"getmode",		&CControlAPI::GetModeCGI,		"text/plain"},
-	{"setmode",		&CControlAPI::SetModeCGI,		"text/plain"},
-	{"epgsearchxml",	&CControlAPI::EpgSearchXMLCGI,		""},
-	{"epgsearch",		&CControlAPI::EpgSearchCGI,		""},
-	{"epg",			&CControlAPI::EpgCGI,			""},
-	{"zapto",		&CControlAPI::ZaptoCGI,			"text/plain"},
-	{"signal",		&CControlAPI::SignalInfoCGI,		"text/plain"},
-	{"getonidsid",		&CControlAPI::GetChannelIDCGI,		"text/plain"},
-	{"getchannelid",	&CControlAPI::GetChannelIDCGI,		""},
-	{"getchannelinfo",	&CControlAPI::GetChannelInfoCGI,	""},
-	{"getepgid",		&CControlAPI::GetEpgIDCGI,		""},
-	{"currenttpchannels",	&CControlAPI::GetTPChannel_IDCGI,	"text/plain"},
+	{"getservicesxml",	&CControlAPI::GetServicesxmlCGI,	"",	yapi::L_READ},
+	{"getbouquetsxml",	&CControlAPI::GetBouquetsxmlCGI,	"",	yapi::L_READ},
+	{"getubouquetsxml",	&CControlAPI::GetUBouquetsxmlCGI,	"",	yapi::L_READ},
+	{"channellist",		&CControlAPI::ChannellistCGI,		"text/plain",	yapi::L_READ},
+	{"logolist",		&CControlAPI::LogolistCGI,		"text/plain",	yapi::L_READ},
+	{"getbouquet",		&CControlAPI::GetBouquetCGI,		"+xml",	yapi::L_READ},
+	{"getchannel",		&CControlAPI::GetChannelCGI,		"",	yapi::L_READ},
+	{"getbouquets",		&CControlAPI::GetBouquetsCGI,		"+xml",	yapi::L_READ},
+	{"getmode",		&CControlAPI::GetModeCGI,		"text/plain",	yapi::L_READ},
+	{"setmode",		&CControlAPI::SetModeCGI,		"text/plain",	LEVEL_READ_BARE},
+	{"epgsearchxml",	&CControlAPI::EpgSearchXMLCGI,		"",	yapi::L_READ},
+	{"epgsearch",		&CControlAPI::EpgSearchCGI,		"",	yapi::L_READ},
+	{"epg",			&CControlAPI::EpgCGI,			"",	yapi::L_READ},
+	{"zapto",		&CControlAPI::ZaptoCGI,			"text/plain",	LEVEL_READ_BARE},
+	{"signal",		&CControlAPI::SignalInfoCGI,		"text/plain",	yapi::L_READ},
+	{"getonidsid",		&CControlAPI::GetChannelIDCGI,		"text/plain",	yapi::L_READ},
+	{"getchannelid",	&CControlAPI::GetChannelIDCGI,		"",	yapi::L_READ},
+	{"getchannelinfo",	&CControlAPI::GetChannelInfoCGI,	"",	yapi::L_READ},
+	{"getepgid",		&CControlAPI::GetEpgIDCGI,		"",	yapi::L_READ},
+	{"currenttpchannels",	&CControlAPI::GetTPChannel_IDCGI,	"text/plain",	yapi::L_READ},
 	// boxcontrol - system
-	{"standby",		&CControlAPI::StandbyCGI,		"text/plain"},
-	{"shutdown",		&CControlAPI::ShutdownCGI,		"text/plain"},
-	{"reboot",		&CControlAPI::RebootCGI,		"text/plain"},
-	{"restart",		&CControlAPI::RestartCGI,		"text/plain"},
-	{"getdate",		&CControlAPI::GetDateCGI,		"text/plain"},
-	{"gettime",		&CControlAPI::GetTimeCGI,		"text/plain"},
-	{"info",		&CControlAPI::InfoCGI,			"text/plain"},
-	{"boxinfo",		&CControlAPI::BoxInfoCGI,		"text/plain"},
-	{"osinfo",		&CControlAPI::OsInfoCGI,		"text/plain"},
-	{"version",		&CControlAPI::VersionCGI,		""},
-	{"reloadsetup",		&CControlAPI::ReloadNeutrinoSetupCGI,	""},
-	{"reloadplugins",	&CControlAPI::ReloadPluginsCGI,		""},
-	{"reloadchannels",	&CControlAPI::ReloadChannelsCGI,	""},
+	{"standby",		&CControlAPI::StandbyCGI,		"text/plain",	LEVEL_READ_BARE},
+	{"shutdown",		&CControlAPI::ShutdownCGI,		"text/plain",	yapi::L_SYSTEM},
+	{"reboot",		&CControlAPI::RebootCGI,		"text/plain",	yapi::L_SYSTEM},
+	{"restart",		&CControlAPI::RestartCGI,		"text/plain",	yapi::L_SYSTEM},
+	{"getdate",		&CControlAPI::GetDateCGI,		"text/plain",	yapi::L_READ},
+	{"gettime",		&CControlAPI::GetTimeCGI,		"text/plain",	yapi::L_READ},
+	{"info",		&CControlAPI::InfoCGI,			"text/plain",	yapi::L_READ},
+	{"boxinfo",		&CControlAPI::BoxInfoCGI,		"text/plain",	yapi::L_READ},
+	{"osinfo",		&CControlAPI::OsInfoCGI,		"text/plain",	yapi::L_READ},
+	{"version",		&CControlAPI::VersionCGI,		"",	yapi::L_READ},
+	{"reloadsetup",		&CControlAPI::ReloadNeutrinoSetupCGI,	"",	yapi::L_SYSTEM},
+	{"reloadplugins",	&CControlAPI::ReloadPluginsCGI,		"",	yapi::L_SYSTEM},
+	{"reloadchannels",	&CControlAPI::ReloadChannelsCGI,	"",	yapi::L_SYSTEM},
 #ifdef SCREENSHOT
-	{"screenshot",		&CControlAPI::ScreenshotCGI,		""},
+	{"screenshot",		&CControlAPI::ScreenshotCGI,		"",	yapi::L_READ},
 #endif
 #ifdef ENABLE_GRAPHLCD
-	{"glcdscreenshot",	&CControlAPI::GlcdScreenshotCGI,	""},
+	{"glcdscreenshot",	&CControlAPI::GlcdScreenshotCGI,	"",	yapi::L_READ},
 #endif
 	// boxcontrol - devices
-	{"volume",		&CControlAPI::VolumeCGI,		"text/plain"},
-	{"lcd",			&CControlAPI::LCDAction,		"text/plain"},
-	{"system",		&CControlAPI::SystemCGI,		"text/plain"},
-	{"message",		&CControlAPI::MessageCGI,		"text/plain"},
-	{"rc",			&CControlAPI::RCCGI,			"text/plain"},
-	{"rcem",		&CControlAPI::RCEmCGI,			"text/plain"},
+	{"volume",		&CControlAPI::VolumeCGI,		"text/plain",	LEVEL_READ_BARE},
+	{"lcd",			&CControlAPI::LCDAction,		"text/plain",	LEVEL_READ_BARE},
+	{"system",		&CControlAPI::SystemCGI,		"text/plain",	yapi::L_SYSTEM},
+	{"message",		&CControlAPI::MessageCGI,		"text/plain",	yapi::L_WRITE},
+	{"rc",			&CControlAPI::RCCGI,			"text/plain",	yapi::L_WRITE},
+	{"rcem",		&CControlAPI::RCEmCGI,			"text/plain",	yapi::L_WRITE},
 	// Start skripts, plugins
-	{"startplugin",		&CControlAPI::StartPluginCGI,		"text/plain"},
-	{"exec",		&CControlAPI::ExecCGI,			"text/plain"},
-	{"wol",			&CControlAPI::WolCGI,			"text/plain"},
-	{"yweb",		&CControlAPI::YWebCGI,			"text/plain"},
+	{"startplugin",		&CControlAPI::StartPluginCGI,		"text/plain",	yapi::L_SYSTEM},
+	{"wol",			&CControlAPI::WolCGI,			"text/plain",	yapi::L_SYSTEM},
 	// video & Audio handling
-	{"aspectratio",		&CControlAPI::AspectRatioCGI,		"text/plain"},
-	{"videoformat",		&CControlAPI::VideoFormatCGI,		"text/plain"},
-	{"videooutput",		&CControlAPI::VideoOutputCGI,		"text/plain"},
-	{"vcroutput",		&CControlAPI::VCROutputCGI,		"text/plain"},
-	{"avinputmode",		&CControlAPI::AVInputModeCGI,		"text/plain"},
-	{"audio",		&CControlAPI::AudioCGI,			"text/plain"},
-	{"crypt",		&CControlAPI::CryptCGI,			"text/plain"},
+	{"aspectratio",		&CControlAPI::AspectRatioCGI,		"text/plain",	LEVEL_READ_BARE},
+	{"videoformat",		&CControlAPI::VideoFormatCGI,		"text/plain",	LEVEL_READ_BARE},
+	{"videooutput",		&CControlAPI::VideoOutputCGI,		"text/plain",	LEVEL_READ_BARE},
+	{"vcroutput",		&CControlAPI::VCROutputCGI,		"text/plain",	LEVEL_READ_BARE},
+	{"avinputmode",		&CControlAPI::AVInputModeCGI,		"text/plain",	LEVEL_READ_BARE},
+	{"audio",		&CControlAPI::AudioCGI,			"text/plain",	LEVEL_READ_BARE},
+	{"crypt",		&CControlAPI::CryptCGI,			"text/plain",	LEVEL_READ_BARE},
 	// timer
-	{"timer",		&CControlAPI::TimerCGI,			"text/plain"},
-	{"sendalltimers",		&CControlAPI::TimerSendCGI,			"text/plain"},
+	{"timer",		&CControlAPI::TimerCGI,			"text/plain",	LEVEL_READ_BARE},
+	{"sendalltimers",		&CControlAPI::TimerSendCGI,			"text/plain",	yapi::L_WRITE},
 	// bouquet editing
-	{"setbouquet",		&CControlAPI::setBouquetCGI,		"text/plain"},
-	{"savebouquet",		&CControlAPI::saveBouquetCGI,		"text/plain"},
-	{"movebouquet",		&CControlAPI::moveBouquetCGI,		"text/plain"},
-	{"deletebouquet",	&CControlAPI::deleteBouquetCGI,		"text/plain"},
-	{"addbouquet",		&CControlAPI::addBouquetCGI,		"text/plain"},
-	{"renamebouquet",	&CControlAPI::renameBouquetCGI,		"text/plain"},
-	{"changebouquet",	&CControlAPI::changeBouquetCGI,		"text/plain"},
-	{"updatebouquet",	&CControlAPI::updateBouquetCGI,		"text/plain"},
+	{"setbouquet",		&CControlAPI::setBouquetCGI,		"text/plain",	yapi::L_WRITE},
+	{"savebouquet",		&CControlAPI::saveBouquetCGI,		"text/plain",	yapi::L_WRITE},
+	{"movebouquet",		&CControlAPI::moveBouquetCGI,		"text/plain",	yapi::L_WRITE},
+	{"deletebouquet",	&CControlAPI::deleteBouquetCGI,		"text/plain",	yapi::L_WRITE},
+	{"addbouquet",		&CControlAPI::addBouquetCGI,		"text/plain",	yapi::L_WRITE},
+	{"renamebouquet",	&CControlAPI::renameBouquetCGI,		"text/plain",	yapi::L_WRITE},
+	{"changebouquet",	&CControlAPI::changeBouquetCGI,		"text/plain",	yapi::L_WRITE},
+	{"updatebouquet",	&CControlAPI::updateBouquetCGI,		"text/plain",	yapi::L_WRITE},
 	// xmltv
-	{"xmltv.data",		&CControlAPI::xmltvepgCGI,		"+xml"},
-	{"xmltv.xml",		&CControlAPI::xmltvepgCGI,		"+xml"},
-	{"xmltv.m3u",		&CControlAPI::xmltvm3uCGI,		""},
-	{"xmltvlist",		&CControlAPI::xmltvlistCGI,		"text/plain"},
+	{"xmltv.data",		&CControlAPI::xmltvepgCGI,		"+xml",	yapi::L_READ},
+	{"xmltv.xml",		&CControlAPI::xmltvepgCGI,		"+xml",	yapi::L_READ},
+	{"xmltv.m3u",		&CControlAPI::xmltvm3uCGI,		"",	yapi::L_READ},
+	{"xmltvlist",		&CControlAPI::xmltvlistCGI,		"text/plain",	yapi::L_READ},
 	// utils
-	{"build_live_url",	&CControlAPI::build_live_url,		""},
-	{"build_playlist",	&CControlAPI::build_playlist,		""},
-	{"streamurl",		&CControlAPI::streamUrlCGI,		"text/plain"},
-	{"netmount",		&CControlAPI::netmountCGI,		"text/plain"},
-	{"get_logo",		&CControlAPI::logoCGI,			"text/plain"},
-	// settings
-	{"config",		&CControlAPI::ConfigCGI,		"text/plain"},
+	{"build_live_url",	&CControlAPI::build_live_url,		"",	yapi::L_READ},
+	{"build_playlist",	&CControlAPI::build_playlist,		"",	yapi::L_READ},
+	{"streamurl",		&CControlAPI::streamUrlCGI,		"text/plain",	yapi::L_READ},
+	{"netmount",		&CControlAPI::netmountCGI,		"text/plain",	yapi::L_SYSTEM},
+	{"get_logo",		&CControlAPI::logoCGI,			"text/plain",	yapi::L_READ},
 	// filehandling
-	{"file",		&CControlAPI::FileCGI,			"+xml"},
-	{"statfs",		&CControlAPI::StatfsCGI,		"+xml"},
-	{"getdir",		&CControlAPI::getDirCGI,		"+xml"},
-	{"getmovies",		&CControlAPI::getMoviesCGI,		"+xml"}
+	{"statfs",		&CControlAPI::StatfsCGI,		"+xml",	yapi::L_READ},
+	{"getdir",		&CControlAPI::getDirCGI,		"+xml",	yapi::L_READ},
+	{"getmovies",		&CControlAPI::getMoviesCGI,		"+xml",	yapi::L_READ}
 };
 //-----------------------------------------------------------------------------
 // Main Dispatcher
@@ -319,6 +303,18 @@ void CControlAPI::Execute(CyhookHandler *hh)
 	if(index == -1) // function not found
 	{
 		hh->SetError(HTTP_NOT_IMPLEMENTED, HANDLED_NOT_IMPLEMENTED);
+		return;
+	}
+	int need = yCgiCallList[index].level;
+	if (need == LEVEL_READ_BARE)
+		need = only_format(hh->ParamList) ? yapi::L_READ : yapi::L_WRITE;
+	if (yapi::foreign_page(hh->HeaderList)) {
+		hh->SetError(HTTP_FORBIDDEN, HANDLED_ERROR);
+		return;
+	}
+	if (yapi::level_of(hh->UrlData["clientaddr"], hh->HeaderList) < need) {
+		/* old clients sign in with Basic once authentication is on */
+		hh->SetError(hh->HeaderList["Authorization"].empty() ? HTTP_UNAUTHORIZED : HTTP_FORBIDDEN, HANDLED_ERROR);
 		return;
 	}
 	// send header
@@ -552,33 +548,6 @@ void CControlAPI::WolCGI(CyhookHandler *hh)
 		hh->SendOk();
 	else
 		hh->SendError();
-}
-
-void CControlAPI::ExecCGI(CyhookHandler *hh)
-{
-	std::string script, result;
-	if (!hh->ParamList.empty() )
-	{
-		script = hh->ParamList["1"];
-		unsigned int len = hh->ParamList.size();
-		for(unsigned int y=2; y<=len; y++)
-			if(!hh->ParamList[itoa(y)].empty())
-			{
-				script += " ";
-				script += hh->ParamList[itoa(y)];
-			}
-		result = yExecuteScript(script);
-	}
-	else
-	{
-		log_level_printf(0, "[%s] no script given\n", __func__);
-		result = "error";
-	}
-
-	if (result == "error")
-		hh->SetError(HTTP_NOT_FOUND);
-	else
-		hh->WriteLn(result);
 }
 
 //-----------------------------------------------------------------------------
@@ -1116,6 +1085,14 @@ void CControlAPI::RCEmCGI(CyhookHandler *hh)
 	if (evd < 0) {
 		perror(g_info.hw_caps->rc_device);
 		hh->SendError();
+		return;
+	}
+	/* a key the remote control of the box does not have, which its input
+	 * device would drop, goes to neutrino's own queue */
+	if (!CRCInput::deviceHasKey(evd, g_RCInput->translateRevert(sendcode))) {
+		close(evd);
+		g_RCInput->postMsg((neutrino_msg_t) sendcode, 0);
+		hh->SendOk();
 		return;
 	}
 	sendcode = g_RCInput->translateRevert(sendcode);
@@ -1928,7 +1905,6 @@ std::string CControlAPI::channelEPGformated(CyhookHandler *hh, int bouquetnr, t_
 	return result;
 }
 
-
 //-----------------------------------------------------------------------------
 // Detailed EPG list in XML or JSON
 //-----------------------------------------------------------------------------
@@ -2377,19 +2353,28 @@ void CControlAPI::ReloadChannelsCGI(CyhookHandler *hh)
 	hh->SendOk();
 }
 
+#if defined(SCREENSHOT) || defined(ENABLE_GRAPHLCD)
+// the name of a file in /tmp: letters, digits, "-" and "_" only
+static std::string tmp_name(const std::string &name, const char *fallback)
+{
+	if (name.empty() || name.size() > 64 || name.find_first_not_of(
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_") != std::string::npos)
+		return fallback;
+	return name;
+}
+#endif
+
 #ifdef SCREENSHOT
 void CControlAPI::ScreenshotCGI(CyhookHandler *hh)
 {
 	bool enableOSD = true;
 	bool enableVideo = true;
-	std::string filename = "screenshot";
+	std::string filename = tmp_name(hh->ParamList["name"], "screenshot");
 
 	if(hh->ParamList["osd"] == "0")
 		enableOSD = false;
 	if(hh->ParamList["video"] == "0")
 		enableVideo = false;
-	if(!hh->ParamList["name"].empty())
-		filename = hh->ParamList["name"];
 	/* a TV picture is a tenth the size as JPEG and encodes faster; PNG keeps the OSD sharp */
 	bool jpg = hh->ParamList["format"] == "jpg";
 
@@ -2410,12 +2395,7 @@ void CControlAPI::ScreenshotCGI(CyhookHandler *hh)
 #ifdef ENABLE_GRAPHLCD
 void CControlAPI::GlcdScreenshotCGI(CyhookHandler *hh)
 {
-	std::string filename = "screenshot-glcd";
-
-	if(!hh->ParamList["name"].empty())
-		filename = hh->ParamList["name"];
-
-	filename = "/tmp/" + filename + ".png";
+	std::string filename = "/tmp/" + tmp_name(hh->ParamList["name"], "screenshot-glcd") + ".png";
 
 	cGLCD *cglcd = cGLCD::getInstance();
 	if (cglcd) {
@@ -3043,71 +3023,6 @@ void CControlAPI::SendTimers(CyhookHandler *hh)
 	result = hh->outArray("timer", result);
 
 	hh->SendResult(result);
-}
-
-//-----------------------------------------------------------------------------
-// yweb : Extentions
-//-----------------------------------------------------------------------------
-
-//-----------------------------------------------------------------------------
-// Dispatcher
-//-----------------------------------------------------------------------------
-void CControlAPI::YWebCGI(CyhookHandler *hh)
-{
-	bool status=true;
-	if (!hh->ParamList["video_stream_pids"].empty())
-	{
-		int para=0;
-		sscanf( hh->ParamList["video_stream_pids"].c_str(), "%d", &para);
-		YWeb_SendVideoStreamingPids(hh, para);
-	}
-	else if (hh->ParamList["1"] == "radio_stream_pid")
-		YWeb_SendRadioStreamingPid(hh);
-
-	if(!status)
-		hh->SendError();
-}
-
-//-----------------------------------------------------------------------------
-// Get Streaming Pids 0x$pmt,0x$vpid,0x$apid with apid_no is the Number of Audio-Pid
-//-----------------------------------------------------------------------------
-void CControlAPI::YWeb_SendVideoStreamingPids(CyhookHandler *hh, int apid_no)
-{
-	CZapitClient::responseGetPIDs pids;
-	int apid=0,apid_idx=0;
-	pids.PIDs.vpid=0;
-	NeutrinoAPI->Zapit->getPIDS(pids);
-
-	if( apid_no < (int)pids.APIDs.size())
-		apid_idx=apid_no;
-	if(!pids.APIDs.empty())
-		apid = pids.APIDs[apid_idx].pid;
-	if(!hh->ParamList["no_commas"].empty())
-	{
-		hh->printf("0x%04x 0x%04x 0x%04x",pids.PIDs.pmtpid,pids.PIDs.vpid,apid);
-		if (pids.PIDs.pcrpid != pids.PIDs.vpid)
-			hh->printf(" 0x%04x", pids.PIDs.pcrpid);
-	}
-	else
-	{
-		hh->printf("0x%04x,0x%04x,0x%04x",pids.PIDs.pmtpid,pids.PIDs.vpid,apid);
-		if (pids.PIDs.pcrpid != pids.PIDs.vpid)
-			hh->printf(",0x%04x", pids.PIDs.pcrpid);
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Get Streaming Pids 0x$pmt,0x$vpid,0x$apid with apid_no is the Number of Audio-Pid
-//-----------------------------------------------------------------------------
-void CControlAPI::YWeb_SendRadioStreamingPid(CyhookHandler *hh)
-{
-	CZapitClient::responseGetPIDs pids;
-	int apid=0;
-	NeutrinoAPI->Zapit->getPIDS(pids);
-
-	if(!pids.APIDs.empty())
-		apid = pids.APIDs[0].pid;
-	hh->printf("0x%04x",apid);
 }
 
 //-----------------------------------------------------------------------------
@@ -3930,294 +3845,6 @@ void CControlAPI::logoCGI(CyhookHandler *hh)
 	hh->Write(NeutrinoAPI->getLogoFile(channel_id));
 }
 
-/* API keys, tokens and passwords are never handed out over the web interface */
-static bool config_key_is_secret(const std::string &key)
-{
-	const char *suffixes[] = { "_key", "_dev_id", "password" };
-	for (unsigned i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++) {
-		size_t n = strlen(suffixes[i]);
-		if (key.size() >= n && key.compare(key.size() - n, n, suffixes[i]) == 0)
-			return true;
-	}
-	return key.find("_token") != std::string::npos;
-}
-
-//-------------------------------------------------------------------------
-/** Get Config File or save values to given config file
- * @param hh CyhookHandler
- *
- * @par nhttpd-usage
- * @code
- * /control/config?config=neutrino|nhttpd|yweb[&action=submit&key1=value1&key2=value2&...][&format=|xml|json]
- * @endcode
- *
- * @par example:
- * @code
- * /control/config?config=neutrino
- * /control/config?config=neutrino&format=json
- * /control/config?config=neutrino&action=submit&epg_dir=/media/sda1/epg
- * @endcode
- *
- * @par output (json)
- * /control/config?config=neutrino&format=json
- * @code
- * {"success": "true", "data":{"analog_mode1": "16",
- * "analog_mode2": "1",
- * [...snip...]
- * "zap_cycle": "0",
- * "zapto_pre_time": "0",
- * }}
- * @endcode
- *
- * @par output (plain)
- * /control/config?config=neutrino
- * @code
- * analog_mode1=16
- * analog_mode2=1
- * [...snip...]
- * zap_cycle=0
- * zapto_pre_time=0
- * @endcode
- *
- * @par output (xml)
- * /control/config?config=neutrino&format=xml
- * @code
- * <config>
- * <analog_mode1>16</analog_mode1>
- * <analog_mode2>1</analog_mode2>
- * [...snip...]
- * <zap_cycle>0</zap_cycle>
- * <zapto_pre_time>0</zapto_pre_time>
- * </config>
- * @endcode
- */
-//-------------------------------------------------------------------------
-void CControlAPI::ConfigCGI(CyhookHandler *hh)
-{
-	bool load = true;
-	CConfigFile *Config = new CConfigFile(',');
-	ConfigDataMap conf;
-	std::string config_filename = "";
-	std::string error = "";
-	std::string result = "";
-	std::string configFileName = hh->ParamList["config"];
-
-	hh->outStart();
-
-	if (hh->ParamList["action"] == "submit")
-		load = false;
-
-	// Para "config" describes the config type
-	if (configFileName == "neutrino")
-		config_filename = NEUTRINO_CONFIGFILE;
-	else if (configFileName == "moviebrowser")
-		config_filename = MOVIEBROWSER_CONFIGFILE;
-	else if (configFileName == "nhttpd")
-		config_filename = HTTPD_CONFIGFILE;
-	else if (configFileName == "yweb")
-		config_filename = YWEB_CONFIGFILE;
-
-	if (!config_filename.empty()) {
-		Config->loadConfig(config_filename);
-
-		if (load) {	// get and output list
-			conf = Config->getConfigDataMap();
-			ConfigDataMap::iterator it, end, start;
-			for (start = conf.begin(), it=start, end = conf.end(); it != end; ++it) {
-				std::string key = it->first;
-				replace(key, ".", "_dot_");
-				replace(key, "-", "_bind_");
-				if (!config_key_is_secret(it->first)) {
-					if(it != start)
-						result += hh->outNext();
-					result += hh->outPair(key, it->second, false);
-				}
-			}
-		}
-		else { // set values and save list
-			for (CStringList::iterator it = hh->ParamList.begin(); it != hh->ParamList.end(); ++it) {
-				std::string key = it->first;
-				replace(key, "_dot_", ".");
-				replace(key, "_bind_", "-");
-				if (key != "_dc" && key != "action" && key != "format" && key != "config") {
-					Config->setString(key, it->second);
-				}
-			}
-			if (!config_filename.empty())
-				Config->saveConfig(config_filename);
-			if (configFileName == "neutrino")
-				NeutrinoAPI->EventServer->sendEvent(NeutrinoMessages::RELOAD_SETUP, CEventServer::INITID_HTTPD);
-		}
-	}
-	else {
-		if(!configFileName.empty())
-			error = string_printf("no config defined for %s", (hh->ParamList["config"]).c_str());
-	}
-
-	hh->WriteLn(hh->outObject("config", result));
-
-	if (error.empty())
-		hh->SendResult(result);
-	else
-		hh->SendError(error);
-
-	delete Config;
-}
-
-//-----------------------------------------------------------------------------
-/** Get a list of files with attributtes for a given path
- *
- * @param hh CyhookHandler
- *
- * @par nhttpd-usage
- * @code
- * /control/file?action=list&path={path}[&format=|xml|json][&sort=false]
- * @endcode
- *
- * @par example:
- * @code
- * /control/file?action=list&path=/
- * /control/file?action=list&path=/&format=json
- * /control/file?action=list&path=/&format=json&sort=false
- * @endcode
- *
- * @par output
- * @code
- * {"success": "true", "data":{"filelist": [{"name": "timeshift",
- * "type_str": "dir",
- * "type": "4",
- * "fullname": "/timeshift",
- * "mode": "41ffld",
- * "nlink": "2",
- * "user": "root",
- * "group": "root",
- * "size": "1024",
- * "time": "Sun Sep  4 07:38:10 2011",
- * "time_t": "1315114690"
- * },
- * @endcode
- * ... snip ...
- * @code
- * {"name": "root",
- * "type_str": "dir",
- * "type": "4",
- * "fullname": "/root",
- * "mode": "41edld",
- * "nlink": "2",
- * "user": "1000",
- * "group": "1000",
- * "size": "1024",
- * "time": "Wed Aug 31 12:09:29 2011",
- * "time_t": "1314785369"
- * },
- * ]
- * }}
- * @endcode
- *
- *  @par Not implemented now:
- *  action =new_folder|delete|read_file|write_file|set_properties
- */
-//-----------------------------------------------------------------------------
-void CControlAPI::FileCGI(CyhookHandler *hh)
-{
-	std::string result = "";
-
-	if (hh->ParamList["action"] == "list") { // directory list: action=list&path=<path>
-		DIR *dirp;
-
-		hh->outStart();
-
-		std::string path = hh->ParamList["path"];
-		if ((dirp = opendir(path.c_str()))) {
-			struct dirent *entry;
-			std::vector<FileCGI_List> filelist;
-			while ((entry = readdir(dirp))) {
-				if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
-					continue;
-				std::string ftype;
-				if (entry->d_type == DT_DIR)
-					ftype = "dir";
-				else if (entry->d_type == DT_LNK)
-					ftype = "lnk";
-				else if (entry->d_type == 8)
-					ftype = "file";
-				if (path[path.length() - 1] != '/')
-					path += "/";
-				std::string fullname = path + entry->d_name;
-
-				FileCGI_List listitem;
-				listitem.name = std::string(entry->d_name);
-				listitem.type_str = ftype;
-				listitem.type = entry->d_type;
-				listitem.fullname = fullname;
-
-				filelist.push_back(listitem);
-			}
-			closedir(dirp);
-
-			if (hh->ParamList["sort"] != "false")
-				sort(filelist.begin(), filelist.end(), fsort);
-
-			for(std::vector<FileCGI_List>::iterator f = filelist.begin(); f != filelist.end(); ++f)
-			{
-				bool got_next = (f != filelist.end()-1);
-
-				std::string item = "";
-				item += hh->outPair("name",	hh->outValue(f->name.c_str()), true);
-				item += hh->outPair("type_str",	hh->outValue(f->type_str.c_str()), true);
-				item += hh->outPair("type",	string_printf("%d", (int) f->type), true);
-				item += hh->outPair("fullname",	hh->outValue(f->fullname.c_str()), true);
-
-				struct stat statbuf;
-				if (stat(f->fullname.c_str(), &statbuf) != -1) {
-					item += hh->outPair("mode", string_printf("%xld", (long) statbuf.st_mode), true);
-
-					/* Print out type, permissions, and number of links. */
-					//TODO:	hh->printf("\t\t<permission>%10.10s</permission>\n", sperm (statbuf.st_mode));
-					item += hh->outPair("nlink", string_printf("%d", statbuf.st_nlink), true);
-
-					/* Print out owner's name if it is found using getpwuid(). */
-					struct passwd *pwd;
-					if ((pwd = getpwuid(statbuf.st_uid)) != NULL)
-						item += hh->outPair("user", pwd->pw_name, true);
-					else
-						item += hh->outPair("user", string_printf("%d", statbuf.st_uid), true);
-
-					/* Print out group name if it is found using getgrgid(). */
-					struct group *grp;
-					if ((grp = getgrgid(statbuf.st_gid)) != NULL)
-						item += hh->outPair("group", grp->gr_name, true);
-					else
-						item += hh->outPair("group", string_printf("%d", statbuf.st_gid), true);
-
-					/* Print size of file. */
-					item += hh->outPair("size", string_printf("%jd", (intmax_t) statbuf.st_size), true);
-
-					struct tm *tm = localtime(&statbuf.st_mtime);
-					char datestring[256] = {0};
-					/* Get localized date string. */
-					strftime(datestring, sizeof(datestring), nl_langinfo(D_T_FMT), tm);
-					item += hh->outPair("time", hh->outValue(datestring), true);
-					item += hh->outPair("time_t", string_printf("%ld", (long) statbuf.st_mtime), false);
-				}
-				result += hh->outArrayItem("item", item, got_next);
-			}
-		}
-		result = hh->outArray("filelist", result);
-
-		hh->SendResult(result);
-	}
-	// create new folder
-	else if (hh->ParamList["action"] == "new_folder") {
-		hh->SetHeader(HTTP_OK, "text/plain; charset=UTF-8");
-		//TODO
-	}
-	else if (hh->ParamList["action"] == "delete") {
-		hh->SetHeader(HTTP_OK, "text/plain; charset=UTF-8");
-		//TODO
-	}
-}
-
 //-----------------------------------------------------------------------------
 /** Get a list of statfs output for a given path
  *
@@ -4368,7 +3995,6 @@ void CControlAPI::getDirCGI(CyhookHandler *hh)
 		}
 	}
 
-
 	result = hh->outArray("dirs", result);
 
 	hh->SendResult(result);
@@ -4399,7 +4025,6 @@ std::string CControlAPI::getSubdirectories(CyhookHandler *hh, std::string path, 
 	}
 	return result;
 }
-
 
 //-----------------------------------------------------------------------------
 /** Get neutrino movies

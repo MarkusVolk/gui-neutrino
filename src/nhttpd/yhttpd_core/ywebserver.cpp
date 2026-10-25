@@ -31,6 +31,7 @@
 #include "ylogging.h"
 #include "helper.h"
 #include "yhook.h"
+#include "ycert.h"
 #include <api/apiserver.h>
 #include <system/set_threadname.h>
 
@@ -54,32 +55,20 @@ struct TRequest
 	bool		too_large;
 	bool		is_api;
 	MHD_PostProcessor *pp;
-	int		upload_fd;
-	std::string	upload_var;
-	bool		upload_seen;
 	std::string	field_name;
 	std::string	field_value;
 	CyhookHandler	*hh;
-	bool		upload_locked;
 
 	TRequest() : started(false), method(M_UNKNOWN), too_large(false), is_api(false),
-		pp(NULL), upload_fd(-1), upload_seen(false), hh(NULL), upload_locked(false) {}
+		pp(NULL), hh(NULL) {}
 	~TRequest();
 };
-
-// One upload at a time: every upload goes to UPLOAD_TMP_FILE, which the
-// scripts of the web interface read while the request is still running
-pthread_mutex_t upload_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 TRequest::~TRequest()
 {
 	if (pp)
 		MHD_destroy_post_processor(pp);
-	if (upload_fd >= 0)
-		close(upload_fd);
 	delete hh;
-	if (upload_locked)
-		pthread_mutex_unlock(&upload_mutex);
 }
 
 // Header names are case-insensitive (RFC 9110); they are kept as
@@ -208,8 +197,7 @@ void request_completed(void *, struct MHD_Connection *, void **con_cls, enum MHD
 	*con_cls = NULL;
 }
 
-// A multipart POST: the one file goes to UPLOAD_TMP_FILE, the fields to
-// the parameters, both under the names the old server gave them
+// A multipart POST: its fields become the parameters, files are not taken
 void finish_field(TRequest *req)
 {
 	if (!req->field_name.empty())
@@ -219,51 +207,12 @@ void finish_field(TRequest *req)
 }
 
 MHD_Result post_iterator(void *cls, enum MHD_ValueKind, const char *key, const char *filename,
-		const char *content_type, const char *, const char *data, uint64_t off, size_t size)
+		const char *, const char *, const char *data, uint64_t, size_t size)
 {
 	TRequest *req = (TRequest *) cls;
 	std::string name = key ? key : "";
-	if (filename) {
-#ifdef Y_CONFIG_FEATURE_UPLOAD
-		finish_field(req);
-		if (off == 0 && req->upload_var != name) {
-			if (req->upload_fd >= 0) {
-				close(req->upload_fd);
-				req->upload_fd = -1;
-			}
-			req->upload_var = name;
-			req->ParameterList[name] = trim(filename);
-			req->ParameterList[name + "_mime"] = content_type ? trim(content_type) : "";
-			req->ParameterList[name + "_upload_filename"] = UPLOAD_TMP_FILE;
-			if (!req->upload_locked) {
-				// one thread serves every connection when threading is off, so it must not wait for itself
-				if (CWebserver::is_threading)
-					pthread_mutex_lock(&upload_mutex);
-				else if (pthread_mutex_trylock(&upload_mutex) != 0) {
-					aprintf("another upload to %s is still running\n", UPLOAD_TMP_FILE);
-					return MHD_NO;
-				}
-				req->upload_locked = true;
-			}
-			req->upload_fd = open(UPLOAD_TMP_FILE, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0644);
-			if (req->upload_fd < 0) {
-				aprintf("cannot open file %s: %s\n", UPLOAD_TMP_FILE, strerror(errno));
-				return MHD_NO;
-			}
-			req->upload_seen = true;
-		}
-		while (size > 0 && req->upload_fd >= 0) {
-			ssize_t w = write(req->upload_fd, data, size);
-			if (w <= 0) {
-				perror("write file failed");
-				return MHD_NO;
-			}
-			data += w;
-			size -= w;
-		}
-#endif
+	if (filename)
 		return MHD_YES;
-	}
 	if (name != req->field_name)
 		finish_field(req);
 	req->field_name = name;
@@ -430,6 +379,7 @@ MHD_Result run_api(struct MHD_Connection *connection, const char *method, TReque
 	in.query = req->UrlData["paramstring"];
 	in.body = req->Body;
 	in.client = req->UrlData["clientaddr"];
+	in.secure = req->UrlData["scheme"] == "https";
 	in.headers = req->HeaderList;
 	in.too_large = req->too_large;
 
@@ -454,6 +404,33 @@ MHD_Result run_api(struct MHD_Connection *connection, const char *method, TReque
 	return queue(connection, out.status, response);
 }
 
+/* A page of the web interface asked for over HTTP from another machine
+ * moves to HTTPS, where a paired phone signs in; programs that use /api
+ * and /control over HTTP keep doing so. */
+bool wants_https(TRequest *req, std::string &url)
+{
+	unsigned int https_port = server ? server->get_https_port() : 0;
+	if (!https_port || req->UrlData["scheme"] == "https" || (req->method != M_GET && req->method != M_HEAD))
+		return false;
+	const std::string &client = req->UrlData["clientaddr"];
+	if (client.compare(0, 4, "127.") == 0 || client == "::1")
+		return false;
+	const std::string &path = req->UrlData["url"];
+	bool page = path == "/" || (path.size() > 5 && path.compare(path.size() - 5, 5, ".html") == 0);
+	std::string host = req->HeaderList["Host"];
+	if (!page || host.empty())
+		return false;
+	std::string::size_type end = host[0] == '[' ? host.find(']') : host.find(':');
+	if (host[0] == '[' && end == std::string::npos)
+		return false;
+	if (end != std::string::npos)
+		host = host.substr(0, host[0] == '[' ? end + 1 : end);
+	if (host.find_first_of("/?#@ ") != std::string::npos)
+		return false;
+	url = "https://" + host + (https_port == 443 ? "" : ":" + std::to_string(https_port)) + req->raw_uri;
+	return true;
+}
+
 MHD_Result access_handler(void *, struct MHD_Connection *connection, const char *, const char *method,
 		const char *, const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
@@ -471,7 +448,16 @@ MHD_Result access_handler(void *, struct MHD_Connection *connection, const char 
 		req->UrlData["startline"] = std::string(method) + " " + req->raw_uri + " HTTP/1.1";
 		req->UrlData["httprotocol"] = "HTTP/1.1";
 		req->UrlData["clientaddr"] = client_address(connection);
+		const union MHD_ConnectionInfo *di = MHD_get_connection_info(connection, MHD_CONNECTION_INFO_DAEMON);
+		req->UrlData["scheme"] = di && server && server->is_tls(di->daemon) ? "https" : "http";
 		req->is_api = yapi::handles(req->UrlData["url"]);
+		/* a tunnel or proxy in front of the box reaches MCP and its
+		 * sign-in only, whatever else the build has */
+		if (yapi::from_internet(req->HeaderList) && !yapi::open_to_internet(req->UrlData["url"])) {
+			CyhookHandler hh;
+			hh.Method = req->method;
+			return queue_error(connection, hh, HTTP_FORBIDDEN);
+		}
 		req->content_type = req->HeaderList["Content-Type"];
 		if (!req->is_api && req->method == M_POST
 				&& req->content_type.compare(0, 19, "multipart/form-data") == 0)
@@ -501,16 +487,20 @@ MHD_Result access_handler(void *, struct MHD_Connection *connection, const char 
 	if (req->is_api)
 		return run_api(connection, method, req);
 
+	std::string https_url;
+	if (wants_https(req, https_url)) {
+		struct MHD_Response *response = MHD_create_response_from_buffer_copy(0, "");
+		if (!response)
+			return MHD_NO;
+		MHD_add_response_header(response, MHD_HTTP_HEADER_LOCATION, https_url.c_str());
+		MHD_add_response_header(response, MHD_HTTP_HEADER_SERVER, WEBSERVERNAME);
+		return queue(connection, MHD_HTTP_FOUND, response);
+	}
+
 	if (req->pp) {
 		MHD_destroy_post_processor(req->pp);
 		req->pp = NULL;
 		finish_field(req);
-		if (req->upload_fd >= 0) {
-			close(req->upload_fd);
-			req->upload_fd = -1;
-		}
-		if (req->upload_seen)
-			handler_of(req).Hooks_UploadReady(UPLOAD_TMP_FILE);
 	} else if (req->too_large) {
 		CyhookHandler hh;
 		hh.Method = req->method;
@@ -550,21 +540,28 @@ bool resolve_bind_address(const std::string &host, struct sockaddr_in &sai)
 CWebserver::CWebserver() {
 	terminate = false;
 	daemon = NULL;
+	tls_daemon = NULL;
+	tls_wanted = false;
+	tls_port = HTTPS_STANDARD_PORT;
 	port = HTTPD_STANDARD_PORT;
 	pthread_mutex_init(&run_mutex, NULL);
 	pthread_cond_init(&run_cond, NULL);
 }
 //-----------------------------------------------------------------------------
 CWebserver::~CWebserver() {
+	if (tls_daemon)
+		MHD_stop_daemon(tls_daemon);
 	if (daemon)
 		MHD_stop_daemon(daemon);
 	pthread_cond_destroy(&run_cond);
 	pthread_mutex_destroy(&run_mutex);
 }
 //-----------------------------------------------------------------------------
-bool CWebserver::start(unsigned int _port) {
+struct MHD_Daemon *CWebserver::start(unsigned int _port, bool tls) {
 	server = this;
 	unsigned int flags = MHD_USE_ERROR_LOG;
+	if (tls)
+		flags |= MHD_USE_TLS;
 	if (is_threading)
 		flags |= MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD;
 	else
@@ -583,43 +580,85 @@ bool CWebserver::start(unsigned int _port) {
 		{ MHD_OPTION_NOTIFY_COMPLETED, (intptr_t) request_completed, NULL },
 		{ MHD_OPTION_CONNECTION_LIMIT, HTTPD_MAX_CONNECTIONS, NULL },
 		{ MHD_OPTION_CONNECTION_TIMEOUT, 60, NULL },
+		{ tls ? MHD_OPTION_HTTPS_MEM_KEY : MHD_OPTION_END, 0, (void *) tls_key.c_str() },
+		{ tls ? MHD_OPTION_HTTPS_MEM_CERT : MHD_OPTION_END, 0, (void *) tls_chain.c_str() },
 		{ bound ? MHD_OPTION_SOCK_ADDR : MHD_OPTION_END, 0, bound ? &sai : NULL },
 		{ MHD_OPTION_END, 0, NULL }
 	};
-	daemon = MHD_start_daemon(flags, (uint16_t) _port, NULL, NULL, access_handler, NULL,
-			MHD_OPTION_ARRAY, ops, MHD_OPTION_END);
-	if (!daemon && !bound) {
+	/* an MHD_OPTION_END ends the array there; the options after it are
+	 * the ones that apply, so move them up */
+	struct MHD_OptionItem used[sizeof(ops) / sizeof(ops[0])];
+	size_t n = 0;
+	for (size_t i = 0; i < sizeof(ops) / sizeof(ops[0]) - 1; i++)
+		if (ops[i].option != MHD_OPTION_END)
+			used[n++] = ops[i];
+	used[n] = ops[sizeof(ops) / sizeof(ops[0]) - 1];
+	struct MHD_Daemon *d = MHD_start_daemon(flags, (uint16_t) _port, NULL, NULL, access_handler, NULL,
+			MHD_OPTION_ARRAY, used, MHD_OPTION_END);
+	if (!d && !bound) {
 		// a kernel without IPv6
 		flags &= ~MHD_USE_DUAL_STACK;
-		daemon = MHD_start_daemon(flags, (uint16_t) _port, NULL, NULL, access_handler, NULL,
-				MHD_OPTION_ARRAY, ops, MHD_OPTION_END);
+		d = MHD_start_daemon(flags, (uint16_t) _port, NULL, NULL, access_handler, NULL,
+				MHD_OPTION_ARRAY, used, MHD_OPTION_END);
 	}
-	if (daemon)
-		port = _port;
-	return daemon != NULL;
+	return d;
+}
+
+//-----------------------------------------------------------------------------
+// HTTPS next to HTTP, on its own port, with the certificate of the box
+void CWebserver::start_tls(void) {
+	if (!tls_wanted)
+		return;
+	if (MHD_is_feature_supported(MHD_FEATURE_TLS) != MHD_YES) {
+		aprintf("libmicrohttpd has no TLS, no HTTPS\n");
+		return;
+	}
+	if (!ycert::server_pem(tls_key, tls_chain)) {
+		aprintf("no certificate, no HTTPS\n");
+		return;
+	}
+	unsigned int want = tls_port;
+	tls_daemon = start(want, true);
+	if (!tls_daemon && want == HTTPS_STANDARD_PORT) {
+		fprintf(stderr, "[yhttpd] cannot listen on port %d. Retrying port %d.\n", HTTPS_STANDARD_PORT, HTTPS_FALLBACK_PORT);
+		want = HTTPS_FALLBACK_PORT;
+		tls_daemon = start(want, true);
+	}
+	if (tls_daemon) {
+		tls_port = want;
+		aprintf("HTTPS on port %d\n", tls_port);
+	} else
+		fprintf(stderr, "[yhttpd] cannot listen on port %d for HTTPS\n", want);
 }
 //-----------------------------------------------------------------------------
 bool CWebserver::run(void) {
 	set_threadname("ywebsrv::run");
-	if (!start(port)) {
+	daemon = start(port, false);
+	if (!daemon) {
 		if (port != HTTPD_STANDARD_PORT) {
 			// WebsiteMain.port in nhttpd.conf is changed by user
 			fprintf(stderr, "[yhttpd] cannot listen on port %d. Abort.\n", port);
 			return false;
 		}
 		fprintf(stderr, "[yhttpd] cannot listen on port %d. Retrying port %d.\n", HTTPD_STANDARD_PORT, HTTPD_FALLBACK_PORT);
-		if (!start(HTTPD_FALLBACK_PORT)) {
+		daemon = start(HTTPD_FALLBACK_PORT, false);
+		if (!daemon) {
 			fprintf(stderr, "[yhttpd] cannot listen on port %d. Abort.\n", HTTPD_FALLBACK_PORT);
 			return false;
 		}
+		port = HTTPD_FALLBACK_PORT;
 	}
 	aprintf("listening on port %d\n", port);
+	start_tls();
 
 	pthread_mutex_lock(&run_mutex);
 	while (!terminate)
 		pthread_cond_wait(&run_cond, &run_mutex);
 	pthread_mutex_unlock(&run_mutex);
 
+	if (tls_daemon)
+		MHD_stop_daemon(tls_daemon);
+	tls_daemon = NULL;
 	MHD_stop_daemon(daemon);
 	daemon = NULL;
 	return true;

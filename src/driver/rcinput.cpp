@@ -1821,6 +1821,17 @@ const char *CRCInput::getKeyNameC(const unsigned int key)
 *	transforms the rc-key to generic - internal use only!
 *
 **************************************************************************/
+bool CRCInput::deviceHasKey(int fd, int code)
+{
+	const size_t bits = 8 * sizeof(unsigned long);
+	unsigned long keys[KEY_MAX / bits + 1] = { 0 };
+	if (code < 0 || code > KEY_MAX)
+		return false;
+	if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keys)), keys) < 0)
+		return true;
+	return keys[code / bits] & (1UL << (code % bits));
+}
+
 int CRCInput::translate(int code)
 {
 	switch(code)

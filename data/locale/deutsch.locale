@@ -1680,14 +1680,16 @@ menu.hint_net_gateway Geben Sie die Gateway-Adresse des Routers ein
 menu.hint_net_hostname Ändern Sie den Hostnamen der Box
 menu.hint_net_httpd Webserver (nhttpd) konfigurieren
 menu.hint_net_httpd_auth Anmeldung für das Webinterface erzwingen
+menu.hint_net_httpd_devices Handys und Browser, die mit dieser Box gekoppelt wurden
 menu.hint_net_httpd_host Bind-Adresse oder Host\n(leer oder 0.0.0.0 für alle)
+menu.hint_net_httpd_https Das Webinterface zusätzlich über HTTPS anbieten, mit einem Zertifikat der Box
+menu.hint_net_httpd_https_port TCP-Port für HTTPS (443, oder 8443, wenn 443 nicht erlaubt ist)
 menu.hint_net_httpd_loglevel Log-Level des Webservers
+menu.hint_net_httpd_new_cert Ein neues Zertifikat erstellen; Handys, die dem alten vertraut haben, müssen dem neuen vertrauen
 menu.hint_net_httpd_noauth Clients ohne Login\n(kommagetrennte IPs/Hosts)
+menu.hint_net_httpd_pair Einen Code zum Scannen anzeigen; das Handy wird danach zur Fernbedienung
 menu.hint_net_httpd_pass Passwort für die HTTP-Authentifizierung
 menu.hint_net_httpd_port TCP-Port für das Webinterface (1-65535)
-menu.hint_net_httpd_ssl HTTPS für das Webinterface aktivieren
-menu.hint_net_httpd_ssl_cafile Pfad zur CA-Datei (optional)
-menu.hint_net_httpd_ssl_pemfile Pfad zur PEM-Datei mit Zertifikat und Schlüssel
 menu.hint_net_httpd_threading Verbindungen in separaten Threads bearbeiten
 menu.hint_net_httpd_user Benutzername für die HTTP-Authentifizierung
 menu.hint_net_if Wählen Sie die Schnittstelle zur Konfiguration
@@ -2380,16 +2382,29 @@ networkmenu.hostname_hint1 Geben sie den Hostnamen ein
 networkmenu.hostname_hint2 Eine Änderung benötigt einen Neustart
 networkmenu.httpd Webserver (nhttpd)
 networkmenu.httpd_auth Authentifizierung
+networkmenu.httpd_devices Gekoppelte Geräte
+networkmenu.httpd_devices_none Kein Gerät ist gekoppelt.
+networkmenu.httpd_devices_remove Dieses Gerät entfernen?
+networkmenu.httpd_devices_remove_all Alle Geräte entfernen
 networkmenu.httpd_host Bind-Adresse
+networkmenu.httpd_https HTTPS
+networkmenu.httpd_https_port HTTPS-Port
 networkmenu.httpd_loglevel Log-Level
+networkmenu.httpd_new_cert Neues Zertifikat
+networkmenu.httpd_new_cert_ask Handys, die dem jetzigen Zertifikat vertrauen, müssen dem neuen vertrauen; es gilt nach einem Neustart von Neutrino. Neues Zertifikat erstellen?
 networkmenu.httpd_noauth Ausnahmen (kein Login)
+networkmenu.httpd_pair Handy koppeln
+networkmenu.httpd_pair_ask Ein Gerät möchte mit dieser Box gekoppelt werden:
+networkmenu.httpd_pair_ask_code Erlauben, wenn das Handy diesen Code zeigt:
+networkmenu.httpd_pair_done Das Handy ist gekoppelt.
+networkmenu.httpd_pair_fingerprint Zertifikat der Box
+networkmenu.httpd_pair_hint Lädt die Seite nicht: dem Browser in den App-Berechtigungen des Handys "Geräte in der Nähe" erlauben (Android 17). Der Browser warnt einmal vor dem Zertifikat; fortfahren, oder das Zertifikat der Box aus dem Webinterface installieren.
+networkmenu.httpd_pair_no_https HTTPS läuft nicht. Einschalten, speichern und Neutrino neu starten.
+networkmenu.httpd_pair_scan Den Code mit dem Handy scannen und den Link im Browser (Chrome) öffnen, nicht in der Vorschau des Scanners. Oder diese Adresse dort öffnen:
 networkmenu.httpd_pass Passwort
 networkmenu.httpd_port Port
 networkmenu.httpd_port_invalid Ungültiger Port. 1-65535 verwenden.
 networkmenu.httpd_save_failed nhttpd.conf konnte nicht gespeichert werden
-networkmenu.httpd_ssl SSL aktivieren
-networkmenu.httpd_ssl_cafile SSL-CA-Datei
-networkmenu.httpd_ssl_pemfile SSL-PEM-Datei
 networkmenu.httpd_threading Verbindungs-Threads
 networkmenu.httpd_user Benutzername
 networkmenu.inactive_network Netzwerk nicht aktiviert!
@@ -3154,8 +3169,8 @@ webradio.xml.auto WebRadio-Dateien automatisch laden
 webtv.dns.blocker_suspected Der Stream-Host wurde auf eine Block-Adresse aufgelöst:\n\nHost: %s\nAdresse: %s\n\nDas kann auf einen DNS-Blocker wie Pi-hole, AdGuard Home oder einen\nRouter-Filter hinweisen.
 webtv.dns.diagnostics DNS-Diagnose
 webtv.dns.failed DNS-Auflösung fehlgeschlagen für:\n%s\n\nBitte Internetverbindung, DNS-Einstellungen oder Router prüfen.
-webtv.no_teletext Web-Kanäle haben keinen Videotext.
 webtv.head WebTV
+webtv.no_teletext Web-Kanäle haben keinen Videotext.
 webtv.stream_restart_attempts Stream-Neustarts nach Verbindungsabbruch
 webtv.xml WebTV-Dateien
 webtv.xml.auto WebTV-Dateien automatisch laden

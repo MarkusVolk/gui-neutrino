@@ -25,6 +25,7 @@ private:
 		const char *func_name;
 		TyFunc pfunc;
 		const char *mime_type;
+		int level;		// yapi::Level the caller needs
 	} TyCgiCall;
 	const static TyCgiCall yCgiCallList[];
 
@@ -59,7 +60,6 @@ private:
 	void EpgSearchXMLCGI(CyhookHandler *hh);
 	void EpgSearchCGI(CyhookHandler *hh);
 	// subs
-	friend class CNeutrinoWebserver; // for timer /fb/ compatibility
 	void doModifyTimer(CyhookHandler *hh);
 	void doNewTimer(CyhookHandler *hh);
 	std::string _SendTime(CyhookHandler *hh, struct tm *Time, int digits);
@@ -67,17 +67,12 @@ private:
 	std::string channelEPGformated(CyhookHandler *hh, int bouquetnr, t_channel_id channel_id, int max, long stoptime);
 	std::string _GetBouquetActualEPGItem(CyhookHandler *hh, CZapitChannel * channel);
 
-	//yweb
-	void YWeb_SendVideoStreamingPids(CyhookHandler *hh, int apid_no);
-	void YWeb_SendRadioStreamingPid(CyhookHandler *hh);
-	void compatibility_Timer(CyhookHandler *hh);
 
 	// CGI functions for ExecuteCGI
 	void TimerCGI(CyhookHandler *hh);
 	void TimerSendCGI(CyhookHandler *hh);
 	void SetModeCGI(CyhookHandler *hh);
 	void GetModeCGI(CyhookHandler *hh);
-	void ExecCGI(CyhookHandler *hh);
 	void WolCGI(CyhookHandler *hh);
 	void SystemCGI(CyhookHandler *hh);
 	void StandbyCGI(CyhookHandler *hh);
@@ -113,7 +108,6 @@ private:
 	void ZaptoCGI(CyhookHandler *hh);
 	void StartPluginCGI(CyhookHandler *hh);
 	void LCDAction(CyhookHandler *hh);
-	void YWebCGI(CyhookHandler *hh);
 	void RebootCGI(CyhookHandler *hh);
 	void RestartCGI(CyhookHandler *hh);
 	void RCEmCGI(CyhookHandler *hh);
@@ -140,8 +134,6 @@ private:
 	void streamUrlCGI(CyhookHandler *hh);
 	void netmountCGI(CyhookHandler *hh);
 	void logoCGI(CyhookHandler *hh);
-	void ConfigCGI(CyhookHandler *hh);
-	void FileCGI(CyhookHandler *hh);
 	void StatfsCGI(CyhookHandler *hh);
 	void SignalInfoCGI(CyhookHandler *hh);
 	void getDirCGI(CyhookHandler *hh);

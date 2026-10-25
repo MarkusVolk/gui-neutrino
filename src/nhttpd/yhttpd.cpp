@@ -16,13 +16,7 @@
 #include <system/helpers.h>
 // yhttpd
 #include <ylogging.h>
-#include <ylanguage.h>
 #include <yhook.h>
-
-#ifdef Y_CONFIG_USE_YPARSER
-#include <mod_yparser.h>
-static CyParser yParser;
-#endif
 
 //-----------------------------------------------------------------------------
 // Setting yhttpd Instance
@@ -50,10 +44,6 @@ static CmWebLog *weblog = NULL;
 static CmodSendfile *mod_sendfile = NULL;
 #endif
 
-#ifdef Y_CONFIG_USE_CACHE
-#include <mod_cache.h>
-static CmodCache mod_cache; // static instance
-#endif
 
 //-----------------------------------------------------------------------------
 
@@ -74,6 +64,11 @@ static CMcpAPI mcpAPI;
 void yhttpd_reload_config() {
 	if (yhttpd)
 		yhttpd->ReadConfig();
+}
+
+/* the port HTTPS listens on, 0 while there is none */
+unsigned int yhttpd_https_port() {
+	return yhttpd ? yhttpd->https_port() : 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -135,7 +130,6 @@ Cyhttpd::Cyhttpd() {
 Cyhttpd::~Cyhttpd() {
 	if (webserver)
 		delete webserver;
-	CLanguage::deleteInstance();
 	webserver = NULL;
 }
 
@@ -261,17 +255,8 @@ void Cyhttpd::hooks_attach() {
 
 #ifdef CONFIG_SYSTEM_TUXBOX
 	NeutrinoAPI = new CNeutrinoAPI();
-	CyhookHandler::attach(NeutrinoAPI->NeutrinoYParser);
 	CyhookHandler::attach(NeutrinoAPI->ControlAPI);
 	yapi::init(NeutrinoAPI);
-#else
-#ifdef Y_CONFIG_USE_YPARSER
-	CyhookHandler::attach(&yParser);
-#endif
-#endif
-
-#ifdef Y_CONFIG_USE_CACHE
-	CyhookHandler::attach(&mod_cache);
 #endif
 
 #ifdef Y_CONFIG_USE_SENDFILE
@@ -291,18 +276,6 @@ void Cyhttpd::hooks_detach() {
 #ifdef Y_CONFIG_USE_AUTHHOOK
 	CyhookHandler::detach(auth);
 	delete auth;
-#endif
-
-#ifdef CONFIG_SYSTEM_TUXBOX
-	CyhookHandler::detach(NeutrinoAPI->NeutrinoYParser);
-#else
-#ifdef Y_CONFIG_USE_YPARSER
-	CyhookHandler::detach(&yParser);
-#endif
-#endif
-
-#ifdef Y_CONFIG_USE_CACHE
-	CyhookHandler::detach(&mod_cache);
 #endif
 
 #ifdef Y_CONFIG_USE_SENDFILE
@@ -355,14 +328,11 @@ void Cyhttpd::ReadConfig(void) {
 		if (Config->getInt32("configfile.version") < 2) {
 			Config->setString("mod_sendfile.mime_types", HTTPD_SENDFILE_EXT);
 			Config->setInt32("configfile.version", CONF_VERSION);
-			Config->setString("mod_sendfile.sendAll", HTTPD_SENDFILE_ALL);
 			Config->saveConfig(HTTPD_CONFIGFILE);
 		}
 		// Add Defaults for Version 4
 		if (Config->getInt32("configfile.version") < 4) {
 			Config->setInt32("configfile.version", CONF_VERSION);
-			Config->setString("Language.selected", HTTPD_DEFAULT_LANGUAGE);
-			Config->setString("Language.directory", HTTPD_LANGUAGEDIR);
 			if (Config->getString("WebsiteMain.hosted_directory", "").empty())
 				Config->setString("WebsiteMain.hosted_directory", HOSTEDDOCUMENTROOT);
 			Config->saveConfig(HTTPD_CONFIGFILE);
@@ -374,9 +344,12 @@ void Cyhttpd::ReadConfig(void) {
 			Config->setInt32("configfile.version", CONF_VERSION);
 			Config->saveConfig(HTTPD_CONFIGFILE);
 		}
-		// Version 6: the media types players and browsers expect, playlists among them
-		if (Config->getInt32("configfile.version") < 6) {
+		// Version 7: the types of the new web interface; the keys of yWeb go
+		if (Config->getInt32("configfile.version") < 7) {
 			Config->setString("mod_sendfile.mime_types", HTTPD_SENDFILE_EXT);
+			Config->deleteKey("mod_sendfile.sendAll");
+			Config->deleteKey("Language.selected");
+			Config->deleteKey("Language.directory");
 			Config->setInt32("configfile.version", CONF_VERSION);
 			Config->saveConfig(HTTPD_CONFIGFILE);
 		}
@@ -396,8 +369,13 @@ void Cyhttpd::ReadConfig(void) {
 	const bool use_threading = Config->getBool("webserver.threading", true);
 	const std::string web_host = Config->getString("WebsiteMain.host", HTTPD_DEFAULT_HOST);
 	webserver->init(web_port, use_threading, web_host);
+	const bool https = Config->getBool("WebsiteMain.https", true);
+	const int https_port = Config->getInt32("WebsiteMain.https_port", HTTPS_STANDARD_PORT);
+	webserver->init_https(https, https_port);
 	// informational use
 	ConfigList["WebsiteMain.port"] = itoa(web_port);
+	ConfigList["WebsiteMain.https"] = https ? "true" : "false";
+	ConfigList["WebsiteMain.https_port"] = itoa(https_port);
 	ConfigList["WebsiteMain.host"] = web_host;
 	ConfigList["webserver.threading"] = Config->getString("webserver.threading", "true");
 	ConfigList["configfile.version"] = Config->getInt32("configfile.version", CONF_VERSION);
@@ -440,11 +418,6 @@ void Cyhttpd::ReadConfig(void) {
 	ConfigList["server.group_name"] = Config->getString("server.group_name", "");
 	ConfigList["server.chroot"] = Config->getString("server.chroot", "");
 
-	// language
-	ConfigList["Language.directory"] = Config->getString("Language.directory", HTTPD_LANGUAGEDIR);
-	ConfigList["Language.selected"] = Config->getString("Language.selected", HTTPD_DEFAULT_LANGUAGE);
-	yhttpd->ReadLanguage();
-
 	// Read App specifig settings by Hook
 	CyhookHandler::Hooks_ReadConfig(Config, ConfigList);
 
@@ -453,13 +426,4 @@ void Cyhttpd::ReadConfig(void) {
 		Config->saveConfig(HTTPD_CONFIGFILE);
 	log_level_printf(3, "ReadConfig End\n");
 	delete Config;
-}
-//-----------------------------------------------------------------------------
-// Read Webserver Configurationfile for languages
-//-----------------------------------------------------------------------------
-void Cyhttpd::ReadLanguage(void) {
-	// Init Class vars
-	CLanguage *lang = CLanguage::getInstance();
-	log_level_printf(3, "ReadLanguage:%s\n", ConfigList["Language.selected"].c_str());
-	lang->setLanguage(ConfigList["Language.selected"]);
 }
