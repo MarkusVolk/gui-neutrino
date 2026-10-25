@@ -33,6 +33,7 @@
 #endif
 
 #include "hintbox.h"
+#include "remote_ui.h"
 
 #define MSGBOX_MIN_WIDTH HINTBOX_MIN_WIDTH
 #define MSGBOX_MIN_HEIGHT HINTBOX_MIN_HEIGHT
@@ -49,7 +50,7 @@ text and context buttons on the right site of header.
 CMsgBox objects return predefined result values of type msg_result_t.
 Button combinations are defined with button_define_t
 */
-class CMsgBox : public CHintBox
+class CMsgBox : public CHintBox, public CRemoteUi
 {
 	public:
 		/* enum definition */
@@ -107,6 +108,8 @@ class CMsgBox : public CHintBox
 		int		mb_show_button;
 
 		///current result value of selected button, see also getResult()
+		///an answer a remote client gave, which ends exec()
+		bool		remote_answered;
 		msg_result_t	result;
 		///defined default result, independently from current selected button result, see also setDefaultResult(), getDefaultResult()
 		msg_result_t	default_result;
@@ -275,6 +278,8 @@ class CMsgBox : public CHintBox
 		* 		a message that carries one.
 		*/
 		int exec();
+		std::string remoteDescribe();
+		bool remoteSelect(const std::string &what, std::string &error);
 
 		/**
 		* returns current result as msg_result_t, result corresponds to the current result value of selected button

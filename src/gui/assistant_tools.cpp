@@ -31,6 +31,7 @@
 #include <eitd/sectionsd.h>
 #include <gui/channellist.h>
 #include <gui/movieplayer.h>
+#include <gui/widget/remote_ui.h>
 #include <gui/plugins.h>
 #include <system/helpers.h>
 #include <timerdclient/timerdclient.h>
@@ -137,6 +138,38 @@ static const struct
 		"{\"type\":\"object\",\"properties\":{"
 		"\"name\":{\"type\":\"string\",\"description\":\"name of the plugin\"}},"
 		"\"required\":[\"name\"]}"
+	},
+	{
+		"tv_screen",
+		"What the TV shows on top: the open menu with its numbered entries and their values, a text input, "
+		"a message box with its answers, or else what plays. Menus of Neutrino and of plugins look alike. "
+		"Look again after each step, as the screen changes.",
+		"{\"type\":\"object\",\"properties\":{}}"
+	},
+	{
+		"tv_select",
+		"Choose an entry of the open menu by its number or its name, like moving there and pressing OK, "
+		"or answer the open message box: yes, no, ok, cancel or back.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"choice\":{\"type\":\"string\",\"description\":\"number or name of the entry, or the answer\"}},"
+		"\"required\":[\"choice\"]}"
+	},
+	{
+		"tv_input",
+		"Type a text into the open text input, such as a search, and confirm it.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"text\":{\"type\":\"string\"}},"
+		"\"required\":[\"text\"]}"
+	},
+	{
+		"tv_key",
+		"Press a key of the remote control, for what a menu does not offer: ok, exit, menu, up, down, left, "
+		"right, red, green, yellow, blue, info, epg, 0 to 9, play, pause, stop, forward, rewind, record, "
+		"volume_up, volume_down, mute, page_up, page_down, tv, radio, www, text, audio, help, favorites.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"key\":{\"type\":\"string\"},"
+		"\"times\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":20}},"
+		"\"required\":[\"key\"]}"
 	}
 };
 
@@ -816,6 +849,89 @@ static bool plugin_start(const Json::Value &input, std::string &result)
 	return true;
 }
 
+//-----------------------------------------------------------------------------
+// the screen, read and answered like a viewer would
+//-----------------------------------------------------------------------------
+static bool screen(std::string &result)
+{
+	CRemoteUi *ui = CRemoteUi::top();
+	if (ui)
+	{
+		result = ui->remoteDescribe();
+		return true;
+	}
+	if (CNeutrinoApp::getInstance()->getMode() == NeutrinoModes::mode_standby)
+		result = "The box is in standby.\n";
+	else if (CMoviePlayerGui::getInstance().Playing())
+		result = "A video plays, no menu is open; keys: play, pause, stop, forward, rewind, info.\n";
+	else
+		result = "No menu is open; live TV.\n" + status();
+	return true;
+}
+
+static bool select_entry(const Json::Value &input, std::string &result)
+{
+	CRemoteUi *ui = CRemoteUi::top();
+	if (!ui)
+	{
+		result = "no menu or message box is open";
+		return false;
+	}
+	if (!ui->remoteSelect(input["choice"].asString(), result))
+		return false;
+	result = "done; look with tv_screen";
+	return true;
+}
+
+static bool input_text(const Json::Value &input, std::string &result)
+{
+	CRemoteUi *ui = CRemoteUi::top();
+	if (!ui)
+	{
+		result = "no text input is open";
+		return false;
+	}
+	if (!ui->remoteInput(input["text"].asString(), result))
+		return false;
+	result = "typed and confirmed; look with tv_screen";
+	return true;
+}
+
+static bool press_key(const Json::Value &input, std::string &result)
+{
+	static const struct { const char *name; neutrino_msg_t key; } keys[] = {
+		{ "ok", CRCInput::RC_ok }, { "exit", CRCInput::RC_home }, { "back", CRCInput::RC_home },
+		{ "menu", CRCInput::RC_setup }, { "up", CRCInput::RC_up }, { "down", CRCInput::RC_down },
+		{ "left", CRCInput::RC_left }, { "right", CRCInput::RC_right }, { "red", CRCInput::RC_red },
+		{ "green", CRCInput::RC_green }, { "yellow", CRCInput::RC_yellow }, { "blue", CRCInput::RC_blue },
+		{ "info", CRCInput::RC_info }, { "epg", CRCInput::RC_epg }, { "0", CRCInput::RC_0 },
+		{ "1", CRCInput::RC_1 }, { "2", CRCInput::RC_2 }, { "3", CRCInput::RC_3 }, { "4", CRCInput::RC_4 },
+		{ "5", CRCInput::RC_5 }, { "6", CRCInput::RC_6 }, { "7", CRCInput::RC_7 }, { "8", CRCInput::RC_8 },
+		{ "9", CRCInput::RC_9 }, { "play", CRCInput::RC_play }, { "pause", CRCInput::RC_pause },
+		{ "stop", CRCInput::RC_stop }, { "forward", CRCInput::RC_forward }, { "rewind", CRCInput::RC_rewind },
+		{ "record", CRCInput::RC_record }, { "volume_up", CRCInput::RC_plus }, { "volume_down", CRCInput::RC_minus },
+		{ "mute", CRCInput::RC_spkr }, { "page_up", CRCInput::RC_page_up }, { "page_down", CRCInput::RC_page_down },
+		{ "tv", CRCInput::RC_tv }, { "radio", CRCInput::RC_radio }, { "www", CRCInput::RC_www },
+		{ "text", CRCInput::RC_text }, { "audio", CRCInput::RC_audio }, { "help", CRCInput::RC_help },
+		{ "favorites", CRCInput::RC_favorites },
+	};
+	std::string want = lower(input["key"].asString());
+	int times = input["times"].isIntegral() ? input["times"].asInt() : 1;
+	if (times < 1 || times > 20)
+		times = 1;
+	for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
+	{
+		if (want != keys[i].name)
+			continue;
+		for (int t = 0; t < times; t++)
+			g_RCInput->postMsg(keys[i].key, 0, false);
+		result = "pressed; look with tv_screen";
+		return true;
+	}
+	result = "no key \"" + input["key"].asString() + "\"";
+	return false;
+}
+
 bool CAssistantTools::call(const std::string &name, const Json::Value &input, std::string &result)
 {
 	result.clear();
@@ -850,6 +966,14 @@ bool CAssistantTools::call(const std::string &name, const Json::Value &input, st
 		return plugins(result);
 	if (name == "tv_plugin_start")
 		return plugin_start(input, result);
+	if (name == "tv_screen")
+		return screen(result);
+	if (name == "tv_select")
+		return select_entry(input, result);
+	if (name == "tv_input")
+		return input_text(input, result);
+	if (name == "tv_key")
+		return press_key(input, result);
 	result = "unknown tool";
 	return false;
 }

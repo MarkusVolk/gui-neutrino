@@ -33,6 +33,8 @@
 #include <neutrino.h>
 
 #include "msgbox.h"
+
+#include <algorithm>
 #include <system/debug.h>
 #include <driver/abstime.h>
 #include <system/settings.h>
@@ -285,6 +287,54 @@ CMsgBox::msg_result_t CMsgBox::getBackResult()
 	return btn_back ? (msg_result_t)btn_back->getButtonResult() : mbrCancel;
 }
 
+/* the answers this box offers, as remoteSelect() takes them */
+static const struct { int buttons; CMsgBox::msg_result_t result; const char *name; } msgbox_answers[] = {
+	{ CMsgBox::mbYes | CMsgBox::mbYesNo | CMsgBox::mbNoYes | CMsgBox::mbYesNoCancel | CMsgBox::mbAll, CMsgBox::mbrYes, "yes" },
+	{ CMsgBox::mbNo | CMsgBox::mbYesNo | CMsgBox::mbNoYes | CMsgBox::mbYesNoCancel | CMsgBox::mbAll, CMsgBox::mbrNo, "no" },
+	{ CMsgBox::mbOk | CMsgBox::mbOKCancel | CMsgBox::mbAll, CMsgBox::mbrOk, "ok" },
+	{ CMsgBox::mbCancel | CMsgBox::mbOKCancel | CMsgBox::mbYesNoCancel | CMsgBox::mbAll, CMsgBox::mbrCancel, "cancel" },
+	{ CMsgBox::mbBack | CMsgBox::mbAll, CMsgBox::mbrBack, "back" },
+};
+
+std::string CMsgBox::remoteDescribe()
+{
+	std::string out = "Message: " + ccw_caption + "\n" + hb_text + "\nAnswers:";
+	bool any = false;
+	for (size_t i = 0; i < sizeof(msgbox_answers) / sizeof(msgbox_answers[0]); i++)
+		if (mb_show_button & msgbox_answers[i].buttons) {
+			out += std::string(" ") + msgbox_answers[i].name;
+			any = true;
+		}
+	if (!any)
+		out += " ok";
+	return out + "\n";
+}
+
+bool CMsgBox::remoteSelect(const std::string &what, std::string &error)
+{
+	std::string want = what;
+	std::transform(want.begin(), want.end(), want.begin(), ::tolower);
+	bool any = false;
+	for (size_t i = 0; i < sizeof(msgbox_answers) / sizeof(msgbox_answers[0]); i++) {
+		bool offered = mb_show_button & msgbox_answers[i].buttons;
+		any |= offered;
+		if (want == msgbox_answers[i].name && offered) {
+			result = msgbox_answers[i].result;
+			remote_answered = true;
+			g_RCInput->postMsg(CRCInput::RC_nokey, 0);
+			return true;
+		}
+	}
+	if (!any && want == "ok") {
+		result = default_result;
+		remote_answered = true;
+		g_RCInput->postMsg(CRCInput::RC_nokey, 0);
+		return true;
+	}
+	error = "this box has no answer \"" + what + "\"; see its answers";
+	return false;
+}
+
 int CMsgBox::exec()
 {
 	neutrino_msg_t      msg;
@@ -306,10 +356,19 @@ int CMsgBox::exec()
 	if (timeout > 0)
 		initTimeOutBar();
 
+	CRemoteUi::Guard remote_guard(this);
+	remote_answered = false;
+
 	bool loop = true;
 	while (loop)
 	{
 		g_RCInput->getMsgAbsoluteTimeout( &msg, &data, &timeoutEnd );
+
+		if (remote_answered)
+		{
+			loop = false;
+			continue;
+		}
 
 		//***timeout result***
 		if (msg == CRCInput::RC_timeout)

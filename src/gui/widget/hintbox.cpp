@@ -159,6 +159,7 @@ void CHintBox::init(	const std::string& Text,
 			const int& frame_width)
 {
 	cc_item_type.name = "wg.hintbox";
+	hb_text		= Text;
 	int _Width	= frameBuffer->scale2Res(Width);
 	timeout		= HINTBOX_DEFAULT_TIMEOUT;
 	w_indentation	= indent;

@@ -54,7 +54,7 @@ class CInputString
 		std::string &getValue();
 };
 
-class CKeyboardInput : public CMenuTarget,  public sigc::trackable
+class CKeyboardInput : public CMenuTarget,  public sigc::trackable, public CRemoteUi
 {
 	protected:
 		CFrameBuffer	*frameBuffer;
@@ -132,6 +132,8 @@ class CKeyboardInput : public CMenuTarget,  public sigc::trackable
 
 		void hide();
 		int exec( CMenuTarget* parent, const std::string & actionKey );
+		std::string remoteDescribe();
+		bool remoteInput(const std::string &text, std::string &error);
 
 		void forceSaveScreen(bool enable);
 		/* for secrets: every character shows as '*', also on the displays of the box */

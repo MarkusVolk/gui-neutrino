@@ -652,6 +652,30 @@ void CKeyboardInput::forceSaveScreen(bool enable)
 	}
 }
 
+std::string CKeyboardInput::remoteDescribe()
+{
+	std::string out = "Text input: " + title + "\n";
+	if (inputString)
+		out += "Current text: " + (masked ? maskedString() : std::string(inputString->c_str())) + "\n";
+	std::string hint = hintText_1.empty() && hint_1 != NONEXISTANT_LOCALE ? g_Locale->getText(hint_1) : hintText_1;
+	if (!hint.empty())
+		out += "Hint: " + hint + "\n";
+	return out;
+}
+
+/* the text replaces what is there and is confirmed, as with the red key */
+bool CKeyboardInput::remoteInput(const std::string &text, std::string &error)
+{
+	if (!inputString) {
+		error = "the text input is not open";
+		return false;
+	}
+	*inputString = text;
+	changed = true;
+	g_RCInput->postMsg(CRCInput::RC_red, 0);
+	return true;
+}
+
 int CKeyboardInput::exec(CMenuTarget* parent, const std::string &)
 {
 	CStringInputOpen counted;
@@ -678,6 +702,8 @@ int CKeyboardInput::exec(CMenuTarget* parent, const std::string &)
 
 	paint();
 	paintKeyboard();
+
+	CRemoteUi::Guard remote_guard(this);
 
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(g_settings.timing[SNeutrinoSettings::TIMING_MENU]);
 

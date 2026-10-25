@@ -45,6 +45,8 @@
 #include <driver/record.h>
 #include <system/helpers.h>
 
+#include <algorithm>
+
 #include <cctype>
 
 #ifdef ENABLE_LCD4LINUX
@@ -228,6 +230,7 @@ void CMenuItem::initItemColors(const bool select_mode)
 
 void CMenuItem::paintItemCaption(const bool select_mode, const char * right_text, const fb_pixel_t right_bgcol)
 {
+	painted_value = right_text ? right_text : "";
 	int item_height = height;
 	const char *left_text = getName();
 	std::string desc_text = getDescription();
@@ -642,6 +645,8 @@ void CMenuWidget::Init(const std::string &NameString, const std::string &Icon, c
 	height		= 0;
 	w_pos_mode 	= g_settings.menu_pos;
 
+	remote_select	= -1;
+
 	//caption and icon
 	nameString 	= NameString;
 	iconfile 	= Icon;
@@ -848,6 +853,92 @@ const char *CMenuWidget::getName()
 	return nameString.c_str();
 }
 
+static std::string lower_text(std::string s)
+{
+	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+	return s;
+}
+
+/* the menu as a list a remote client reads: number, name, value, and
+ * the hint of the selected entry */
+std::string CMenuWidget::remoteDescribe()
+{
+	std::string out = std::string("Menu: ") + getName() + "\n";
+	if (!subhead_text.empty())
+		out += subhead_text + "\n";
+	for (unsigned int i = 0; i < items.size(); i++) {
+		CMenuItem *item = items[i];
+		std::string name = item->getName() ? item->getName() : "";
+		if (item->isSeparator()) {
+			if (!name.empty())
+				out += "--- " + name + " ---\n";
+			continue;
+		}
+		if (name.empty() && item->getValueText().empty())
+			continue;
+		out += std::string((int)i == selected ? "> " : "  ") + to_string(i + 1) + ". " + name;
+		std::string value = item->getValueText();
+		if (!value.empty())
+			out += " = " + value;
+		if (!item->isSelectable())
+			out += " (not selectable)";
+		out += "\n";
+	}
+	if (selected >= 0 && selected < (int)items.size()) {
+		CMenuItem *item = items[selected];
+		std::string hint = item->hintText;
+		if (hint.empty() && item->hint != NONEXISTANT_LOCALE)
+			hint = g_Locale->getText(item->hint);
+		if (!hint.empty())
+			out += "Hint of the selected entry: " + hint + "\n";
+	}
+	return out;
+}
+
+/* chooses an entry by its number in remoteDescribe() or by its name:
+ * the same name first, else the one name that contains the text */
+bool CMenuWidget::remoteSelect(const std::string &what, std::string &error)
+{
+	int found = -1;
+	char *end = NULL;
+	long number = strtol(what.c_str(), &end, 10);
+	if (!what.empty() && end && !*end) {
+		if (number >= 1 && number <= (long)items.size())
+			found = number - 1;
+	} else {
+		std::string want = lower_text(what);
+		int partial = -1, partials = 0;
+		for (unsigned int i = 0; i < items.size() && found < 0; i++) {
+			if (items[i]->isSeparator() || !items[i]->getName())
+				continue;
+			std::string name = lower_text(items[i]->getName());
+			if (name == want)
+				found = i;
+			else if (!want.empty() && name.find(want) != std::string::npos) {
+				partial = i;
+				partials++;
+			}
+		}
+		if (found < 0 && partials == 1)
+			found = partial;
+		if (found < 0 && partials > 1) {
+			error = "more than one entry contains \"" + what + "\"; give its number";
+			return false;
+		}
+	}
+	if (found < 0) {
+		error = "no entry \"" + what + "\" in this menu";
+		return false;
+	}
+	if (!items[found]->isSelectable()) {
+		error = std::string("the entry \"") + items[found]->getName() + "\" cannot be chosen";
+		return false;
+	}
+	remote_select = found;
+	g_RCInput->postMsg(CRCInput::RC_ok, 0);
+	return true;
+}
+
 static bool inStandby()
 {
 	return CNeutrinoApp::getInstance()->getMode() == NeutrinoModes::mode_standby;
@@ -866,6 +957,9 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 	 * player was cancelled) must not paint into the standby screen */
 	if (inStandby())
 		return menu_return::RETURN_EXIT_ALL;
+
+	CRemoteUi::Guard remote_guard(this);
+	remote_select = -1;
 
 	frameBuffer->Lock();
 
@@ -909,6 +1003,23 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 		bAllowRepeatLR |= bAllowRepeatLR_override;
 
 		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd, bAllowRepeatLR);
+
+		/* the OK a remote client sent after it chose an entry: the entry
+		 * becomes the selected one first, as with a direct key */
+		if (msg == CRCInput::RC_ok && remote_select >= 0) {
+			if (remote_select < (int)items.size() && items[remote_select]->isSelectable()) {
+				if (selected >= 0 && selected < (int)items.size())
+					items[selected]->paint(false);
+				selected = remote_select;
+				if (selected >= page_start[current_page + 1] || selected < page_start[current_page])
+					paintItems();
+				else
+					items[selected]->paint(true);
+				paintHint(selected);
+				pos = selected;
+			}
+			remote_select = -1;
+		}
 
 		/* The RC layer reports RC_standby on both press (data=0) and release (data=1);
 		 * no other key delivers a release event here. A menu action bound to RC_standby

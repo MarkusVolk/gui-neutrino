@@ -43,6 +43,7 @@
 #include <gui/widget/icons.h>
 #include <gui/plugins.h>
 #include <gui/components/cc.h>
+#include <gui/widget/remote_ui.h>
 #include <string>
 #include <vector>
 #include <neutrino_menue.h>
@@ -149,6 +150,10 @@ class CMenuItem : public  CComponentsSignals
 		const char *	hintIcon;
 		std::string	hintText;
 		neutrino_locale_t hint;
+		/* the value shown right of the name when it was painted last */
+		std::string	painted_value;
+		virtual std::string getValueText() { return painted_value; }
+		virtual bool isSeparator() const { return false; }
 
 		CMenuItem(bool Active = true, neutrino_msg_t DirectKey = RC_NOKEY, const char * const IconName= NULL, const char * const IconName_Info_right = NULL, bool IsStatic = false);
 
@@ -234,6 +239,7 @@ class CMenuSeparator : public CMenuItem
 
 
 		CMenuSeparator(const int Type = 0, const neutrino_locale_t Text = NONEXISTANT_LOCALE, bool IsStatic = false);
+		bool isSeparator() const { return true; }
 		CMenuSeparator(const int Type, const std::string &Text, bool IsStatic = false);
 		virtual ~CMenuSeparator(){}
 
@@ -262,6 +268,7 @@ class CMenuForwarder : public CMenuItem
 	std::string getOption(void);
 
  public:
+	std::string getValueText() { return getOption(); }
 
 	CMenuForwarder(const neutrino_locale_t Text, const bool Active, const std::string &Option,
 		       CMenuTarget* Target=NULL, const char * const ActionKey = NULL, const neutrino_msg_t DirectKey = RC_NOKEY,
@@ -540,7 +547,7 @@ class CMenuGlobal
 		static CMenuGlobal* getInstance();
 };
 
-class CMenuWidget : public CMenuTarget, public CComponentsSignals
+class CMenuWidget : public CMenuTarget, public CComponentsSignals, public CRemoteUi
 {
 	private: 
 		mn_widget_id_t 		widget_index;
@@ -576,6 +583,7 @@ class CMenuWidget : public CMenuTarget, public CComponentsSignals
 		int			offx, offy;
 		int			preselected;
 		int			selected;
+		int			remote_select;		/* an entry a remote client chose, taken with the next OK */
 		int 			iconOffset;
 		int			scrollbar_width;
 		fb_pixel_t		*background;
@@ -654,6 +662,8 @@ class CMenuWidget : public CMenuTarget, public CComponentsSignals
 		void setSelectedByName(const neutrino_locale_t &Locale);
 		void setSelectedByName(const std::string &Name);
 		int getSelected()const { return selected; };
+		std::string remoteDescribe();
+		bool remoteSelect(const std::string &what, std::string &error);
 		int getSelectedByName(const neutrino_locale_t &Locale);
 		int getSelectedByName(const std::string &Name);
 		void move(int xoff, int yoff);
