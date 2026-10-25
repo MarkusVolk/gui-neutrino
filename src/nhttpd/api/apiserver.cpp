@@ -1003,8 +1003,19 @@ void ep_zap(Call &c)
 			return;
 		}
 	}
+	/* a recording is not given up for a zap: the channel list's own test
+	 * decides, which lets web channels, timeshift and a free tuner through */
+	std::shared_ptr<bool> can_zap = std::make_shared<bool>(true);
+	main_call::run([can_zap, id] {
+		CNeutrinoApp *app = CNeutrinoApp::getInstance();
+		*can_zap = !app->channelList || app->channelList->SameTP(id);
+	}, 5000);
+	if (!*can_zap) {
+		problem(c.out, 409, "recording-running", "a recording runs and no tuner is free for this channel");
+		return;
+	}
 	if (box_mode() == NeutrinoModes::mode_ts && !stop_playback) {
-		problem(c.out, 409, "playback-running", "a recording or file is playing; send stop_playback to end it");
+		problem(c.out, 409, "playback-running", "a file or a plugin plays; send stop_playback to end it");
 		return;
 	}
 	if (box_mode() == NeutrinoModes::mode_standby) {
@@ -1014,6 +1025,20 @@ void ep_zap(Call &c)
 		}
 		neutrino_api->Zapit->setStandby(false);
 		neutrino_api->EventServer->sendEvent(NeutrinoMessages::STANDBY_OFF, CEventServer::INITID_HTTPD);
+	}
+	/* a file or a plugin plays in the player's own loop: the zap goes the
+	 * way of a zap timer, which ends the playback and the plugin with it */
+	if (box_mode() == NeutrinoModes::mode_ts) {
+		unsigned char *data = new unsigned char[sizeof(CTimerd::EventInfo)];
+		memset(data, 0, sizeof(CTimerd::EventInfo));
+		((CTimerd::EventInfo *) data)->channel_id = id;
+		if (!g_RCInput->postMsg(NeutrinoMessages::ZAPTO, (neutrino_msg_data_t) data, false)) {
+			delete[] data;
+			problem(c.out, 503, "busy", "the box did not take the zap");
+			return;
+		}
+		send_empty(c.out, 202);
+		return;
 	}
 	neutrino_api->ZapToChannelId(id);
 	send_empty(c.out, 202);
