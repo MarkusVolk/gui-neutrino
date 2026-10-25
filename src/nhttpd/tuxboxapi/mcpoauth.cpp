@@ -6,8 +6,9 @@
 	with PKCE (S256 only) and refresh tokens. A client that asks for
 	access is shown on the television, and OK on the remote control
 	allows it; the browser that started the sign-in waits for that answer.
-	Refresh tokens are kept as SHA-256 in CONFIGDIR/mcp-oauth.json, access
-	tokens only in memory.
+	Refresh and access tokens are kept as SHA-256 in
+	CONFIGDIR/mcp-oauth.json, so that a sign-in outlives a restart of
+	Neutrino; a client that is not asked to sign in again keeps working.
 
 
 	License: GPL
@@ -236,6 +237,13 @@ static void load()
 		if (g.expires > now && clients.count(g.client))
 			refreshes[it.name()] = g;
 	}
+	const Json::Value &a = root["access_tokens"];
+	for (Json::Value::const_iterator it = a.begin(); it != a.end(); ++it)
+	{
+		grant g = { (*it)["client"].asString(), (time_t) (*it)["expires"].asInt64() };
+		if (g.expires > now && clients.count(g.client))
+			accesses[it.name()] = g;
+	}
 }
 
 static std::mutex save_lock;		/* serializes the writers of the file */
@@ -263,6 +271,15 @@ static std::string snapshot(unsigned &generation)
 	{
 		root["refresh_tokens"][it->first]["client"] = it->second.client;
 		root["refresh_tokens"][it->first]["expires"] = (Json::Int64) it->second.expires;
+	}
+	root["access_tokens"] = Json::Value(Json::objectValue);
+	time_t now = time(NULL);
+	for (std::map<std::string, grant>::const_iterator it = accesses.begin(); it != accesses.end(); ++it)
+	{
+		if (it->second.expires <= now)
+			continue;
+		root["access_tokens"][it->first]["client"] = it->second.client;
+		root["access_tokens"][it->first]["expires"] = (Json::Int64) it->second.expires;
 	}
 	generation = ++save_generation;
 	return json_compact(root);
@@ -410,6 +427,7 @@ bool mcp_oauth::validAccessToken(const std::string &token)
 	if (token.empty())
 		return false;
 	std::lock_guard<std::mutex> l(lock);
+	load();
 	std::map<std::string, grant>::iterator it = accesses.find(sha256_b64url(token));
 	if (it == accesses.end())
 		return false;
