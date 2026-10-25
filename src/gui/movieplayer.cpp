@@ -3736,7 +3736,7 @@ void CMoviePlayerGui::PlayFileLoop(void)
 			disableOsdElements(NO_MUTE);
 			showHelp();
 			enableOsdElements(NO_MUTE);
-		} else if (msg == CRCInput::RC_info ||
+		} else if (msg == CRCInput::RC_info || (isLuaPlay && msg == CRCInput::RC_ok) ||
 			   (g_info.hw_caps->rc_e2_keys && (msg == CRCInput::RC_tv || msg == CRCInput::RC_radio))) {
 			callInfoViewer();
 			update_lcd = true;
