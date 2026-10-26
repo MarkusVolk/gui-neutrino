@@ -401,10 +401,15 @@ void CMenuItem::paintItemButton(const bool select_mode, int item_height, const c
 	int icon_space_mid = icon_start_x + icon_space_x/2;
 
 	//get data of number icon and paint
+	std::string inactive_icon;
 	if (icon_name && *icon_name)
 	{
-               if (!active)
-			icon_name = NEUTRINO_ICON_BUTTON_DUMMY;
+		/* a locked entry keeps its key, faded, where there is such an icon */
+		if (!active)
+		{
+			inactive_icon = std::string(icon_name) + "_inactive";
+			icon_name = frameBuffer->getIconPath(inactive_icon).empty() ? NEUTRINO_ICON_BUTTON_DUMMY : inactive_icon.c_str();
+		}
 
 		frameBuffer->getIconSize(icon_name, &icon_w, &icon_h);
 
