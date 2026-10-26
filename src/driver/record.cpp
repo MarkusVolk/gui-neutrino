@@ -1198,9 +1198,11 @@ CRecordManager::CRecordManager()
 
 CRecordManager::~CRecordManager()
 {
+	/* Neutrino ends: the recordings stop, their timers do not, so that
+	   timerd takes up a planned one again at the next start */
 	for(recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++) {
 		CRecordInstance * inst = it->second;
-		inst->Stop();
+		inst->Stop(false);
 		delete inst;
 	}
 	recmap.clear();

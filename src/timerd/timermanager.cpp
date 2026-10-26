@@ -750,9 +750,17 @@ void CTimerManager::loadEventsFromConfig()
 						CTimerEvent_Record *event=
 						new CTimerEvent_Record(&config, savedIDs[i]);
 						/* a recording ends with the Neutrino that ran it: a timer
-						   saved while it recorded, a timeshift above all, records
-						   nothing after a restart and is not kept as running */
+						   saved while it recorded records nothing after a restart.
+						   A planned one (it has an announcement) whose end is to
+						   come starts again; one made to record at once, a
+						   timeshift above all, is not kept as running */
 						bool was_running = event->eventState == CTimerd::TIMERSTATE_ISRUNNING;
+						if (was_running && event->announceTime && event->stopTime > now &&
+						    event->eventRepeat == CTimerd::TIMERREPEAT_ONCE)
+						{
+							event->eventState = CTimerd::TIMERSTATE_SCHEDULED;
+							was_running = false;
+						}
 						if (!was_running && ((event->alarmTime >= now) || (event->stopTime > now)))
 						{
 							addEvent(event,false);
