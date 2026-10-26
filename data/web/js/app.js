@@ -345,8 +345,20 @@ async function viewEpg(main) {
 				if (right - left < 2)
 					return;
 				const running = ev.start <= t && t < end;
+				/* a click on what runs now plays it (on the box itself: zaps
+				 * to it), the right button or a long press opens the choices */
+				const direct = running && (!onBox || may("write"));
 				line.append(h("div", { class: `event${running ? " running" : ""}`, style: `left:${left}px;width:${right - left - 2}px`,
-					title: `${hm(ev.start)} ${ev.title}`, onclick: () => eventDialog(ch, ev) }, ev.title));
+					title: `${hm(ev.start)} ${ev.title}${direct ? (onBox ? "\nClick: zap - right click: more" : "\nClick: stream - right click: more") : ""}`,
+					onclick: () => {
+						if (!direct)
+							eventDialog(ch, ev);
+						else if (onBox)
+							zap(ch).catch(fail);
+						else
+							stream(ch.id).catch(fail);
+					},
+					oncontextmenu: (e) => { e.preventDefault(); eventDialog(ch, ev); } }, ev.title));
 			});
 			/* the channel logo, the name where there is none */
 			const head = h("div", { class: "rowh logo-head", title: ch.name });
