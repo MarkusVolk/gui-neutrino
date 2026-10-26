@@ -2,7 +2,7 @@
 // code the TV shows, the address carries a one-time code that pairs the
 // phone first.
 
-import { session, may, key, ApiError, pairWithCode, pairOnTv, httpsUrl } from "./api.js";
+import { session, may, key, ApiError, pairWithCode, pairOnTv, httpsUrl, applyTheme } from "./api.js";
 import { loadLayout, drawRemote } from "./remote.js";
 
 const msg = document.getElementById("msg");
@@ -116,6 +116,7 @@ async function start() {
 	document.addEventListener("fullscreenchange", updateFull);
 	document.addEventListener("pointerdown", firstTouch);
 	updateFull();
+	applyTheme();
 	document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && document.fullscreenElement) stayAwake(); });
 	try {
 		await session();

@@ -1,4 +1,4 @@
-import { api, all, session, may, key, osdUrl, ApiError, pairOnTv, httpsUrl } from "./api.js";
+import { api, all, session, may, key, osdUrl, ApiError, pairOnTv, httpsUrl, applyTheme } from "./api.js";
 import { loadLayout, drawRemote, KEYBOARD } from "./remote.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -1097,6 +1097,7 @@ async function route() {
 
 async function start() {
 	frame();
+	applyTheme();
 	try {
 		await session();
 	} catch (e) {

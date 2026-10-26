@@ -95,6 +95,7 @@
 #include <system/fsmounter.h>
 #include <system/netshares.h>
 #include <gui/hdd_menu.h>
+#include <gui/color.h>
 #include <src/tools/rcsim.h>
 
 #include <yhttpd.h>
@@ -2173,6 +2174,22 @@ void ep_mcp_clients_delete(Call &c)
 #endif
 
 /* the certificate of the box's own CA, for a phone to trust */
+// the selection colour of the OSD theme, which the web pages take as their accent
+std::string theme_hex(unsigned char r, unsigned char g, unsigned char b)
+{
+	return string_printf("#%06x", convertSetupColor2RGB(r, g, b) & 0xffffff);
+}
+
+void ep_theme(Call &c)
+{
+	const SNeutrinoTheme &t = g_settings.theme;
+	Json::Value v(Json::objectValue);
+	v["accent"] = theme_hex(t.menu_Content_Selected_red, t.menu_Content_Selected_green, t.menu_Content_Selected_blue);
+	v["accent_text"] = theme_hex(t.menu_Content_Selected_Text_red, t.menu_Content_Selected_Text_green, t.menu_Content_Selected_Text_blue);
+	v["rounded"] = t.rounded_corners != 0;
+	send_json(c.out, 200, v);
+}
+
 void ep_ca(Call &c)
 {
 	std::string pem = ycert::ca_pem();
@@ -2842,6 +2859,7 @@ const Route routes[] = {
 	{ "GET",	"/api/v1/pair/devices",		L_SYSTEM,	ep_devices },
 	{ "DELETE",	"/api/v1/pair/devices/{}",	L_SYSTEM,	ep_device_delete },
 	{ "GET",	"/api/v1/system/ca",		L_PUBLIC,	ep_ca },
+	{ "GET",	"/api/v1/theme",		L_PUBLIC,	ep_theme },
 	{ "GET",	"/api/v1/ext",			L_READ,		ep_ext_list },
 	{ "GET",	"/api/v1/mcp",			L_SYSTEM,	ep_mcp_get },
 #ifdef ENABLE_ASSISTANT
