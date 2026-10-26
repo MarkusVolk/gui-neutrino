@@ -313,6 +313,15 @@ static bool deleteEvent(const t_event_id uniqueKey)
 	return ret;
 }
 
+/* Which of two overlapping events stays: the lower rank. That is the table
+   id, present/following before the schedule, but the following event of
+   another transponder (0x4f) gives way to a schedule: it can be a
+   placeholder lasting a day that would keep the schedule out. */
+static unsigned tableRank(unsigned char table_id)
+{
+	return table_id == 0x4f ? 0x70 : table_id;
+}
+
 /* if cn == true (if called by cnThread), then myCurrentEvent and myNextEvent is updated, too */
 /*static*/ void addEvent(const SIevent &evt, const time_t zeit, bool cn = false)
 {
@@ -513,7 +522,7 @@ debug(DEBUG_ERROR, "addEvent: ch %012" PRIx64 " running %d (%s) got_CN %d", evt.
 					 * find an identical one => bail out */
 					if ((*x)->times.begin()->startzeit + (long)(*x)->times.begin()->dauer <= start_time)
 						break;
-					if ((*x)->table_id < e->table_id)
+					if (tableRank((*x)->table_id) < tableRank(e->table_id))
 					{
 						/* don't add the higher table_id */
 						debug(DEBUG_INFO, "%s: don't replace 0x%012" PRIx64 ".%02x with 0x%012" PRIx64 ".%02x",
@@ -542,16 +551,21 @@ debug(DEBUG_ERROR, "addEvent: ch %012" PRIx64 " running %d (%s) got_CN %d", evt.
 				if ((*later)->get_channel_id() != e_chid || (*later)->times.begin()->startzeit >= end_time)
 					break;
 				t_event_id l_key = (*later)->uniqueKey();
-				if ((*later)->table_id < e->table_id)
-				{
-					debug(DEBUG_INFO, "%s: don't replace 0x%012" PRIx64 ".%02x with 0x%012" PRIx64 ".%02x",
-						__func__, l_key, (*later)->table_id, e_key, e->table_id);
-					unlockEvents();
-					delete eptr;
-					return;
-				}
 				if (l_key == e_key)
 					continue;
+				/* one of a lower rank stays, beside the new one rather than
+				   leave the time before it empty; a following event of another
+				   transponder is not added over it */
+				if (tableRank((*later)->table_id) < tableRank(e->table_id))
+				{
+					if (e->table_id == 0x4f)
+					{
+						unlockEvents();
+						delete eptr;
+						return;
+					}
+					continue;
+				}
 				debug(DEBUG_INFO, "%s: delete 0x%012" PRIx64 ".%02x time = 0x%012" PRIx64 ".%02x", __func__,
 					l_key, (*later)->table_id, e_key, e->table_id);
 				to_delete.push_back(l_key);
