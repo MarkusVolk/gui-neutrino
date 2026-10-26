@@ -271,28 +271,21 @@ void readDVBTimeFilter(void)
 	}
 }
 
-void deleteOldfileEvents(const char *epgdir)
+/* removes the files of the old index that the new save did not write again */
+static void deleteOldfileEvents(const char *epgdir, const std::set<std::string> &keep)
 {
 	std::string indexname = std::string(epgdir) + "/index.xml";
 	xmlDocPtr filter_parser = parseXmlFile(indexname.c_str());
-	std::string filename;
-	std::string file;
 
 	if (filter_parser != NULL)
 	{
 		xmlNodePtr filter = xmlDocGetRootElement(filter_parser);
 		filter = xmlChildrenNode(filter);
 
-		while (filter) {
+		for (; filter; filter = xmlNextNode(filter)) {
 			const char * name = xmlGetAttribute(filter, "name");
-			if(name){
-				filename=name;
-				file = epgdir;
-				file +="/";
-				file +=filename;
-				unlink(file.c_str());
-				filter = xmlNextNode(filter);
-			}
+			if (name && !keep.count(name))
+				unlink((std::string(epgdir) + "/" + name).c_str());
 		}
 		xmlFreeDoc(filter_parser);
 	}
@@ -955,7 +948,9 @@ void writeEventsToFile(const char *epgdir)
 	t_original_network_id onid = 0;
 	t_transport_stream_id tsid = 0;
 	t_service_id sid = 0;
-	deleteOldfileEvents(epgdir);
+	/* every file is written under a temporary name and the old save stays
+	   whole until the new one is: a save cut short keeps the old EPG */
+	std::set<std::string> written;
 
 	tmpname  = (std::string)epgdir + "/index.tmp";
 
@@ -982,10 +977,11 @@ void writeEventsToFile(const char *epgdir)
 			tsid = (*e)->transport_stream_id;
 			sid = (*e)->service_id;
 			snprintf(eventname, 17, "%04x%04x%04x.xml", tsid, onid, sid);
-			filename  = (std::string)epgdir + "/" + (std::string)eventname;
+			filename  = (std::string)epgdir + "/" + (std::string)eventname + ".tmp";
 			if (!(eventfile = fopen(filename.c_str(), "w"))) {
 				goto _done;
 			}
+			written.insert(eventname);
 			fprintf(indexfile, "\t<eventfile name=\"%s\"/>\n", eventname);
 			write_epg_xml_header(eventfile, onid, tsid, sid);
 		}
@@ -999,6 +995,12 @@ _done:
 	unlockEvents();
 	write_indexxml_footer(indexfile);
 	fclose(indexfile);
+
+	for (std::set<std::string>::iterator it = written.begin(); it != written.end(); ++it) {
+		filename = (std::string)epgdir + "/" + *it;
+		rename((filename + ".tmp").c_str(), filename.c_str());
+	}
+	deleteOldfileEvents(epgdir, written);
 
 	filename  = (std::string)epgdir + "/index.xml";
 	rename(tmpname.c_str(), filename.c_str());
