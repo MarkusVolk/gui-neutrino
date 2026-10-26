@@ -37,6 +37,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+
 #ifdef ENABLE_LIBSECRET
 #include <libsecret/secret.h>
 #endif
@@ -46,6 +49,9 @@
 
 #define SECRETS_FILE		CONFIGDIR "/secrets.conf"
 #define SECRETS_CRED_DIR	CONFIGDIR "/credentials"
+/* outside CONFIGDIR, so that a copy or backup of the settings holds no usable secret */
+#define SECRETS_KEY_FILE	DATADIR_VAR "/secrets.key"
+#define SEALED_PREFIX		"enc1:"
 
 namespace
 {
@@ -259,12 +265,110 @@ void systemd_creds_remove(const std::string &name)
 
 /* ---- file only its owner can read -------------------------------------- */
 
+/* The values in the file are sealed with AES-256-GCM under a key of the box
+   kept in SECRETS_KEY_FILE. The box opens them on its own, so root on the box
+   can as well; the seal keeps them out of settings backups and copies. */
+bool file_key(unsigned char key[32], bool create)
+{
+	int fd = open(SECRETS_KEY_FILE, O_RDONLY | O_CLOEXEC);
+	if (fd >= 0) {
+		bool ok = read(fd, key, 32) == 32;
+		close(fd);
+		return ok;
+	}
+	if (!create || RAND_bytes(key, 32) != 1)
+		return false;
+	safe_mkdir(DATADIR_VAR);
+	std::string tmp = std::string(SECRETS_KEY_FILE) + ".tmp";
+	fd = open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+	if (fd < 0)
+		return false;
+	bool ok = write(fd, key, 32) == 32 && fsync(fd) == 0;
+	close(fd);
+	if (!ok || rename(tmp.c_str(), SECRETS_KEY_FILE) != 0) {
+		unlink(tmp.c_str());
+		return false;
+	}
+	return true;
+}
+
+bool seal(const std::string &value, std::string &out)
+{
+	unsigned char key[32], iv[12], tag[16];
+	if (!file_key(key, true) || RAND_bytes(iv, sizeof(iv)) != 1)
+		return false;
+	std::vector<unsigned char> buf(sizeof(iv) + value.size() + sizeof(tag));
+	memcpy(buf.data(), iv, sizeof(iv));
+	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+	int len = 0, fin = 0;
+	bool ok = ctx && EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key, iv) == 1
+		&& EVP_EncryptUpdate(ctx, buf.data() + sizeof(iv), &len, (const unsigned char *) value.data(), value.size()) == 1
+		&& EVP_EncryptFinal_ex(ctx, buf.data() + sizeof(iv) + len, &fin) == 1
+		&& EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, sizeof(tag), tag) == 1;
+	EVP_CIPHER_CTX_free(ctx);
+	OPENSSL_cleanse(key, sizeof(key));
+	if (!ok)
+		return false;
+	memcpy(buf.data() + sizeof(iv) + len + fin, tag, sizeof(tag));
+	std::vector<unsigned char> b64(4 * ((buf.size() + 2) / 3) + 1);
+	int n = EVP_EncodeBlock(b64.data(), buf.data(), buf.size());
+	out = SEALED_PREFIX + std::string((const char *) b64.data(), n);
+	return true;
+}
+
+/* false for a sealed value whose key is gone or another one */
+bool unseal(const std::string &text, std::string &value, bool &was_sealed)
+{
+	was_sealed = text.compare(0, strlen(SEALED_PREFIX), SEALED_PREFIX) == 0;
+	if (!was_sealed) {
+		value = text;
+		return true;
+	}
+	std::string b64 = text.substr(strlen(SEALED_PREFIX));
+	std::vector<unsigned char> buf(3 * (b64.size() / 4) + 3);
+	int n = EVP_DecodeBlock(buf.data(), (const unsigned char *) b64.data(), b64.size());
+	if (n < 0)
+		return false;
+	for (size_t i = b64.size(); i > 0 && b64[i - 1] == '='; i--)
+		n--;
+	unsigned char key[32];
+	if (n < 28 || !file_key(key, false))
+		return false;
+	const unsigned char *iv = buf.data(), *ct = buf.data() + 12, *tag = buf.data() + n - 16;
+	int ct_len = n - 28;
+	std::vector<unsigned char> plain(ct_len + 16);
+	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+	int len = 0, fin = 0;
+	bool ok = ctx && EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key, iv) == 1
+		&& EVP_DecryptUpdate(ctx, plain.data(), &len, ct, ct_len) == 1
+		&& EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, (void *) tag) == 1
+		&& EVP_DecryptFinal_ex(ctx, plain.data() + len, &fin) == 1;
+	EVP_CIPHER_CTX_free(ctx);
+	OPENSSL_cleanse(key, sizeof(key));
+	if (ok)
+		value.assign((const char *) plain.data(), len + fin);
+	OPENSSL_cleanse(plain.data(), plain.size());
+	return ok;
+}
+
+bool file_store(const std::string &name, const std::string &value);
+
 bool file_load(const std::string &name, std::string &value)
 {
 	CConfigFile file(',');
 	if (!file_exists(SECRETS_FILE) || !file.loadConfig(SECRETS_FILE))
 		return false;
-	value = file.getString(name, "");
+	std::string text = file.getString(name, "");
+	if (text.empty())
+		return false;
+	bool was_sealed;
+	if (!unseal(text, value, was_sealed)) {
+		fprintf(stderr, "[secrets] %s cannot be opened: %s is missing or another one\n", name.c_str(), SECRETS_KEY_FILE);
+		return false;
+	}
+	/* a value from before the seal is sealed now */
+	if (!was_sealed)
+		file_store(name, value);
 	return !value.empty();
 }
 
@@ -282,7 +386,13 @@ bool file_store(const std::string &name, const std::string &value)
 	CConfigFile file(',');
 	if (file_exists(SECRETS_FILE))
 		file.loadConfig(SECRETS_FILE);
-	file.setString(name, value);
+	std::string sealed;
+	/* without a key file (a read-only /var) the file's own mode is all that is left */
+	if (!seal(value, sealed)) {
+		fprintf(stderr, "[secrets] cannot seal %s, it is kept unsealed\n", name.c_str());
+		sealed = value;
+	}
+	file.setString(name, sealed);
 	return file_save(file);
 }
 

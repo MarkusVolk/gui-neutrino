@@ -1,5 +1,5 @@
 /*
-	Secrets: API keys and tokens kept outside of neutrino.conf
+	Secrets: API keys, tokens and share passwords kept outside of neutrino.conf
 
 	License: GPL
 
@@ -28,7 +28,8 @@
  *    when built with --enable-libsecret and a session bus is there,
  *  - a credential encrypted by systemd-creds under CONFIGDIR/credentials,
  *    with the host key or a TPM2 as root, with the user's key otherwise,
- *  - CONFIGDIR/secrets.conf, readable by its owner only.
+ *  - CONFIGDIR/secrets.conf, readable by its owner only, its values sealed
+ *    with a key in DATADIR_VAR/secrets.key (a settings backup holds none).
  * The empty string removes a secret.
  */
 namespace secrets

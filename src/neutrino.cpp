@@ -393,12 +393,16 @@ static void clearUsermenuConfig()
 *          CNeutrinoApp -  loadSetup, load the application-settings                   *
 **************************************************************************************/
 
-#ifdef ENABLE_ASSISTANT
-/* API keys and tokens live in the secret store, not in neutrino.conf */
+/* API keys, tokens and share passwords live in the secret store, not in
+   neutrino.conf; one still found there moves over */
 static void loadSecret(CConfigFile &config, const std::string &key, std::string &field)
 {
+	std::string old = config.getString(key, "");
 	config.deleteKey(key);
-	setSettingsText(field, secrets::load(key));
+	if (!old.empty() && secrets::store(key, old))
+		setSettingsText(field, old);
+	else
+		setSettingsText(field, old.empty() ? secrets::load(key) : old);
 }
 
 static void saveSecret(CConfigFile &config, const std::string &key, const std::string &value)
@@ -408,7 +412,6 @@ static void saveSecret(CConfigFile &config, const std::string &key, const std::s
 	else
 		config.setString(key, value);
 }
-#endif
 
 std::string font_file_monospace = "";
 
@@ -853,7 +856,7 @@ int CNeutrinoApp::loadSetup(const char *fname)
 		setSettingsText(g_settings.network_nfs[i].mount_options2, configfile.getString("network_nfs_mount_options2_" + i_str, "nolock"));
 		g_settings.network_nfs[i].type = configfile.getInt32("network_nfs_type_" + i_str, 0);
 		setSettingsText(g_settings.network_nfs[i].username, configfile.getString("network_nfs_username_" + i_str, ""));
-		setSettingsText(g_settings.network_nfs[i].password, configfile.getString("network_nfs_password_" + i_str, ""));
+		loadSecret(configfile, "network_nfs_password_" + i_str, g_settings.network_nfs[i].password);
 	}
 
 	std::string music_dir = TARGET_ROOT "/media/sda1/music";
@@ -1925,7 +1928,7 @@ void CNeutrinoApp::saveSetup(const char *fname)
 		snprintf(cfg_key, sizeof(cfg_key), "network_nfs_username_%d", i);
 		configfile.setString(cfg_key, g_settings.network_nfs[i].username);
 		snprintf(cfg_key, sizeof(cfg_key), "network_nfs_password_%d", i);
-		configfile.setString(cfg_key, g_settings.network_nfs[i].password);
+		saveSecret(configfile, cfg_key, g_settings.network_nfs[i].password);
 	}
 
 	configfile.setString("network_nfs_audioplayerdir", g_settings.network_nfs_audioplayerdir);
