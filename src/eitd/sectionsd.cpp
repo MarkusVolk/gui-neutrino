@@ -483,6 +483,7 @@ debug(DEBUG_ERROR, "addEvent: ch %012" PRIx64 " running %d (%s) got_CN %d", evt.
 			MySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey::iterator x =
 				mySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey.upper_bound(e);
 			e->eventID = eventID;
+			MySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey::iterator later = x;
 
 			/* the first decrement of the iterator gives us an event that's a potential
 			 * match *or* from a different channel, then no event for this channel is stored */
@@ -533,6 +534,27 @@ debug(DEBUG_ERROR, "addEvent: ch %012" PRIx64 " running %d (%s) got_CN %d", evt.
 						x_key, (*x)->table_id, e_key, e->table_id);
 					to_delete.push_back(x_key);
 				}
+			}
+			/* the events that begin within the new one overlap it as well, such as a
+			   programme of an older XMLTV reading that has since been moved */
+			for (; later != mySIeventsOrderServiceUniqueKeyFirstStartTimeEventUniqueKey.end(); ++later)
+			{
+				if ((*later)->get_channel_id() != e_chid || (*later)->times.begin()->startzeit >= end_time)
+					break;
+				t_event_id l_key = (*later)->uniqueKey();
+				if ((*later)->table_id < e->table_id)
+				{
+					debug(DEBUG_INFO, "%s: don't replace 0x%012" PRIx64 ".%02x with 0x%012" PRIx64 ".%02x",
+						__func__, l_key, (*later)->table_id, e_key, e->table_id);
+					unlockEvents();
+					delete eptr;
+					return;
+				}
+				if (l_key == e_key)
+					continue;
+				debug(DEBUG_INFO, "%s: delete 0x%012" PRIx64 ".%02x time = 0x%012" PRIx64 ".%02x", __func__,
+					l_key, (*later)->table_id, e_key, e->table_id);
+				to_delete.push_back(l_key);
 			}
 
 			while (! to_delete.empty())
