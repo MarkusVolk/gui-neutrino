@@ -38,6 +38,7 @@
 #include <eitd/sectionsd.h>
 
 #include <vector>
+#include <algorithm>
 #include <cstdlib>
 
 #include "debug.h"
@@ -1403,22 +1404,67 @@ void CTimerEvent_Record::Reschedule()
 	getEpgId();
 }
 //------------------------------------------------------------
-void CTimerEvent_Record::getEpgId()
+/* The programme a timer is for, from what the timer knows of it: its start
+   (epg_starttime, else from) and, for a recording, its end. The guide's event
+   ids do not last (sectionsd numbers XMLTV programmes anew at every reading)
+   and two guides can overlap on a channel, so the times decide first:
+   1. the programme that starts and ends there, the event id choosing between
+      two such;
+   2. the one that overlaps from..to the longest (a programme moved);
+   3. without an end, the one that runs at check_time. */
+static void findTimerEvent(CTimerd::EventInfo &info, time_t from, time_t to, time_t check_time)
 {
-	//TODO: Record/Zapto getEpgId code almost identical !
 	CChannelEventList evtlist;
-	CEitManager::getInstance()->getEventsServiceKey(eventInfo.channel_id, evtlist);
-	// we check for a time in the middle of the recording
-	time_t check_time=alarmTime/2 + stopTime/2;
-	for ( CChannelEventList::iterator e= evtlist.begin(); e != evtlist.end(); ++e )
+	CEitManager::getInstance()->getEventsServiceKey(info.channel_id, evtlist);
+	time_t start = info.epg_starttime ? info.epg_starttime : from;
+
+	const CChannelEvent *best = NULL;
+	for (CChannelEventList::iterator e = evtlist.begin(); e != evtlist.end(); ++e)
 	{
-		if ( e->startTime <= check_time && (e->startTime + (int)e->duration) >= check_time)
+		time_t end = e->startTime + (int)e->duration;
+		bool same = e->startTime == start && (!to || std::abs((long)(end - to)) <= 60);
+		if (same && (!best || e->eventID == info.epg_id))
+			best = &(*e);
+	}
+	if (!best && to > from)
+	{
+		time_t most = 0;
+		for (CChannelEventList::iterator e = evtlist.begin(); e != evtlist.end(); ++e)
 		{
-			eventInfo.epg_id = e->eventID;
-			eventInfo.epg_starttime = e->startTime;
-			break;
+			time_t end = e->startTime + (int)e->duration;
+			time_t overlap = std::min(end, to) - std::max(e->startTime, from);
+			if (overlap > most || (overlap == most && overlap > 0 && e->eventID == info.epg_id))
+			{
+				most = overlap;
+				best = &(*e);
+			}
 		}
 	}
+	if (!best && !to)
+	{
+		for (CChannelEventList::iterator e = evtlist.begin(); e != evtlist.end(); ++e)
+		{
+			if (e->startTime < check_time && e->startTime + (int)e->duration > check_time)
+			{
+				best = &(*e);
+				break;
+			}
+		}
+	}
+	if (best)
+	{
+		info.epg_id = best->eventID;
+		info.epg_starttime = best->startTime;
+	}
+}
+
+void CTimerEvent_Record::getEpgId()
+{
+	/* the programme itself lies within the safety time before and after */
+	int pre = 0, post = 0;
+	if (eventInfo.recordingSafety)
+		CTimerManager::getInstance()->getRecordingSafety(pre, post);
+	findTimerEvent(eventInfo, alarmTime + pre, stopTime - post, 0);
 	/* Reached on every read of the timer list, on every announcement and at
 	   the moment the recording begins, so this is where a name that came in
 	   with the timer would be replaced by the guide's within a second of the
@@ -1515,20 +1561,9 @@ void CTimerEvent_Zapto::fireEvent()
 //------------------------------------------------------------
 void CTimerEvent_Zapto::getEpgId()
 {
-	//TODO: Record/Zapto getEpgId code almost identical !
-	CChannelEventList evtlist;
-	CEitManager::getInstance()->getEventsServiceKey(eventInfo.channel_id, evtlist);
-	// we check for a time 5 min after zap
-	time_t check_time=alarmTime + 300;
-	for ( CChannelEventList::iterator e= evtlist.begin(); e != evtlist.end(); ++e )
-	{
-    	if ( e->startTime < check_time && (e->startTime + (int)e->duration) > check_time)
-		{
-			eventInfo.epg_id = e->eventID;
-			eventInfo.epg_starttime = e->startTime;
-			break;
-		}
-	}
+	/* a zap has no end: the programme that starts at the zap, else the one
+	   running 5 min after it */
+	findTimerEvent(eventInfo, alarmTime, 0, alarmTime + 300);
 	if(eventInfo.epg_id != 0)
 	{
 		CShortEPGData epgdata;
