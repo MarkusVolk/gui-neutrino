@@ -98,6 +98,7 @@ enable_xkbcommon = get_option('xkbcommon')
 enable_udev = get_option('udev')
 enable_libsecret = get_option('libsecret')
 enable_xmltv_xz = get_option('xmltv-xz')
+enable_netshares = get_option('netshares')
 enable_assistant = get_option('assistant')
 enable_assistant_voice = get_option('assistant-voice')
 enable_webp = get_option('webp')
@@ -218,6 +219,7 @@ foreach def : [
 	['ENABLE_TRAY', enable_tray],
 	['ENABLE_TERMINAL', enable_terminal],
 	['ENABLE_XMLTV_XZ', enable_xmltv_xz],
+	['ENABLE_NETSHARES', enable_netshares],
 	['ENABLE_ASSISTANT', enable_assistant],
 	['ENABLE_ASSISTANT_VOICE', enable_assistant_voice],
 	['ENABLE_FREESATEPG', get_option('freesatepg')],
@@ -319,6 +321,8 @@ xkbcommon_dep = enable_xkbcommon ? dependency('xkbcommon') : []
 udev_dep = enable_udev ? dependency('libudev') : []
 libsecret_dep = enable_libsecret ? dependency('libsecret-1') : []
 lzma_dep = enable_xmltv_xz ? dependency('liblzma') : []
+nfs_dep = enable_netshares ? dependency('libnfs') : []
+smb2_dep = enable_netshares ? dependency('libsmb2') : []
 alsa_dep = enable_assistant_voice ? dependency('alsa') : []
 # the certificates of the HTTPS server and the hashes of its sign-ins
 crypto_dep = dependency('libcrypto')
@@ -346,6 +350,8 @@ nt_deps = [
 	libsecret_dep,
 	tsm_dep,
 	lzma_dep,
+	nfs_dep,
+	smb2_dep,
 	alsa_dep,
 	crypto_dep,
 	qrencode_dep,

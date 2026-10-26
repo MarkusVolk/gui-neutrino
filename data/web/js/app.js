@@ -8,6 +8,7 @@ const ICONS = {
 	channels: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
 	epg: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 17h7"/>',
 	timers: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/>',
+	mounts: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6"/>',
 	box: '<rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 12h.01M10 12h4"/>',
 	record: '<circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/>',
 	stream: '<path d="M8 5v14l11-7z" fill="currentColor" stroke="none"/>',
@@ -627,6 +628,336 @@ async function viewSignIn(main) {
 }
 
 /* ------------------------------------------------------------------ */
+/* drives and network shares                                           */
+
+const SHARE_TYPES = { smb: "SMB", nfs: "NFS", ftp: "FTP" };
+
+function usage(d) {
+	if (!d.size)
+		return null;
+	const used = Math.round(100 * (d.size - d.free) / d.size);
+	return h("div", {},
+		h("div", { class: "progress" }, h("span", { style: `width:${used}%` })),
+		h("div", { class: "dim small" }, `${size(d.free)} free of ${size(d.size)}`));
+}
+
+function holds(dir, path) {
+	if (!dir || !path)
+		return false;
+	return path === dir || path.startsWith(dir.endsWith("/") ? dir : `${dir}/`);
+}
+
+function shareLabel(s) {
+	return s.type === "nfs" ? `${s.host}:${s.share}` : `//${s.host}/${s.share}`;
+}
+
+function localDirFor(share) {
+	return `/media/net/${share.replace(/^\/+/, "").replace(/[^\w.-]+/g, "_") || "share"}`;
+}
+
+/* asks for what a share entry holds; resolves to the body, or null on cancel */
+function shareDialog(title, init, isNew) {
+	return new Promise((resolve) => {
+		const type = h("select", { "aria-label": "Type" },
+			h("option", { value: "smb" }, "SMB (Windows, Fritz!Box, most NAS)"),
+			h("option", { value: "nfs" }, "NFS (Linux, NAS)"));
+		type.value = init.type || "smb";
+		const field = (label, input) => h("label", { class: "field" }, h("span", { class: "dim small" }, label), input);
+		const shareName = h("span", { class: "dim small" });
+		const host = h("input", { type: "text", required: true, value: init.host || "", placeholder: "192.168.178.1 or nas" });
+		const share = h("input", { type: "text", required: true, value: init.share || "" });
+		const dir = h("input", { type: "text", required: true, value: init.local_dir || "" });
+		const user = h("input", { type: "text", value: init.username || "", autocomplete: "off" });
+		const pass = h("input", { type: "password", value: init.password || "", autocomplete: "new-password",
+			placeholder: init.has_password ? "unchanged" : "" });
+		const options = h("input", { type: "text", value: init.options || "", placeholder: "rw" });
+		const auto = h("input", { type: "checkbox" });
+		auto.checked = init.automount !== false;
+		const record = h("input", { type: "checkbox" });
+		const login = h("div", { class: "fields" }, field("User", user), field("Password", pass));
+		const sync = () => {
+			login.hidden = type.value === "nfs";
+			share.placeholder = type.value === "nfs" ? "/export/path" : "share name";
+			shareName.textContent = type.value === "nfs" ? "Export" : "Share";
+		};
+		type.addEventListener("change", sync);
+		sync();
+		if (!init.local_dir)
+			share.addEventListener("input", () => { dir.value = localDirFor(share.value); });
+
+		const form = h("form", { method: "dialog", class: "fields" },
+			h("h2", {}, title),
+			field("Type", type), field("Server", host), h("label", { class: "field" }, shareName, share),
+			login, field("Mount at", dir), field("Options", options),
+			h("label", { class: "check" }, auto, "Mount when the box starts"),
+			isNew ? h("label", { class: "check" }, record, "Record here") : null,
+			h("div", { class: "buttons" },
+				h("button", { class: "btn", type: "button", onclick: () => d.close() }, "Cancel"),
+				h("button", { class: "btn primary", value: "ok" }, isNew ? "Add and mount" : "Save")));
+		const d = h("dialog", {}, form);
+		d.addEventListener("close", () => {
+			d.remove();
+			if (d.returnValue !== "ok")
+				return resolve(null);
+			const body = { type: type.value, host: host.value.trim(), share: share.value.trim(),
+				local_dir: dir.value.trim(), automount: auto.checked, options: options.value.trim() };
+			if (type.value === "smb") {
+				body.username = user.value.trim();
+				if (pass.value || !init.has_password || !body.username)
+					body.password = pass.value;
+			}
+			resolve({ body, record: record.checked });
+		});
+		document.body.append(d);
+		d.showModal();
+	});
+}
+
+function loginDialog(host) {
+	return new Promise((resolve) => {
+		const user = h("input", { type: "text", required: true, autocomplete: "off", "aria-label": "User" });
+		const pass = h("input", { type: "password", autocomplete: "new-password", "aria-label": "Password" });
+		const d = h("dialog", {}, h("form", { method: "dialog", class: "fields" },
+			h("h2", {}, `Sign in to ${host}`),
+			h("label", { class: "field" }, h("span", { class: "dim small" }, "User"), user),
+			h("label", { class: "field" }, h("span", { class: "dim small" }, "Password"), pass),
+			h("div", { class: "buttons" },
+				h("button", { class: "btn", type: "button", onclick: () => d.close() }, "Cancel"),
+				h("button", { class: "btn primary", value: "ok" }, "List shares"))));
+		d.addEventListener("close", () => {
+			d.remove();
+			resolve(d.returnValue === "ok" ? { username: user.value.trim(), password: pass.value } : null);
+		});
+		document.body.append(d);
+		d.showModal();
+	});
+}
+
+async function viewMounts(main) {
+	const drives = h("div", { class: "cards" });
+	const shares = h("div", { class: "list" });
+	const found = h("div", { class: "list" });
+	let state = null;
+
+	const run = async (btn, fn, done) => {
+		if (btn)
+			btn.disabled = true;
+		try {
+			const result = await fn();
+			if (done)
+				toast(typeof done === "function" ? done(result) : done);
+			await show();
+		} catch (e) {
+			fail(e);
+		} finally {
+			if (btn)
+				btn.disabled = false;
+		}
+	};
+	const recordHere = (path) => api("mounts/record", { method: "POST", body: { path } });
+	const recordButton = (dir, target, writable) => {
+		if (!may("system") || !dir || !writable || holds(dir, state.record_dir))
+			return null;
+		return h("button", { class: "btn", onclick: (ev) => run(ev.currentTarget,
+			() => recordHere(target), "Recordings go here") }, "Record here");
+	};
+	/* unmounting the record target moves the recordings; the box says where */
+	const unmounted = (what) => (r) => r?.record_dir ? `${what} unmounted, recordings go to ${r.record_dir} again` : `${what} unmounted`;
+	const marker = (dir) => holds(dir, state.record_dir)
+		? h("span", { class: "badge", title: state.record_dir, html: `${icon("record")}Recordings` }) : null;
+
+	const addShare = async (init) => {
+		const r = await shareDialog("Add a network share", init, true);
+		if (!r)
+			return;
+		await run(null, async () => {
+			const s = await api("mounts/shares", { method: "POST", body: r.body });
+			try {
+				await api(`mounts/shares/${s.nr}/mount`, { method: "POST" });
+			} catch (e) {
+				/* an entry that never mounted is not kept */
+				await api(`mounts/shares/${s.nr}`, { method: "DELETE" }).catch(() => {});
+				throw e;
+			}
+			if (r.record)
+				await recordHere(s.local_dir);
+		}, "Share mounted");
+	};
+
+	const renderDrives = () => {
+		if (!state.drives.length) {
+			drives.replaceChildren(h("div", { class: "empty" }, "No drives"));
+			return;
+		}
+		drives.replaceChildren(...state.drives.map((d) => {
+			const buttons = h("div", { class: "row", style: "margin-top:10px" });
+			if (state.can_mount && may("write"))
+				buttons.append(d.mounted
+					? h("button", { class: "btn", onclick: (ev) => run(ev.currentTarget,
+						() => api(`mounts/drives/${d.name}/umount`, { method: "POST" }), unmounted("Drive")) }, "Unmount")
+					: h("button", { class: "btn", onclick: (ev) => run(ev.currentTarget,
+						() => api(`mounts/drives/${d.name}/mount`, { method: "POST" }), "Drive mounted") }, "Mount"));
+			if (d.mounted && d.mount_point) {
+				const b = recordButton(d.mount_point, `${d.mount_point}/movies`, d.writable);
+				if (b)
+					buttons.append(b);
+			}
+			return h("div", { class: "card" },
+				h("div", { class: "row" }, h("h2", { style: "margin:0;flex:1" }, d.label || d.name), marker(d.mount_point)),
+				h("div", { class: "dim small" }, [d.name, d.fs, d.mounted ? d.mount_point || "mounted" : "not mounted"].filter(Boolean).join(" · ")),
+				usage(d), buttons.childElementCount ? buttons : null);
+		}));
+	};
+
+	const renderShares = () => {
+		if (!state.shares.length) {
+			shares.replaceChildren(h("div", { class: "empty" }, state.can_mount ? "No network shares" : "No network shares mounted"));
+			return;
+		}
+		shares.replaceChildren(...state.shares.map((s) => {
+			const buttons = h("div", { class: "row" });
+			if (!s.managed) {
+				buttons.append(recordButton(s.local_dir, s.local_dir, s.writable) || "");
+				return h("div", { class: "card share" },
+					h("div", {},
+						h("div", { class: "row" }, h("strong", {}, shareLabel(s)),
+							h("span", { class: "badge on" }, "Mounted by the desktop"), marker(s.local_dir)),
+						h("div", { class: "dim small" }, `${SHARE_TYPES[s.type] || s.type} · ${s.local_dir}`),
+						usage(s)),
+					buttons);
+			}
+			if (may("write"))
+				buttons.append(s.mounted
+					? h("button", { class: "btn", onclick: (ev) => run(ev.currentTarget,
+						() => api(`mounts/shares/${s.nr}/umount`, { method: "POST" }), unmounted("Share")) }, "Unmount")
+					: h("button", { class: "btn", onclick: (ev) => run(ev.currentTarget,
+						() => api(`mounts/shares/${s.nr}/mount`, { method: "POST" }), "Share mounted") }, "Mount"));
+			if (may("system")) {
+				if (s.mounted)
+					buttons.append(recordButton(s.local_dir, s.local_dir, s.writable) || "");
+				if (!s.mounted)
+					buttons.append(h("button", { class: "btn", onclick: async () => {
+						const r = await shareDialog("Change the share", s, false);
+						if (r)
+							await run(null, () => api(`mounts/shares/${s.nr}`, { method: "POST", body: r.body }), "Saved");
+					} }, "Edit"));
+				buttons.append(h("button", { class: "btn icon danger", title: "Remove", html: icon("trash"),
+					onclick: async (ev) => {
+						if (await confirmDialog(`Remove ${shareLabel(s)}?`, "Remove", true))
+							await run(ev.currentTarget, () => api(`mounts/shares/${s.nr}`, { method: "DELETE" }),
+								(r) => r?.record_dir ? `Share removed, recordings go to ${r.record_dir} again` : "Share removed");
+					} }));
+			}
+			return h("div", { class: "card share" },
+				h("div", {},
+					h("div", { class: "row" }, h("strong", {}, shareLabel(s)),
+						h("span", { class: `badge ${s.mounted ? "on" : ""}` }, s.mounted ? "Mounted" : "Not mounted"),
+						h("span", { class: "badge" }, s.automount ? "Mounts at boot" : "Manual mount"),
+						marker(s.local_dir)),
+					h("div", { class: "dim small" }, `${SHARE_TYPES[s.type] || s.type} · ${s.local_dir}`),
+					s.mounted ? usage(s) : null),
+				buttons);
+		}));
+	};
+
+	const show = async () => {
+		state = await api("mounts");
+		renderDrives();
+		renderShares();
+	};
+
+	const browse = async (host, type, row) => {
+		const label = host.name || host.ip;
+		const out = h("div", { class: "list" }, h("div", { class: "dim small" }, "Asking the server..."));
+		row.querySelector(".shares")?.remove();
+		out.classList.add("shares");
+		row.append(out);
+		let creds = {};
+		for (;;) {
+			try {
+				const items = (await api("mounts/browse", { method: "POST", body: { host: host.ip, type, ...creds } })).items || [];
+				if (!items.length) {
+					out.replaceChildren(h("div", { class: "dim small" }, "The server lists no shares"));
+					return;
+				}
+				out.replaceChildren(...items.map((it) => h("div", { class: "row" },
+					h("span", { style: "flex:1" }, h("strong", {}, it.name), it.comment ? h("span", { class: "dim small" }, ` ${it.comment}`) : null),
+					h("button", { class: "btn", onclick: () => addShare({ type, host: host.ip, share: it.name,
+						local_dir: localDirFor(it.name), ...creds }) }, "Add"))));
+				return;
+			} catch (e) {
+				if (e instanceof ApiError && e.code === "login-needed") {
+					const c = await loginDialog(label);
+					if (!c) {
+						out.remove();
+						return;
+					}
+					creds = c;
+					continue;
+				}
+				if (e instanceof ApiError && e.code === "no-share-list") {
+					out.replaceChildren(h("div", { class: "row" },
+						h("span", { class: "dim small", style: "flex:1" }, e.message),
+						h("button", { class: "btn", onclick: () => addShare({ type, host: host.ip }) }, "Add by name")));
+					return;
+				}
+				out.remove();
+				fail(e);
+				return;
+			}
+		}
+	};
+
+	const search = async (btn) => {
+		btn.disabled = true;
+		found.replaceChildren(h("div", { class: "empty" }, "Searching the network..."));
+		try {
+			const hosts = (await api("mounts/scan", { method: "POST" })).items || [];
+			if (!hosts.length) {
+				found.replaceChildren(h("div", { class: "empty" }, "No SMB or NFS server answered"));
+				return;
+			}
+			found.replaceChildren(h("h2", { style: "margin-top:20px" }, "Servers in the network"), ...hosts.map((host) => {
+				const row = h("div", { class: "card" });
+				row.append(h("div", { class: "row" },
+					h("span", { style: "flex:1" }, h("strong", {}, host.name || host.ip), host.name ? h("span", { class: "dim small" }, ` ${host.ip}`) : null),
+					host.smb ? h("button", { class: "btn", onclick: () => browse(host, "smb", row) }, "SMB shares") : null,
+					host.nfs ? h("button", { class: "btn", onclick: () => browse(host, "nfs", row) }, "NFS exports") : null));
+				return row;
+			}));
+		} catch (e) {
+			found.replaceChildren();
+			fail(e);
+		} finally {
+			btn.disabled = false;
+		}
+	};
+
+	await show();
+	/* a Neutrino without root (a desktop) shows what the desktop mounted and mounts nothing itself */
+	const manage = state.can_mount && may("system");
+	main.append(
+		h("div", { class: "toolbar" }, h("h1", {}, "Mounts"),
+			h("button", { class: "btn icon", title: "Refresh", html: icon("refresh"), onclick: () => show().catch(fail) })),
+		h("h2", {}, "Drives"), drives,
+		h("div", { class: "toolbar", style: "margin-top:24px" }, h("h2", { style: "margin:0;flex:1" }, "Network shares"),
+			manage ? h("button", { class: "btn", onclick: () => addShare({}) }, "Add") : null,
+			manage ? h("button", { class: "btn primary", onclick: (ev) => search(ev.currentTarget) }, "Find shares") : null),
+		state.can_mount ? null : h("p", { class: "dim small" },
+			"Drives and shares are mounted by the desktop (file manager or fstab). Once mounted they show up here and can take the recordings."),
+		shares, found);
+
+	/* a mount changes behind the page (boot, menu, another browser) */
+	const refresh = () => { if (!document.hidden) show().catch(() => {}); };
+	const timer = setInterval(refresh, 10000);
+	document.addEventListener("visibilitychange", refresh);
+	cleanup = () => {
+		clearInterval(timer);
+		document.removeEventListener("visibilitychange", refresh);
+	};
+}
+
+/* ------------------------------------------------------------------ */
 /* frame and routing                                                   */
 
 const VIEWS = {
@@ -634,6 +965,7 @@ const VIEWS = {
 	channels: ["Channels", viewChannels, "read"],
 	epg: ["Guide", viewEpg, "read"],
 	timers: ["Timers", viewTimers, "read"],
+	mounts: ["Mounts", viewMounts, "read"],
 	box: ["Box", viewBox, "read"],
 	signin: ["Sign in", viewSignIn, "public"],
 };

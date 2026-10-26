@@ -12,6 +12,7 @@ libneutrino_system_sources = [
 	'zap_failure_analyzer.cpp',
 	'helpers.cpp',
 	'mdb-tools.cpp',
+	'netshares.cpp',
 	'ping.cpp',
 	'proc_tools.cpp',
 	'secrets.cpp',

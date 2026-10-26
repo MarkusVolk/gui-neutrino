@@ -62,6 +62,7 @@
 #include <signal.h>
 #include <spawn.h>
 #include <string.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/sysinfo.h>
@@ -91,6 +92,9 @@
 #include <driver/record.h>
 #include <hardware/video.h>
 #include <system/main_call.h>
+#include <system/fsmounter.h>
+#include <system/netshares.h>
+#include <gui/hdd_menu.h>
 #include <src/tools/rcsim.h>
 
 #include <yhttpd.h>
@@ -2194,6 +2198,597 @@ void ep_logout(Call &c)
 }
 
 //-----------------------------------------------------------------------------
+// mounts: the local drives and the network shares of g_settings.network_nfs
+//-----------------------------------------------------------------------------
+void fill_space(Json::Value &v, const std::string &dir)
+{
+	struct statvfs fs;
+	if (dir.empty() || statvfs(dir.c_str(), &fs) != 0)
+		return;
+	v["size"] = Json::UInt64((uint64_t) fs.f_blocks * fs.f_frsize);
+	v["free"] = Json::UInt64((uint64_t) fs.f_bavail * fs.f_frsize);
+}
+
+/* whether path lies on the mount at dir */
+bool below(const std::string &path, const std::string &dir)
+{
+	if (dir.empty() || path.compare(0, dir.size(), dir) != 0)
+		return false;
+	return path.size() == dir.size() || path[dir.size()] == '/' || dir[dir.size() - 1] == '/';
+}
+
+bool share_used(int i)
+{
+	return !g_settings.network_nfs[i].ip.empty();
+}
+
+Json::Value share_json(int i, const CFSMounter::MountInfos &mounts)
+{
+	const auto &n = g_settings.network_nfs[i];
+	Json::Value v(Json::objectValue);
+	v["nr"] = i;
+	v["type"] = n.type == CFSMounter::CIFS ? "smb" : n.type == CFSMounter::NFS ? "nfs" : "ftp";
+	v["host"] = n.ip;
+	v["share"] = n.dir;
+	v["local_dir"] = n.local_dir;
+	v["automount"] = n.automount != 0;
+	v["username"] = n.username;
+	v["has_password"] = !n.password.empty();
+	std::string opts = n.mount_options1;
+	if (!n.mount_options2.empty())
+		opts += (opts.empty() ? "" : ",") + n.mount_options2;
+	v["options"] = opts;
+	bool mounted = CFSMounter::findMountPoint(mounts, n.local_dir) != NULL;
+	v["mounted"] = mounted;
+	v["managed"] = true;
+	v["writable"] = mounted && access(n.local_dir.c_str(), W_OK) == 0;
+	if (mounted)
+		fill_space(v, n.local_dir);
+	return v;
+}
+
+/* a real recording keeps the drive or share at dir; a timeshift alone is ended */
+bool free_for_umount(Call &c, const std::string &dir)
+{
+	CRecordManager *rm = CRecordManager::getInstance();
+	bool here = below(g_settings.network_nfs_recordingdir, dir) || below(g_settings.timeshiftdir, dir);
+	if (!here || !rm->RecordingStatus())
+		return true;
+	if (!rm->TimeshiftOnly()) {
+		problem(c.out, 409, "busy", "a recording writes to " + dir);
+		return false;
+	}
+	main_call::run([] { CRecordManager::getInstance()->StopAutoRecord(); }, 5000);
+	return true;
+}
+
+bool drive_name_ok(const std::string &name)
+{
+	if (name.empty() || name.size() > 32)
+		return false;
+	for (size_t i = 0; i < name.size(); i++)
+		if (!isalnum((unsigned char) name[i]))
+			return false;
+	return true;
+}
+
+std::string drive_mount_point(const CFSMounter::MountInfos &mounts, const std::string &dev)
+{
+	for (CFSMounter::MountInfos::const_iterator it = mounts.begin(); it != mounts.end(); ++it)
+		if (it->device == "/dev/" + dev)
+			return it->mountPoint;
+	return "";
+}
+
+/* where the recordings go when the mount at dir that holds them goes away:
+   the first other drive below /media. Without one the caller refuses, so the
+   box never records into an empty directory on its own flash. */
+bool record_fallback(Call &c, const std::string &dir, std::string &target)
+{
+	target.clear();
+	if (!below(g_settings.network_nfs_recordingdir, dir) && !below(g_settings.timeshiftdir, dir))
+		return true;
+	CFSMounter::MountInfos mounts;
+	CFSMounter::getMounts(mounts);
+	std::vector<CHDDMenuHandler::Drive> drives;
+	CHDDMenuHandler::listDrives(drives);
+	for (size_t i = 0; i < drives.size(); i++) {
+		std::string mp = drive_mount_point(mounts, drives[i].devname);
+		if (mp.compare(0, 7, "/media/") == 0 && !below(mp, dir) && !below(dir, mp)) {
+			target = mp + "/movies";
+			return true;
+		}
+	}
+	problem(c.out, 409, "no-other-drive", "recordings go to " + dir + " and no other drive is mounted to take them");
+	return false;
+}
+
+/* moves the recordings (and a timeshift dir of its own) off dir to target */
+bool move_records(Call &c, const std::string &dir, const std::string &target)
+{
+	if (target.empty())
+		return true;
+	bool done = main_call::run([&] {
+		if (below(g_settings.timeshiftdir, dir))
+			g_settings.timeshiftdir.clear();
+		CHDDMenuHandler::applyRecordPath(target);
+		CNeutrinoApp::getInstance()->saveSetup(NEUTRINO_SETTINGS_FILE);
+	}, 5000);
+	if (!done)
+		problem(c.out, 503, "busy", "the box did not take the change in time");
+	return done;
+}
+
+/* 204, or the new record dir when the recordings had to move */
+void send_unmounted(Call &c, const std::string &target)
+{
+	if (target.empty()) {
+		send_empty(c.out, 204);
+		return;
+	}
+	Json::Value v(Json::objectValue);
+	v["record_dir"] = g_settings.network_nfs_recordingdir;
+	send_json(c.out, 200, v);
+}
+
+/* mounting and unmounting need root; a desktop Neutrino runs as a user and
+   only shows what the desktop mounted */
+bool can_mount()
+{
+	return geteuid() == 0;
+}
+
+bool need_root(Call &c)
+{
+	if (can_mount())
+		return true;
+	problem(c.out, 403, "not-permitted", "mounting needs root; mount drives and shares in the desktop");
+	return false;
+}
+
+/* where a desktop mounts removable drives and shares */
+bool removable_mount_point(const std::string &mp)
+{
+	return mp.compare(0, 7, "/media/") == 0 || mp.compare(0, 11, "/run/media/") == 0 || mp.compare(0, 5, "/mnt/") == 0;
+}
+
+bool network_type(const std::string &type)
+{
+	return type == "nfs" || type == "nfs4" || type == "cifs" || type == "smb3";
+}
+
+/* a network mount made outside Neutrino, shown as it is */
+Json::Value foreign_share_json(const CFSMounter::MountInfo &mi)
+{
+	Json::Value v(Json::objectValue);
+	bool nfs = mi.type.compare(0, 3, "nfs") == 0;
+	std::string host, share;
+	if (nfs) {
+		size_t colon = mi.device.find(':');
+		host = mi.device.substr(0, colon);
+		share = colon == std::string::npos ? "" : mi.device.substr(colon + 1);
+	} else if (mi.device.compare(0, 2, "//") == 0) {
+		size_t slash = mi.device.find('/', 2);
+		host = mi.device.substr(2, slash == std::string::npos ? std::string::npos : slash - 2);
+		share = slash == std::string::npos ? "" : mi.device.substr(slash + 1);
+	}
+	v["nr"] = -1;
+	v["type"] = nfs ? "nfs" : "smb";
+	v["host"] = host;
+	v["share"] = share;
+	v["local_dir"] = mi.mountPoint;
+	v["mounted"] = true;
+	v["managed"] = false;
+	v["writable"] = access(mi.mountPoint.c_str(), W_OK) == 0;
+	fill_space(v, mi.mountPoint);
+	return v;
+}
+
+void ep_mounts(Call &c)
+{
+	CFSMounter::MountInfos mounts;
+	CFSMounter::getMounts(mounts);
+
+	Json::Value v(Json::objectValue);
+	v["drives"] = Json::Value(Json::arrayValue);
+	bool root = can_mount();
+	std::vector<CHDDMenuHandler::Drive> drives;
+	CHDDMenuHandler::listDrives(drives);
+	for (size_t i = 0; i < drives.size(); i++) {
+		std::string mp = drive_mount_point(mounts, drives[i].devname);
+		/* without root only the removable drives the desktop mounted, never its own partitions */
+		if (!root && !removable_mount_point(mp))
+			continue;
+		Json::Value d(Json::objectValue);
+		d["name"] = drives[i].devname;
+		d["label"] = drives[i].label;
+		d["fs"] = drives[i].fmt;
+		d["mounted"] = drives[i].mounted;
+		d["mount_point"] = mp;
+		d["writable"] = !mp.empty() && access(mp.c_str(), W_OK) == 0;
+		if (!mp.empty())
+			fill_space(d, mp);
+		v["drives"].append(d);
+	}
+	v["shares"] = Json::Value(Json::arrayValue);
+	if (root) {
+		for (int i = 0; i < NETWORK_NFS_NR_OF_ENTRIES; i++)
+			if (share_used(i))
+				v["shares"].append(share_json(i, mounts));
+	} else {
+		for (CFSMounter::MountInfos::const_iterator it = mounts.begin(); it != mounts.end(); ++it)
+			if (network_type(it->type))
+				v["shares"].append(foreign_share_json(*it));
+	}
+	v["can_mount"] = root;
+	v["record_dir"] = g_settings.network_nfs_recordingdir;
+	v["timeshift_dir"] = g_settings.timeshiftdir;
+	v["can_list_shares"] = netshares::canListShares();
+	send_json(c.out, 200, v);
+}
+
+bool share_nr(Call &c, int &nr)
+{
+	nr = -1;
+	const std::string &s = c.args[0];
+	if (s.size() == 1 && s[0] >= '0' && s[0] < '0' + NETWORK_NFS_NR_OF_ENTRIES)
+		nr = s[0] - '0';
+	if (nr < 0 || !share_used(nr)) {
+		problem(c.out, 404, "no-such-share", "no share has the number " + s);
+		return false;
+	}
+	return true;
+}
+
+/* new (nr < 0) or changed share from the body */
+void share_store(Call &c, int nr)
+{
+	static const char *members[] = { "type", "host", "share", "local_dir", "automount", "username",
+		"password", "options", NULL };
+	std::string type, host, share, local_dir, user, password, options;
+	bool automount;
+	if (!read_body(c, members) || !body_string(c, "type", true, 8, type)
+			|| !body_string(c, "host", true, 253, host) || !body_string(c, "share", true, 1024, share)
+			|| !body_string(c, "local_dir", true, 1024, local_dir) || !body_bool(c, "automount", false, true, automount)
+			|| !body_string(c, "username", false, 256, user) || !body_string(c, "password", false, 256, password)
+			|| !body_string(c, "options", false, 512, options))
+		return;
+	bool keep_password = c.body["password"].isNull();
+	host = trim(host);
+	share = trim(share);
+	local_dir = trim(local_dir);
+	if (type != "smb" && type != "nfs") {
+		problem(c.out, 400, "not-a-listed-value", "type is smb or nfs");
+		return;
+	}
+	if (host.empty() || host.find_first_of("/\\ ,") != std::string::npos) {
+		problem(c.out, 400, "bad-string", "host is a name or an address");
+		return;
+	}
+	if (type == "nfs" && share.compare(0, 1, "/") != 0) {
+		problem(c.out, 400, "bad-string", "an NFS export is a path starting with /");
+		return;
+	}
+	while (type == "smb" && !share.empty() && (share[0] == '/' || share[0] == '\\'))
+		share.erase(0, 1);
+	if (share.empty()) {
+		problem(c.out, 400, "bad-string", "share is empty");
+		return;
+	}
+	if (local_dir.size() < 2 || local_dir[0] != '/' || local_dir.find("..") != std::string::npos) {
+		problem(c.out, 400, "bad-string", "local_dir is an absolute path");
+		return;
+	}
+
+	CFSMounter::MountInfos mounts;
+	CFSMounter::getMounts(mounts);
+	if (CFSMounter::findMountPoint(mounts, local_dir) && (nr < 0 || local_dir != g_settings.network_nfs[nr].local_dir)) {
+		problem(c.out, 409, "in-use", local_dir + " already holds a mount");
+		return;
+	}
+	if (nr >= 0 && CFSMounter::findMountPoint(mounts, g_settings.network_nfs[nr].local_dir)) {
+		problem(c.out, 409, "mounted", "unmount the share before changing it");
+		return;
+	}
+
+	int slot = nr;
+	bool done = main_call::run([&] {
+		if (slot < 0)
+			for (int i = 0; i < NETWORK_NFS_NR_OF_ENTRIES && slot < 0; i++)
+				if (!share_used(i))
+					slot = i;
+		if (slot < 0)
+			return;
+		auto &n = g_settings.network_nfs[slot];
+		n.type = type == "smb" ? CFSMounter::CIFS : CFSMounter::NFS;
+		n.ip = host;
+		n.dir = share;
+		n.local_dir = local_dir;
+		n.automount = automount ? 1 : 0;
+		n.username = user;
+		if (!keep_password || user.empty())
+			n.password = user.empty() ? "" : password;
+		n.mount_options1 = options.empty() ? (type == "nfs" ? "rw,soft" : "rw") : options;
+		n.mount_options2 = "";
+		CNeutrinoApp::getInstance()->saveSetup(NEUTRINO_SETTINGS_FILE);
+	}, 5000);
+	if (!done) {
+		problem(c.out, 503, "busy", "the box did not take the change in time");
+		return;
+	}
+	if (slot < 0) {
+		problem(c.out, 409, "no-free-entry", "all " + std::to_string(NETWORK_NFS_NR_OF_ENTRIES) + " shares are in use");
+		return;
+	}
+	CFSMounter::getMounts(mounts);
+	send_json(c.out, nr < 0 ? 201 : 200, share_json(slot, mounts));
+}
+
+void ep_share_new(Call &c)
+{
+	if (!need_root(c))
+		return;
+	share_store(c, -1);
+}
+
+void ep_share_set(Call &c)
+{
+	if (!need_root(c))
+		return;
+	int nr;
+	if (share_nr(c, nr))
+		share_store(c, nr);
+}
+
+void ep_share_delete(Call &c)
+{
+	if (!need_root(c))
+		return;
+	int nr;
+	if (!share_nr(c, nr))
+		return;
+	std::string dir = g_settings.network_nfs[nr].local_dir;
+	std::string target;
+	if (!record_fallback(c, dir, target))
+		return;
+	if (CFSMounter::isMounted(dir) && !free_for_umount(c, dir))
+		return;
+	if (CFSMounter::isMounted(dir) && CFSMounter::umount(dir.c_str()) != CFSMounter::UMRES_OK) {
+		problem(c.out, 409, "busy", "the share is still in use and cannot be unmounted");
+		return;
+	}
+	if (!move_records(c, dir, target))
+		return;
+	bool done = main_call::run([&] {
+		auto &n = g_settings.network_nfs[nr];
+		n.ip.clear();
+		n.dir.clear();
+		n.local_dir = "/mnt/mnt" + std::to_string(nr);
+		n.automount = 0;
+		n.username.clear();
+		n.password.clear();
+		n.mount_options1 = "rw,soft";
+		n.mount_options2 = "nolock";
+		n.type = CFSMounter::NFS;
+		CNeutrinoApp::getInstance()->saveSetup(NEUTRINO_SETTINGS_FILE);
+	}, 5000);
+	if (!done) {
+		problem(c.out, 503, "busy", "the box did not take the change in time");
+		return;
+	}
+	send_unmounted(c, target);
+}
+
+void ep_share_mount(Call &c)
+{
+	if (!need_root(c))
+		return;
+	int nr;
+	if (!share_nr(c, nr))
+		return;
+	auto n = g_settings.network_nfs[nr];
+	std::string error;
+	CFSMounter::MountRes res = CFSMounter::mount(n.ip, n.dir, n.local_dir, (CFSMounter::FSType) n.type,
+						     n.username, n.password, n.mount_options1, n.mount_options2, &error);
+	if (res == CFSMounter::MRES_FS_ALREADY_MOUNTED) {
+		problem(c.out, 409, "in-use", error);
+		return;
+	}
+	if (res == CFSMounter::MRES_FS_NOT_SUPPORTED) {
+		problem(c.out, 501, "not-supported", error);
+		return;
+	}
+	if (res != CFSMounter::MRES_OK) {
+		problem(c.out, res == CFSMounter::MRES_TIMEOUT ? 503 : 409, "mount-failed", error);
+		return;
+	}
+	CFSMounter::MountInfos mounts;
+	CFSMounter::getMounts(mounts);
+	send_json(c.out, 200, share_json(nr, mounts));
+}
+
+void ep_share_umount(Call &c)
+{
+	if (!need_root(c))
+		return;
+	int nr;
+	if (!share_nr(c, nr))
+		return;
+	std::string dir = g_settings.network_nfs[nr].local_dir;
+	if (!CFSMounter::isMounted(dir)) {
+		send_empty(c.out, 204);
+		return;
+	}
+	std::string target;
+	if (!record_fallback(c, dir, target) || !free_for_umount(c, dir))
+		return;
+	if (CFSMounter::umount(dir.c_str()) != CFSMounter::UMRES_OK) {
+		problem(c.out, 409, "busy", "the share is still in use");
+		return;
+	}
+	if (move_records(c, dir, target))
+		send_unmounted(c, target);
+}
+
+bool known_drive(Call &c, std::string &name)
+{
+	name = c.args[0];
+	if (drive_name_ok(name)) {
+		std::vector<CHDDMenuHandler::Drive> drives;
+		CHDDMenuHandler::listDrives(drives);
+		for (size_t i = 0; i < drives.size(); i++)
+			if (drives[i].devname == name)
+				return true;
+	}
+	problem(c.out, 404, "no-such-drive", "no drive is called " + name);
+	return false;
+}
+
+void ep_drive_mount(Call &c)
+{
+	if (!need_root(c))
+		return;
+	std::string name;
+	if (!known_drive(c, name))
+		return;
+	if (!CHDDMenuHandler::getInstance()->mountDrive(name)) {
+		problem(c.out, 409, "mount-failed", "/dev/" + name + " could not be mounted");
+		return;
+	}
+	send_empty(c.out, 204);
+}
+
+void ep_drive_umount(Call &c)
+{
+	if (!need_root(c))
+		return;
+	std::string name;
+	if (!known_drive(c, name))
+		return;
+	CFSMounter::MountInfos mounts;
+	CFSMounter::getMounts(mounts);
+	std::string mp = drive_mount_point(mounts, name);
+	if (mp.empty()) {
+		send_empty(c.out, 204);
+		return;
+	}
+	if (mp.compare(0, 7, "/media/") != 0) {
+		problem(c.out, 409, "not-permitted", "the system uses " + mp);
+		return;
+	}
+	std::string target;
+	if (!record_fallback(c, mp, target) || !free_for_umount(c, mp))
+		return;
+	/* a drive the system mounted elsewhere below /media (the record disk of a
+	   box) is unmounted where it is, not where the menu would have put it */
+	bool ok = mp == "/media/" + name ? CHDDMenuHandler::getInstance()->umountDrive(name) : ::umount(mp.c_str()) == 0;
+	if (!ok) {
+		problem(c.out, 409, "busy", "the drive is still in use");
+		return;
+	}
+	if (move_records(c, mp, target))
+		send_unmounted(c, target);
+}
+
+void ep_record_dir(Call &c)
+{
+	static const char *members[] = { "path", NULL };
+	std::string path;
+	if (!read_body(c, members) || !body_string(c, "path", true, 1024, path))
+		return;
+	path = trim(path);
+	while (path.size() > 1 && path[path.size() - 1] == '/')
+		path.erase(path.size() - 1);
+	/* only onto a drive or a share that is there now */
+	CFSMounter::MountInfos mounts;
+	CFSMounter::getMounts(mounts);
+	bool ok = path.find("..") == std::string::npos;
+	bool on_mount = false;
+	for (CFSMounter::MountInfos::const_iterator it = mounts.begin(); ok && it != mounts.end(); ++it)
+		if (it->mountPoint != "/" && below(path, it->mountPoint)
+				&& (removable_mount_point(it->mountPoint) || network_type(it->type)
+					|| CFSMounter::getMountEntry(*it) != CFSMounter::MOUNT_ENTRY_NONE)
+				&& access(it->mountPoint.c_str(), W_OK) == 0)
+			on_mount = true;
+	if (!ok || !on_mount) {
+		problem(c.out, 400, "bad-string", "path is not on a mounted, writable drive or share");
+		return;
+	}
+	if (CRecordManager::getInstance()->RecordingStatus() && !CRecordManager::getInstance()->TimeshiftOnly()) {
+		problem(c.out, 409, "busy", "a recording is running");
+		return;
+	}
+	bool done = main_call::run([&] {
+		CHDDMenuHandler::applyRecordPath(path);
+		CNeutrinoApp::getInstance()->saveSetup(NEUTRINO_SETTINGS_FILE);
+	}, 5000);
+	if (!done) {
+		problem(c.out, 503, "busy", "the box did not take the change in time");
+		return;
+	}
+	Json::Value v(Json::objectValue);
+	v["record_dir"] = g_settings.network_nfs_recordingdir;
+	send_json(c.out, 200, v);
+}
+
+void ep_share_scan(Call &c)
+{
+	if (!need_root(c))
+		return;
+	std::vector<netshares::Host> hosts;
+	std::string error;
+	if (!netshares::scanHosts(hosts, error)) {
+		problem(c.out, 503, "no-network", error);
+		return;
+	}
+	Json::Value v(Json::objectValue);
+	v["items"] = Json::Value(Json::arrayValue);
+	for (size_t i = 0; i < hosts.size(); i++) {
+		Json::Value h(Json::objectValue);
+		h["ip"] = hosts[i].ip;
+		h["name"] = hosts[i].name;
+		h["smb"] = hosts[i].smb;
+		h["nfs"] = hosts[i].nfs;
+		v["items"].append(h);
+	}
+	send_json(c.out, 200, v);
+}
+
+void ep_share_list(Call &c)
+{
+	if (!need_root(c))
+		return;
+	static const char *members[] = { "host", "type", "username", "password", NULL };
+	std::string host, type, user, password;
+	if (!read_body(c, members) || !body_string(c, "host", true, 253, host) || !body_string(c, "type", true, 8, type)
+			|| !body_string(c, "username", false, 256, user) || !body_string(c, "password", false, 256, password))
+		return;
+	if (type != "smb" && type != "nfs") {
+		problem(c.out, 400, "not-a-listed-value", "type is smb or nfs");
+		return;
+	}
+	std::vector<netshares::Share> shares;
+	std::string error;
+	bool need_login = false;
+	if (!netshares::listShares(trim(host), type == "nfs", user, password, shares, error, need_login)) {
+		if (need_login)
+			problem(c.out, 409, "login-needed", error);
+		else
+			problem(c.out, netshares::canListShares() ? 503 : 501, "no-share-list", error);
+		return;
+	}
+	Json::Value v(Json::objectValue);
+	v["items"] = Json::Value(Json::arrayValue);
+	for (size_t i = 0; i < shares.size(); i++) {
+		Json::Value s(Json::objectValue);
+		s["name"] = shares[i].name;
+		s["comment"] = shares[i].comment;
+		v["items"].append(s);
+	}
+	send_json(c.out, 200, v);
+}
+
+//-----------------------------------------------------------------------------
 // routing
 //-----------------------------------------------------------------------------
 struct Route
@@ -2225,6 +2820,17 @@ const Route routes[] = {
 	{ "GET",	"/api/v1/timers",		L_READ,		ep_timers },
 	{ "POST",	"/api/v1/timers",		L_WRITE,	ep_timer_new },
 	{ "DELETE",	"/api/v1/timers/{}",		L_WRITE,	ep_timer_delete },
+	{ "GET",	"/api/v1/mounts",		L_READ,		ep_mounts },
+	{ "POST",	"/api/v1/mounts/shares",	L_SYSTEM,	ep_share_new },
+	{ "POST",	"/api/v1/mounts/shares/{}",	L_SYSTEM,	ep_share_set },
+	{ "DELETE",	"/api/v1/mounts/shares/{}",	L_SYSTEM,	ep_share_delete },
+	{ "POST",	"/api/v1/mounts/shares/{}/mount",	L_WRITE,	ep_share_mount },
+	{ "POST",	"/api/v1/mounts/shares/{}/umount",	L_WRITE,	ep_share_umount },
+	{ "POST",	"/api/v1/mounts/drives/{}/mount",	L_WRITE,	ep_drive_mount },
+	{ "POST",	"/api/v1/mounts/drives/{}/umount",	L_WRITE,	ep_drive_umount },
+	{ "POST",	"/api/v1/mounts/record",	L_SYSTEM,	ep_record_dir },
+	{ "POST",	"/api/v1/mounts/scan",		L_SYSTEM,	ep_share_scan },
+	{ "POST",	"/api/v1/mounts/browse",	L_SYSTEM,	ep_share_list },
 	{ "GET",	"/api/v1/stream/{}",		L_READ,		ep_stream },
 	{ "POST",	"/api/v1/login",		L_PUBLIC,	ep_login },
 	{ "GET",	"/api/v1/session",		L_PUBLIC,	ep_session },

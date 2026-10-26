@@ -56,6 +56,7 @@ option('tray', type : 'boolean', value : false, description : 'Show an icon in t
 option('xkbcommon', type : 'boolean', value : false, description : 'Type text with a keyboard in its layout through libxkbcommon')
 option('terminal', type : 'boolean', value : false, description : 'Run plugins with a text user interface in a terminal on the OSD')
 option('xmltv-xz', type : 'boolean', value : false, description : 'Read XMLTV files packed with xz')
+option('netshares', type : 'boolean', value : false, description : 'List the shares of NFS and SMB servers (libnfs, libsmb2)')
 option('assistant', type : 'boolean', value : false, description : 'Ask a language model that operates the box')
 option('assistant-voice', type : 'boolean', value : false, description : 'Ask the assistant by voice')
 option('webp', type : 'boolean', value : false, description : 'Show WebP pictures')
