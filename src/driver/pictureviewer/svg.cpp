@@ -48,7 +48,49 @@
 #include "nanosvgrast.h"
 
 #include <config.h>
+#include <global.h>
+#include <gui/color.h>
 #include "pv_config.h"
+
+/* icons drawn in these colours take the colours of the theme: text, inactive
+   text and a halo that sets the lines off against the background */
+static const char ICON_TEXT[] = "#e8eaee";
+static const char ICON_TEXT_INACTIVE[] = "#8f96a1";
+static const char ICON_HALO[] = "#010203";
+
+static void svg_replace(std::string &svg, const char *from, unsigned int rgb)
+{
+	char to[8];
+	snprintf(to, sizeof(to), "#%06x", rgb & 0xffffff);
+	for (size_t pos = svg.find(from); pos != std::string::npos; pos = svg.find(from, pos + 7))
+		svg.replace(pos, 7, to);
+}
+
+static NSVGimage *svg_parse(const char *name)
+{
+	FILE *f = fopen(name, "rb");
+	if (!f)
+		return NULL;
+	std::string svg;
+	char buf[4096];
+	size_t n;
+	while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
+		svg.append(buf, n);
+	fclose(f);
+
+	if (svg.find(ICON_TEXT) != std::string::npos || svg.find(ICON_TEXT_INACTIVE) != std::string::npos)
+	{
+		unsigned int text = convertSetupColor2RGB(g_settings.theme.menu_Content_Text_red,
+				g_settings.theme.menu_Content_Text_green, g_settings.theme.menu_Content_Text_blue);
+		unsigned int inactive = convertSetupColor2RGB(g_settings.theme.menu_Content_inactive_Text_red,
+				g_settings.theme.menu_Content_inactive_Text_green, g_settings.theme.menu_Content_inactive_Text_blue);
+		int luma = (((text >> 16) & 0xff) * 299 + ((text >> 8) & 0xff) * 587 + (text & 0xff) * 114) / 1000;
+		svg_replace(svg, ICON_TEXT, text);
+		svg_replace(svg, ICON_TEXT_INACTIVE, inactive);
+		svg_replace(svg, ICON_HALO, luma > 128 ? 0x000000 : 0xffffff);
+	}
+	return nsvgParse(&svg[0], "px", 96.0f);
+}
 
 /* nanosvg smooths edges only coarsely; small images are rasterised at a
    multiple of their size and averaged down */
@@ -106,7 +148,7 @@ int fh_svg_load(const char *name, unsigned char **buffer, int* xp, int* yp)
 	int w, h;
 
 	//printf("[SVG] parsing load %s\n", name);
-	image = nsvgParseFromFile(name, "px", 96.0f);
+	image = svg_parse(name);
 	if (image == NULL)
 	{
 		printf("[SVG] Could not open SVG image.\n");
@@ -155,7 +197,7 @@ int svg_load_resize(const char *name, unsigned char **buffer, int* ox, int* oy, 
 	int w, h;
 
 	//printf("[SVG] parsing load %s\n", name);
-	image = nsvgParseFromFile(name, "px", 96.0f);
+	image = svg_parse(name);
 	if (image == NULL)
 	{
 		printf("[SVG] Could not open SVG image.\n");
@@ -206,7 +248,7 @@ int fh_svg_getsize(const char *name,int *x,int *y, int /*wanted_width*/, int /*w
 	int w, h;
 
 	//printf("[SVG] parsing getsize %s\n", name);
-	image = nsvgParseFromFile(name, "px", 96.0f);
+	image = svg_parse(name);
 	if (image == NULL)
 	{
 		printf("[SVG] Could not open SVG image.\n");
