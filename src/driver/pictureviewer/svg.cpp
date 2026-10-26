@@ -50,6 +50,44 @@
 #include <config.h>
 #include "pv_config.h"
 
+/* nanosvg smooths edges only coarsely; small images are rasterised at a
+   multiple of their size and averaged down */
+static void svg_rasterize(NSVGrasterizer *rast, NSVGimage *image, float sx, float sy, unsigned char *dst, int w, int h)
+{
+	int ss = (w * h <= 128 * 128) ? 4 : (w * h <= 512 * 512) ? 2 : 1;
+	unsigned char *big = ss > 1 ? (unsigned char *) malloc((size_t)w * h * 4 * ss * ss) : NULL;
+	if (!big)
+	{
+		nsvgRasterizeFull(rast, image, 0, 0, sx, sy, dst, w, h, w * 4);
+		return;
+	}
+	int W = w * ss;
+	nsvgRasterizeFull(rast, image, 0, 0, sx * ss, sy * ss, big, W, h * ss, W * 4);
+	for (int y = 0; y < h; y++)
+	{
+		for (int x = 0; x < w; x++)
+		{
+			unsigned int c[3] = { 0, 0, 0 }, a = 0;
+			for (int j = 0; j < ss; j++)
+			{
+				const unsigned char *p = big + ((size_t)(y * ss + j) * W + x * ss) * 4;
+				for (int i = 0; i < ss; i++, p += 4)
+				{
+					c[0] += p[0] * p[3];
+					c[1] += p[1] * p[3];
+					c[2] += p[2] * p[3];
+					a += p[3];
+				}
+			}
+			unsigned char *q = dst + ((size_t)y * w + x) * 4;
+			for (int k = 0; k < 3; k++)
+				q[k] = a ? c[k] / a : 0;
+			q[3] = a / (ss * ss);
+		}
+	}
+	free(big);
+}
+
 int fh_svg_id(const char *name)
 {
 	std::string fn = name;
@@ -99,7 +137,7 @@ int fh_svg_load(const char *name, unsigned char **buffer, int* xp, int* yp)
 	}
 
 	//printf("[SVG] rasterizing image %d x %d\n", w, h);
-	nsvgRasterize(rast, image, 0,0,1, *buffer, w, h, w*4);
+	svg_rasterize(rast, image, 1, 1, *buffer, w, h);
 
 error:
 	nsvgDeleteRasterizer(rast);
@@ -153,7 +191,7 @@ int svg_load_resize(const char *name, unsigned char **buffer, int* ox, int* oy, 
 	}
 
 	//printf("[SVG] rasterizing image %d x %d\n", w, h);
-	nsvgRasterizeFull(rast, image, 0, 0, scale_w, scale_h, *buffer, w, h, w*4);
+	svg_rasterize(rast, image, scale_w, scale_h, *buffer, w, h);
 
 error:
 	nsvgDeleteRasterizer(rast);
