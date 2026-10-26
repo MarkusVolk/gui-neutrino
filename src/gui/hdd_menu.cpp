@@ -35,6 +35,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/swap.h>
 #include <sys/vfs.h>
 #include <sys/wait.h>
@@ -202,37 +203,50 @@ bool CHDDMenuHandler::is_mounted(const char *dev)
 		}
 		fclose(f);
 	}
+	/* a root mounted from /dev/root is not found by its name */
+	if (!res)
+		res = !mountPoints(devpath + 5).empty();
 	printf("CHDDMenuHandler::is_mounted: dev [%s] is %s\n", devpath, res ? "mounted" : "not mounted");
 	return res;
 }
 
-/* Only what is mounted below MOUNT_BASE is the box's own. A partition the
-   system runs from or keeps its data on, such as /boot or /home on a PC,
-   is not offered for unmounting. */
-static bool mounted_outside_media(const std::string &devname)
+std::vector<std::string> CHDDMenuHandler::mountPoints(const std::string &devname)
 {
-	std::string devpath = "/dev/" + devname;
-	std::string realdev = readlink(devpath.c_str());
-	realdev = trim(realdev);
-	bool outside = false;
-	FILE *f = fopen("/proc/mounts", "r");
+	std::vector<std::string> points;
+	struct stat st;
+	if (stat(("/dev/" + devname).c_str(), &st) != 0 || !S_ISBLK(st.st_mode))
+		return points;
+	FILE *f = fopen("/proc/self/mountinfo", "r");
 	if (!f)
-		return false;
-	char buffer[512];
-	while (!outside && fgets(buffer, sizeof(buffer), f)) {
-		if (buffer[0] != '/')
+		return points;
+	std::string devpath = "/dev/" + devname;
+	char buffer[1024];
+	while (fgets(buffer, sizeof(buffer), f)) {
+		unsigned int maj, min;
+		char dir[512], source[256] = "";
+		if (sscanf(buffer, "%*d %*d %u:%u %*s %511s", &maj, &min, dir) != 3)
 			continue;
-		char dev[256], dir[256];
-		if (sscanf(buffer, "%255s %255s", dev, dir) != 2)
-			continue;
-		std::string realmount = readlink(dev);
-		if (devpath != dev && realdev != trim(realmount))
-			continue;
-		if (strncmp(dir, MOUNT_BASE, strlen(MOUNT_BASE)) != 0)
-			outside = true;
+		/* after " - " come the type and the source; btrfs has a device number of its own */
+		const char *sep = strstr(buffer, " - ");
+		if (sep)
+			sscanf(sep + 3, "%*s %255s", source);
+		if ((maj == major(st.st_rdev) && min == minor(st.st_rdev)) || devpath == source)
+			points.push_back(dir);
 	}
 	fclose(f);
-	return outside;
+	return points;
+}
+
+/* Only what is mounted below MOUNT_BASE is the box's own. A partition the
+   system runs from or keeps its data on, such as /boot or /home on a PC or
+   the root on the card of a Pi, is no drive for the menu. */
+bool CHDDMenuHandler::isSystemDrive(const std::string &devname)
+{
+	std::vector<std::string> points = CHDDMenuHandler::mountPoints(devname);
+	for (size_t i = 0; i < points.size(); i++)
+		if (points[i].compare(0, strlen(MOUNT_BASE), MOUNT_BASE) != 0)
+			return true;
+	return false;
 }
 
 void CHDDMenuHandler::listDrives(std::vector<Drive> &drives)
@@ -605,6 +619,11 @@ int CHDDMenuHandler::handleMsg(const neutrino_msg_t msg, neutrino_msg_data_t dat
 			mounted = is_mounted(dev.c_str());
 		}
 		std::string tmp = dev.substr(0, 2);
+
+		/* a partition the system runs from (the card of a Pi, /boot, /home)
+		   comes in with the others at start; it is no drive to record to */
+		if (added && mounted && isSystemDrive(dev))
+			return messages_return::handled;
 
 		if (added && !mounted && tmp != "sr") {
 			std::string message = dev + ": " + g_Locale->getText(LOCALE_HDD_MOUNT_FAILED);
@@ -989,7 +1008,7 @@ _show_menu:
 			if (stat(("/dev/" + it->devname).c_str(), &dev_st) != -1
 			    && dev_st.st_rdev == root_st.st_dev)
 				enabled = false;
-			else if (it->mounted && mounted_outside_media(it->devname))
+			else if (it->mounted && isSystemDrive(it->devname))
 				enabled = false;
 			else if (kernel_fs_list.find(it->fmt) == kernel_fs_list.end())
 				enabled = false;

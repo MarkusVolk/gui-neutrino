@@ -2289,12 +2289,14 @@ bool drive_name_ok(const std::string &name)
 	return true;
 }
 
-std::string drive_mount_point(const CFSMounter::MountInfos &mounts, const std::string &dev)
+/* where a drive is mounted: below /media if it is mounted there too */
+std::string drive_mount_point(const CFSMounter::MountInfos &, const std::string &dev)
 {
-	for (CFSMounter::MountInfos::const_iterator it = mounts.begin(); it != mounts.end(); ++it)
-		if (it->device == "/dev/" + dev)
-			return it->mountPoint;
-	return "";
+	std::vector<std::string> points = CHDDMenuHandler::mountPoints(dev);
+	for (size_t i = 0; i < points.size(); i++)
+		if (points[i].compare(0, 7, "/media/") == 0)
+			return points[i];
+	return points.empty() ? "" : points[0];
 }
 
 /* where the recordings go when the mount at dir that holds them goes away:
@@ -2413,8 +2415,10 @@ void ep_mounts(Call &c)
 	CHDDMenuHandler::listDrives(drives);
 	for (size_t i = 0; i < drives.size(); i++) {
 		std::string mp = drive_mount_point(mounts, drives[i].devname);
-		/* without root only the removable drives the desktop mounted, never its own partitions */
-		if (!root && !removable_mount_point(mp))
+		/* only drives, never the partitions the system runs from (a Pi's card,
+		   /boot, /home): with root those Neutrino mounts below /media or could
+		   mount, without root those the desktop mounted */
+		if (root ? CHDDMenuHandler::isSystemDrive(drives[i].devname) : !removable_mount_point(mp))
 			continue;
 		Json::Value d(Json::objectValue);
 		d["name"] = drives[i].devname;

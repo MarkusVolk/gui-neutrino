@@ -110,6 +110,11 @@ class CHDDMenuHandler : public CMenuTarget
 			bool mounted;
 		};
 		static void listDrives(std::vector<Drive> &drives);
+		/* where the partition is mounted, found by its device number, so that
+		   a root that /proc/mounts names /dev/root is found as well */
+		static std::vector<std::string> mountPoints(const std::string &devname);
+		/* mounted anywhere outside /media: the system runs from it or keeps its data there */
+		static bool isSystemDrive(const std::string &devname);
 		bool mountDrive(const std::string &name) { return mount_dev(name); }
 		bool umountDrive(const std::string &name) { return umount_dev(name); }
 		/* records into dir and, without a timeshift dir of its own, timeshifts there too */
