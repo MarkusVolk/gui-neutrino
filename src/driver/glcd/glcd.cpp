@@ -962,8 +962,9 @@ void cGLCD::Run(void)
 					bitmap->Clear(GLCD::cColor::Black);
 					ts.tv_sec = 0; // don't wait
 					static CFrameBuffer *fb = CFrameBuffer::getInstance();
-					static int fb_height = fb->getScreenHeight(true);
-					static uint32_t *fbp = fb->getFrameBufferPointer();
+					/* the OSD changes its size with the output */
+					int fb_height = fb->getScreenHeight(true);
+					uint32_t *fbp = fb->getFrameBufferPointer();
 					int lcd_width = bitmap->Width();
 					int lcd_height = bitmap->Height();
 #if BOXMODEL_VUSOLO4K || BOXMODEL_VUDUO4K || BOXMODEL_VUDUO4KSE || BOXMODEL_VUULTIMO4K || BOXMODEL_VUUNO4KSE
@@ -971,7 +972,7 @@ void cGLCD::Run(void)
 					if (!showImage(fbp, fb_stride, fb_height, 0, 0, lcd_width, lcd_height, false, false))
 					{
 #else
-					static int fb_width = fb->getScreenWidth(true);
+					int fb_width = fb->getScreenWidth(true);
 					if (!showImage(fbp, fb_width, fb_height, 0, 0, lcd_width, lcd_height, false, true))
 					{
 #endif

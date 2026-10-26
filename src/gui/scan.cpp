@@ -68,8 +68,8 @@ extern cVideo * videoDecoder;
 #define NEUTRINO_SCAN_STOP_SCRIPT "scan.stop"
 
 #define BAR_BORDER 2
-#define BAR_WIDTH 150
-#define BAR_HEIGHT 16//(13 + BAR_BORDER*2)
+#define BAR_WIDTH CFrameBuffer::getInstance()->scale2Res(150)
+#define BAR_HEIGHT CFrameBuffer::getInstance()->scale2Res(16) //(13 + BAR_BORDER*2)
 
 CScanTs::CScanTs(delivery_system_t DelSys)
 {

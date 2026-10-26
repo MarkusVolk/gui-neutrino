@@ -63,7 +63,7 @@
 
 extern CPictureViewer * g_PicViewer;
 
-#define ICON_LARGE_WIDTH 26
+#define ICON_LARGE_WIDTH CFrameBuffer::getInstance()->scale2Res(26)
 
 int findItem(std::string strItem, std::vector<std::string> & vecItems) {
 	for (std::vector<std::string>::size_type nCnt = 0; nCnt < vecItems.size(); nCnt++) {

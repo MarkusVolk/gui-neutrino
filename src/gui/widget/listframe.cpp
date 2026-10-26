@@ -63,7 +63,7 @@
 #define MAX_WINDOW_HEIGHT (frameBuffer ? frameBuffer->getScreenHeight() - 40:0)
 
 #define MIN_WINDOW_WIDTH  (frameBuffer ? frameBuffer->getScreenWidth() >> 1:0)
-#define MIN_WINDOW_HEIGHT 40
+#define MIN_WINDOW_HEIGHT CFrameBuffer::getInstance()->scale2Res(40)
 
 #define TITLE_BACKGROUND_COLOR COL_MENUHEAD_PLUS_0
 #define TITLE_FONT_COLOR COL_MENUHEAD_TEXT

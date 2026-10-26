@@ -43,7 +43,7 @@
 #define MAX_WINDOW_HEIGHT (g_settings.screen_EndY - g_settings.screen_StartY - 40)
 
 #define MIN_WINDOW_WIDTH  (MAX_WINDOW_WIDTH>>1)
-#define MIN_WINDOW_HEIGHT 40
+#define MIN_WINDOW_HEIGHT CFrameBuffer::getInstance()->scale2Res(40)
 
 using namespace std; /* TODO: remove all std:: prefixes in this file */
 

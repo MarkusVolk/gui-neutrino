@@ -136,8 +136,8 @@ int CStreamInfo2::exec (CMenuTarget * parent, const std::string &)
 
 int CStreamInfo2::doSignalStrengthLoop ()
 {
-#define BAR_WIDTH 150
-#define BAR_HEIGHT 12
+#define BAR_WIDTH CFrameBuffer::getInstance()->scale2Res(150)
+#define BAR_HEIGHT CFrameBuffer::getInstance()->scale2Res(12)
 	int res = menu_return::RETURN_REPAINT;
 	
 	bool fadeout = false;

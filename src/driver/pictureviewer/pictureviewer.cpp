@@ -1153,8 +1153,23 @@ fb_pixel_t * CPictureViewer::getImage(const std::string & name, int width, int h
 	return int_getImage(name, &width, &height, true);
 }
 
+/* an icon at the size of the OSD (CFrameBuffer::scaleIcon), an SVG drawn
+   afresh at the size, anything else resized */
 fb_pixel_t * CPictureViewer::getIcon(const std::string & name, int *width, int *height)
 {
+	int x = 0, y = 0;
+	if (access(name.c_str(), R_OK) == 0)
+		fh_getsize(name.c_str(), &x, &y, INT_MAX, INT_MAX);
+	CFrameBuffer *fb = CFrameBuffer::getInstance();
+	int w = fb->scaleIcon(x), h = fb->scaleIcon(y);
+	if (x > 0 && y > 0 && (w != x || h != y)) {
+		fb_pixel_t *ret = int_getImage(name, &w, &h, true);
+		if (ret) {
+			*width = w;
+			*height = h;
+		}
+		return ret;
+	}
 	return int_getImage(name, width, height, false);
 }
 

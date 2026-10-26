@@ -48,8 +48,8 @@
 #include <zapit/scannit.h>
 
 #define BAR_BORDER 2
-#define BAR_WIDTH 100
-#define BAR_HEIGHT 16 //(13 + BAR_BORDER*2)
+#define BAR_WIDTH CFrameBuffer::getInstance()->scale2Res(100)
+#define BAR_HEIGHT CFrameBuffer::getInstance()->scale2Res(16) //(13 + BAR_BORDER*2)
 
 CMotorControl::CMotorControl(int tnum)
 {

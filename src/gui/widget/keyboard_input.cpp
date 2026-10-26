@@ -175,10 +175,10 @@ CKeyboardInput::~CKeyboardInput()
 {
 }
 
-#define BORDER_OFFSET 20
+#define BORDER_OFFSET CFrameBuffer::getInstance()->scale2Res(20)
 #define INPUT_BORDER 2
 #define KEY_FRAME_WIDTH 2 // keys frame width
-#define KEY_BORDER 4 // spacing between keys
+#define KEY_BORDER CFrameBuffer::getInstance()->scale2Res(4) // spacing between keys
 
 void CKeyboardInput::init()
 {

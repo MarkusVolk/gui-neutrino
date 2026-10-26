@@ -76,7 +76,11 @@ void CCPicture::setPicture(const std::string &name, const int &w, const int &h)
 		return;
 	}
 
-	g_PicViewer->getSize(getBodyBGImage().c_str(), &dx_orig, &dy_orig);
+	/* an icon given by its name has the size it is painted at on this OSD */
+	if (name.find('/') == std::string::npos)
+		frameBuffer->getIconSize(name.c_str(), &dx_orig, &dy_orig);
+	if (dx_orig <= 0 || dy_orig <= 0)
+		g_PicViewer->getSize(getBodyBGImage().c_str(), &dx_orig, &dy_orig);
 
 	float dx_ratio = static_cast<float>(dx_orig) / static_cast<float>(std::max(1, w));
 	float dy_ratio = static_cast<float>(dy_orig) / static_cast<float>(std::max(1, h));
