@@ -8,6 +8,7 @@ const ICONS = {
 	channels: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
 	epg: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 17h7"/>',
 	timers: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/>',
+	recordings: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M7 5v4M12 5v4M17 5v4M10 12.5v4l3.5-2z"/>',
 	mounts: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6"/>',
 	box: '<rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 12h.01M10 12h4"/>',
 	record: '<circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/>',
@@ -156,7 +157,11 @@ async function zap(ch) {
  * mpv: link starts mpv, where a handler for it is set up (mpv-url.desktop).
  * The address goes to the clipboard as well, for when nothing opens. */
 async function stream(id) {
-	const s = await api(`stream/${id}`);
+	await playUrl((await api(`stream/${id}`)).url);
+}
+
+async function playUrl(url) {
+	const s = { url };
 	const m = s.url.match(/^(https?):\/\/(.*)$/);
 	if (/Android/i.test(navigator.userAgent) && m) {
 		location.href = `intent://${m[2]}#Intent;scheme=${m[1]};action=android.intent.action.VIEW;type=video/*;end`;
@@ -694,6 +699,81 @@ async function viewSignIn(main) {
 }
 
 /* ------------------------------------------------------------------ */
+/* recordings                                                          */
+
+function renameDialog(title) {
+	return new Promise((resolve) => {
+		const input = h("input", { type: "text", required: true, value: title, maxlength: 200, "aria-label": "Title" });
+		const d = h("dialog", {}, h("form", { method: "dialog", class: "fields" },
+			h("h2", {}, "Rename the recording"),
+			h("label", { class: "field" }, h("span", { class: "dim small" }, "Title"), input),
+			h("div", { class: "buttons" },
+				h("button", { class: "btn", type: "button", onclick: () => d.close() }, "Cancel"),
+				h("button", { class: "btn primary", value: "ok" }, "Rename"))));
+		d.addEventListener("close", () => {
+			d.remove();
+			resolve(d.returnValue === "ok" && input.value.trim() ? input.value.trim() : null);
+		});
+		document.body.append(d);
+		d.showModal();
+		input.select();
+	});
+}
+
+async function viewRecordings(main) {
+	const list = h("div", { class: "list" });
+	const run = async (fn, done) => {
+		try {
+			await fn();
+			if (done)
+				toast(done);
+			await show();
+		} catch (e) { fail(e); }
+	};
+	const row = (r) => {
+		const cover = r.cover
+			? h("img", { class: "cover", src: `/api/v1/recordings/${r.id}/cover`, alt: "", loading: "lazy" })
+			: h("div", { class: "cover none", html: icon("recordings") });
+		const buttons = h("div", { class: "row" });
+		if (!onBox)
+			buttons.append(h("button", { class: "btn icon", title: "Play on this device", html: icon("stream"),
+				onclick: () => playUrl(`${location.origin}/api/v1/recordings/${r.id}/file`).catch(fail) }));
+		if (may("write"))
+			buttons.append(h("button", { class: "btn", onclick: async () => {
+				try {
+					await api(`recordings/${r.id}/play`, { method: "POST" });
+					toast(`Playing on the TV: ${r.title}`);
+				} catch (e) { fail(e); }
+			} }, "Play on TV"));
+		if (may("system") && !r.busy) {
+			buttons.append(h("button", { class: "btn", onclick: async () => {
+				const title = await renameDialog(r.title);
+				if (title && title !== r.title)
+					await run(() => api(`recordings/${r.id}/rename`, { method: "POST", body: { title } }), "Renamed");
+			} }, "Rename"));
+			buttons.append(h("button", { class: "btn icon danger", title: "Delete", html: icon("trash"), onclick: async () => {
+				if (await confirmDialog(`Delete the recording "${r.title}"?`, "Delete", true))
+					await run(() => api(`recordings/${r.id}`, { method: "DELETE" }), "Recording deleted");
+			} }));
+		}
+		return h("div", { class: "card recording" }, cover,
+			h("div", {},
+				h("strong", {}, r.title),
+				h("div", { class: "dim small" }, [r.channel, `${day(r.time)} ${hm(r.time)}`, r.length ? `${r.length} min` : "",
+					size(r.size), r.busy ? "recording now" : ""].filter(Boolean).join(" · ")),
+				r.info ? h("div", { class: "dim small" }, r.info) : null),
+			buttons);
+	};
+	const show = async () => {
+		const items = ((await api("recordings")).items || []).sort((a, b) => b.time - a.time);
+		list.replaceChildren(...(items.length ? items.map(row) : [h("div", { class: "card empty" }, "No recordings")]));
+	};
+	main.append(h("div", { class: "toolbar" }, h("h1", {}, "Recordings"),
+		h("button", { class: "btn icon", title: "Refresh", html: icon("refresh"), onclick: () => show().catch(fail) })), list);
+	await show();
+}
+
+/* ------------------------------------------------------------------ */
 /* drives and network shares                                           */
 
 const SHARE_TYPES = { smb: "SMB", nfs: "NFS", ftp: "FTP" };
@@ -1032,6 +1112,7 @@ const VIEWS = {
 	channels: ["Channels", viewChannels, "read"],
 	epg: ["Guide", viewEpg, "read"],
 	timers: ["Timers", viewTimers, "read"],
+	recordings: ["Recordings", viewRecordings, "read"],
 	mounts: ["Mounts", viewMounts, "read"],
 	box: ["Box", viewBox, "read"],
 	signin: ["Sign in", viewSignIn, "public"],

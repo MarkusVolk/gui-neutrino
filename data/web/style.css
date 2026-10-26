@@ -316,6 +316,13 @@ svg.remote .key .glyph .line { fill: none; stroke: #d7dce5; stroke-width: 1.6; s
 /* timers */
 .timer { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
 
+/* recordings */
+.recording { display: grid; grid-template-columns: 96px 1fr auto; gap: 12px; align-items: center; }
+.recording .cover { width: 96px; height: 54px; object-fit: cover; border-radius: 6px; background: var(--raised); }
+.recording .cover.none { display: flex; align-items: center; justify-content: center; color: var(--dim); }
+.recording .cover.none svg { width: 28px; height: 28px; }
+@media (max-width: 640px) { .recording { grid-template-columns: 64px 1fr; } .recording .cover { width: 64px; height: 36px; } .recording > .row { grid-column: 1 / -1; } }
+
 /* mounts */
 .share { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
 .share .progress { max-width: 260px; }

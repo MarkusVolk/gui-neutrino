@@ -96,6 +96,9 @@
 #include <system/netshares.h>
 #include <gui/hdd_menu.h>
 #include <gui/timerlist.h>
+#include <gui/movieplayer.h>
+#include <driver/movieinfo.h>
+#include <zapit/client/zapittools.h>
 #include <gui/color.h>
 #include <src/tools/rcsim.h>
 
@@ -106,6 +109,12 @@
 #include <neutrinoapi.h>
 #ifdef ENABLE_ASSISTANT
 #include <mcpoauth.h>
+#endif
+
+/* helpers.h, which the movie player brings in, makes to_string a macro
+   that std::to_string does not survive */
+#ifdef to_string
+#undef to_string
 #endif
 
 extern cVideo *videoDecoder;
@@ -2834,6 +2843,284 @@ void ep_share_list(Call &c)
 }
 
 //-----------------------------------------------------------------------------
+// recordings: the .ts files below the record directory, with Neutrino's .xml
+//-----------------------------------------------------------------------------
+std::string hex_of(const std::string &s)
+{
+	std::string out;
+	for (size_t i = 0; i < s.size(); i++)
+		out += string_printf("%02x", (unsigned char) s[i]);
+	return out;
+}
+
+bool unhex(const std::string &s, std::string &out)
+{
+	out.clear();
+	if (s.empty() || s.size() % 2 || s.size() > 2048)
+		return false;
+	for (size_t i = 0; i < s.size(); i += 2) {
+		unsigned int b;
+		if (!isxdigit((unsigned char) s[i]) || !isxdigit((unsigned char) s[i + 1]) || sscanf(s.c_str() + i, "%2x", &b) != 1)
+			return false;
+		out += (char) b;
+	}
+	return true;
+}
+
+std::string record_dir()
+{
+	std::string d = g_settings.network_nfs_recordingdir;
+	while (d.size() > 1 && d[d.size() - 1] == '/')
+		d.erase(d.size() - 1);
+	return d;
+}
+
+/* the record directory and the directories in it, but no hidden one (.timeshift) */
+void recording_files(std::vector<std::string> &files)
+{
+	std::string base = record_dir();
+	std::vector<std::string> dirs(1, "");
+	for (size_t d = 0; d < dirs.size(); d++) {
+		DIR *dir = opendir((base + "/" + dirs[d]).c_str());
+		if (!dir)
+			continue;
+		while (struct dirent *e = readdir(dir)) {
+			std::string name = e->d_name;
+			if (name.empty() || name[0] == '.')
+				continue;
+			std::string rel = dirs[d].empty() ? name : dirs[d] + "/" + name;
+			struct stat st;
+			if (stat((base + "/" + rel).c_str(), &st) != 0)
+				continue;
+			if (S_ISDIR(st.st_mode) && dirs[d].empty())
+				dirs.push_back(rel);
+			else if (S_ISREG(st.st_mode) && name.size() > 3 && name.compare(name.size() - 3, 3, ".ts") == 0)
+				files.push_back(rel);
+		}
+		closedir(dir);
+	}
+}
+
+/* the file of the recording the id names, below the record directory only */
+bool recording_arg(Call &c, std::string &rel, std::string &path)
+{
+	if (!unhex(c.args[0], rel) || rel.find("..") != std::string::npos || rel[0] == '/'
+			|| rel.size() < 4 || rel.compare(rel.size() - 3, 3, ".ts") != 0) {
+		problem(c.out, 404, "no-such-recording", "no such recording");
+		return false;
+	}
+	path = record_dir() + "/" + rel;
+	struct stat st;
+	if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+		problem(c.out, 404, "no-such-recording", "no such recording");
+		return false;
+	}
+	return true;
+}
+
+std::string without_ts(const std::string &path)
+{
+	return path.substr(0, path.size() - 3);
+}
+
+/* a file still being written belongs to a recording or the timeshift */
+bool recording_busy(const std::string &path)
+{
+	struct stat st;
+	return stat(path.c_str(), &st) == 0 && time(NULL) - st.st_mtime < 30;
+}
+
+Json::Value recording_json(const std::string &rel)
+{
+	std::string path = record_dir() + "/" + rel;
+	struct stat st;
+	stat(path.c_str(), &st);
+	MI_MOVIE_INFO mi;
+	CMovieInfo info;
+	info.clearMovieInfo(&mi);
+	mi.file.Name = path;
+	bool have_info = info.loadMovieInfo(&mi);
+
+	std::string name = rel.substr(rel.rfind('/') == std::string::npos ? 0 : rel.rfind('/') + 1);
+	Json::Value v(Json::objectValue);
+	v["id"] = hex_of(rel);
+	v["file"] = rel;
+	v["title"] = have_info && !mi.epgTitle.empty() ? mi.epgTitle : without_ts(name);
+	v["info"] = have_info ? mi.epgInfo1 : "";
+	v["channel"] = have_info ? mi.channelName : "";
+	v["length"] = have_info ? mi.length : 0;
+	v["time"] = (Json::Int64) st.st_mtime;
+	v["size"] = Json::UInt64(st.st_size);
+	v["cover"] = access((without_ts(path) + ".jpg").c_str(), R_OK) == 0;
+	v["busy"] = recording_busy(path);
+	return v;
+}
+
+void ep_recordings(Call &c)
+{
+	std::vector<std::string> files;
+	recording_files(files);
+	Json::Value v(Json::objectValue);
+	v["items"] = Json::Value(Json::arrayValue);
+	for (size_t i = 0; i < files.size(); i++)
+		v["items"].append(recording_json(files[i]));
+	v["dir"] = record_dir();
+	send_json(c.out, 200, v);
+}
+
+/* the file itself, from a byte on where the player asks (Range), so that it can seek */
+void ep_recording_file(Call &c)
+{
+	std::string rel, path;
+	if (!recording_arg(c, rel, path) || !send_file(c, path, "video/mp2t", false))
+		return;
+	off_t size = c.out.length;
+	c.out.headers.push_back(std::make_pair("Accept-Ranges", "bytes"));
+	CStringList::const_iterator it = c.in.headers.find("Range");
+	long long from, to = -1;
+	if (it == c.in.headers.end() || sscanf(it->second.c_str(), "bytes=%lld-%lld", &from, &to) < 1)
+		return;
+	if (from < 0 || from >= size) {
+		close(c.out.fd);
+		c.out.fd = -1;
+		c.out.headers.push_back(std::make_pair("Content-Range", string_printf("bytes */%lld", (long long) size)));
+		problem(c.out, 416, "out-of-range", "the range lies outside the file");
+		return;
+	}
+	if (to < from || to >= size)
+		to = size - 1;
+	c.out.status = 206;
+	c.out.offset = from;
+	c.out.length = to - from + 1;
+	c.out.headers.push_back(std::make_pair("Content-Range", string_printf("bytes %lld-%lld/%lld", from, to, (long long) size)));
+}
+
+void ep_recording_cover(Call &c)
+{
+	std::string rel, path;
+	if (!recording_arg(c, rel, path))
+		return;
+	if (!send_file(c, without_ts(path) + ".jpg", "image/jpeg", false))
+		problem(c.out, 404, "no-such-cover", "the recording has no cover");
+}
+
+void ep_recording_play(Call &c)
+{
+	std::string rel, path;
+	if (!recording_arg(c, rel, path))
+		return;
+	if (CMoviePlayerGui::getInstance().Playing()) {
+		problem(c.out, 409, "busy", "the box plays something already");
+		return;
+	}
+	std::string title = recording_json(rel)["title"].asString();
+	/* the player runs in the main loop until the recording ends */
+	if (!main_call::post([title, path] {
+			std::string t = title, f = path;
+			CMoviePlayerGui::getInstance().SetFile(t, f);
+			CMoviePlayerGui::getInstance().exec(NULL, "http");
+		})) {
+		problem(c.out, 503, "busy", "the box did not take the playback");
+		return;
+	}
+	send_empty(c.out, 202);
+}
+
+void ep_recording_delete(Call &c)
+{
+	std::string rel, path;
+	if (!recording_arg(c, rel, path))
+		return;
+	if (recording_busy(path)) {
+		problem(c.out, 409, "busy", "the recording is still being written");
+		return;
+	}
+	std::string base = without_ts(path);
+	if (unlink(path.c_str()) != 0) {
+		problem(c.out, 500, "not-deleted", std::string("the recording could not be deleted: ") + strerror(errno));
+		return;
+	}
+	unlink((base + ".xml").c_str());
+	unlink((base + ".jpg").c_str());
+	send_empty(c.out, 204);
+}
+
+/* the file name part a title gives, as the recorder makes it */
+std::string file_part(const std::string &s)
+{
+	std::string t = UTF8_TO_FILESYSTEM_ENCODING(s.c_str());
+	std::vector<char> buf(t.begin(), t.end());
+	buf.push_back(0);
+	ZapitTools::replace_char(buf.data());
+	return buf.data();
+}
+
+void ep_recording_rename(Call &c)
+{
+	static const char *members[] = { "title", NULL };
+	std::string title, rel, path;
+	if (!read_body(c, members) || !body_string(c, "title", true, 200, title) || !recording_arg(c, rel, path))
+		return;
+	title = trim(title);
+	if (title.empty()) {
+		problem(c.out, 400, "bad-string", "title is empty");
+		return;
+	}
+	if (recording_busy(path)) {
+		problem(c.out, 409, "busy", "the recording is still being written");
+		return;
+	}
+	MI_MOVIE_INFO mi;
+	CMovieInfo info;
+	info.clearMovieInfo(&mi);
+	mi.file.Name = path;
+	bool have_info = info.loadMovieInfo(&mi);
+
+	/* Neutrino names a recording channel_title_date_time: the title part
+	   changes, the channel and the time stay and keep the name its own */
+	std::string dir = path.substr(0, path.rfind('/') + 1);
+	std::string name = without_ts(path.substr(dir.size()));
+	std::string stamp;
+	if (name.size() > 16 && name[name.size() - 16] == '_' && name[name.size() - 7] == '_')
+		stamp = name.substr(name.size() - 16);
+	std::string channel = have_info && !mi.channelName.empty() ? file_part(mi.channelName) + "_" : "";
+	if (stamp.empty()) {
+		struct stat st;
+		stat(path.c_str(), &st);
+		char buf[32];
+		struct tm tm;
+		localtime_r(&st.st_mtime, &tm);
+		strftime(buf, sizeof(buf), "_%Y%m%d_%H%M%S", &tm);
+		stamp = buf;
+	}
+	std::string base = dir + channel + file_part(title) + stamp;
+	std::string old_base = without_ts(path);
+	if (base != old_base) {
+		if (access((base + ".ts").c_str(), F_OK) == 0) {
+			problem(c.out, 409, "exists", "a recording of that name is there already");
+			return;
+		}
+		if (rename(path.c_str(), (base + ".ts").c_str()) != 0) {
+			problem(c.out, 500, "not-renamed", std::string("the recording could not be renamed: ") + strerror(errno));
+			return;
+		}
+		rename((old_base + ".jpg").c_str(), (base + ".jpg").c_str());
+	}
+	mi.file.Name = base + ".ts";
+	mi.epgTitle = title;
+	if (mi.tfile == old_base + ".jpg")
+		mi.tfile = base + ".jpg";
+	if (!info.saveMovieInfo(mi)) {
+		problem(c.out, 500, "not-saved", "the title could not be written");
+		return;
+	}
+	if (base != old_base)
+		unlink((old_base + ".xml").c_str());
+	std::string new_rel = (base + ".ts").substr(record_dir().size() + 1);
+	send_json(c.out, 200, recording_json(new_rel));
+}
+
+//-----------------------------------------------------------------------------
 // routing
 //-----------------------------------------------------------------------------
 struct Route
@@ -2865,6 +3152,12 @@ const Route routes[] = {
 	{ "GET",	"/api/v1/timers",		L_READ,		ep_timers },
 	{ "POST",	"/api/v1/timers",		L_WRITE,	ep_timer_new },
 	{ "DELETE",	"/api/v1/timers/{}",		L_WRITE,	ep_timer_delete },
+	{ "GET",	"/api/v1/recordings",		L_READ,		ep_recordings },
+	{ "GET",	"/api/v1/recordings/{}/file",	L_READ,		ep_recording_file },
+	{ "GET",	"/api/v1/recordings/{}/cover",	L_READ,		ep_recording_cover },
+	{ "POST",	"/api/v1/recordings/{}/play",	L_WRITE,	ep_recording_play },
+	{ "POST",	"/api/v1/recordings/{}/rename",	L_SYSTEM,	ep_recording_rename },
+	{ "DELETE",	"/api/v1/recordings/{}",	L_SYSTEM,	ep_recording_delete },
 	{ "GET",	"/api/v1/mounts",		L_READ,		ep_mounts },
 	{ "POST",	"/api/v1/mounts/shares",	L_SYSTEM,	ep_share_new },
 	{ "POST",	"/api/v1/mounts/shares/{}",	L_SYSTEM,	ep_share_set },
