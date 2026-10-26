@@ -112,6 +112,11 @@ class CTimerList : public CMenuTarget, public CListHelpers
 		void RemoteBoxTimerList(CTimerd::TimerList &timerlist);
 };
 
+/* the timers a new one from announceTime to stopTime on channel_id could not
+   run beside: with one tuner, or on a channel through the CI, every other in
+   that time but recordings on the same transponder; a web channel takes no
+   tuner, and the timeshift gives way */
+CTimerd::TimerList timerConflicts(time_t announceTime, time_t stopTime, t_channel_id channel_id = 0);
 bool askUserOnTimerConflict(time_t announceTime, time_t stopTime, t_channel_id channel_id = 0);
 
 #endif

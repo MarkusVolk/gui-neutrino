@@ -127,8 +127,20 @@ async function record(channel, ev) {
 		body.epg_id = ev.id;
 		body.epg_start = ev.start;
 	}
-	await api("timers", { method: "POST", body });
+	let r;
+	try {
+		r = await api("timers", { method: "POST", body });
+	} catch (e) {
+		/* the box sees no tuner for it beside the timers there are, as its own menus ask */
+		if (!(e instanceof ApiError && e.code === "timer-conflict"))
+			throw e;
+		const what = e.message.replace(/^overlaps with /, "");
+		if (!await confirmDialog(`"${ev.title}" overlaps with ${what}. The box may not be able to record both. Set the timer anyway?`, "Set anyway"))
+			return null;
+		r = await api("timers", { method: "POST", body: { ...body, force: true } });
+	}
 	toast(`Recording set: ${ev.title}`);
+	return r;
 }
 
 /* the browser runs on the box itself, where a stream would only play

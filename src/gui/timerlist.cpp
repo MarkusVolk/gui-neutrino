@@ -1972,31 +1972,37 @@ bool CTimerList::askUserOnRemoteTimerConflict(time_t announceTime, time_t stopTi
 		return true;
 }
 
-bool askUserOnTimerConflict(time_t announceTime, time_t stopTime, t_channel_id channel_id)
+CTimerd::TimerList timerConflicts(time_t announceTime, time_t stopTime, t_channel_id channel_id)
 {
+	CTimerd::TimerList conflicts;
+	if (channel_id && IS_WEBCHAN(channel_id))
+		return conflicts;
 	bool useCI = false;
 	CZapitChannel *channel = CServiceManager::getInstance()->FindChannel(channel_id);
 	if (channel)
 		useCI = channel->bUseCI;
+	if (CFEManager::getInstance()->getEnabledCount() != 1 && !useCI)
+		return conflicts;
 
-	if (CFEManager::getInstance()->getEnabledCount() == 1 || useCI)
+	CTimerdClient Timer;
+	CTimerd::TimerList overlapping = Timer.getOverlappingTimers(announceTime, stopTime);
+	CRecordManager::getInstance()->RemoveTimeshiftTimers(overlapping);
+	for (CTimerd::TimerList::iterator i = overlapping.begin(); i != overlapping.end(); ++i) {
+		bool record = i->eventType == CTimerd::TIMER_RECORD || i->eventType == CTimerd::TIMER_IMMEDIATE_RECORD;
+		if (record && IS_WEBCHAN(i->channel_id))
+			continue;
+		if (record && channel_id && !useCI && SAME_TRANSPONDER(channel_id, i->channel_id))
+			continue;
+		conflicts.push_back(*i);
+	}
+	return conflicts;
+}
+
+bool askUserOnTimerConflict(time_t announceTime, time_t stopTime, t_channel_id channel_id)
+{
+	CTimerd::TimerList overlappingTimers = timerConflicts(announceTime, stopTime, channel_id);
+	if (!overlappingTimers.empty())
 	{
-		CTimerdClient Timer;
-		CTimerd::TimerList overlappingTimers = Timer.getOverlappingTimers(announceTime, stopTime);
-		//printf("[CTimerdClient] attention\n%d\t%d\t%d conflicts with:\n",timerNew.announceTime,timerNew.alarmTime,timerNew.stopTime);
-
-		// Don't ask if there are overlapping timers on the same transponder.
-		if (channel_id)
-		{
-			CTimerd::TimerList::iterator i;
-			for (i = overlappingTimers.begin(); i != overlappingTimers.end(); i++)
-				//if ((i->eventType != CTimerd::TIMER_RECORD || !SAME_TRANSPONDER(channel_id, i->channel_id)))
-				if ((i->eventType != CTimerd::TIMER_RECORD || !SAME_TRANSPONDER(channel_id, i->channel_id && !useCI) /*|| (useCI && i->channel_ci)*/)) // FIXME: channel_ci not available
-					break;
-			if (i == overlappingTimers.end())
-				return true; // yes, add timer
-		}
-
 		std::string timerbuf = g_Locale->getText(LOCALE_TIMERLIST_OVERLAPPING_TIMER);
 		timerbuf += "\n";
 		for (CTimerd::TimerList::iterator it = overlappingTimers.begin(); it != overlappingTimers.end(); ++it)
@@ -2036,6 +2042,5 @@ bool askUserOnTimerConflict(time_t announceTime, time_t stopTime, t_channel_id c
 
 		return (ShowMsg(LOCALE_MESSAGEBOX_INFO, timerbuf, CMsgBox::mbrNo, CMsgBox::mbNo | CMsgBox::mbYes) == CMsgBox::mbrYes);
 	}
-	else
-		return true;
+	return true;
 }

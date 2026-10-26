@@ -95,6 +95,7 @@
 #include <system/fsmounter.h>
 #include <system/netshares.h>
 #include <gui/hdd_menu.h>
+#include <gui/timerlist.h>
 #include <gui/color.h>
 #include <src/tools/rcsim.h>
 
@@ -1504,11 +1505,11 @@ void ep_timer_new(Call &c)
 {
 	static const char *members[] = { "kind", "start", "channel_id", "stop", "title", "repeat",
 		"repeat_count", "announce", "epg_id", "epg_start", "standby_on", "recording_dir",
-		"recording_safety", "auto_adjust", NULL };
+		"recording_safety", "auto_adjust", "force", NULL };
 	std::string kind, title, dir;
 	int64_t start, stop, repeat, repeat_count, announce, epg_start;
 	uint64_t channel, epg_id;
-	bool standby_on, safety, adjust;
+	bool standby_on, safety, adjust, force;
 	if (!read_body(c, members) || !body_string(c, "kind", true, 32, kind)
 			|| !body_int(c, "start", true, 0, start) || !body_hex(c, "channel_id", false, channel)
 			|| !body_int(c, "stop", false, 0, stop) || !body_string(c, "title", false, 512, title)
@@ -1516,7 +1517,8 @@ void ep_timer_new(Call &c)
 			|| !body_int(c, "announce", false, 0, announce) || !body_hex(c, "epg_id", false, epg_id)
 			|| !body_int(c, "epg_start", false, 0, epg_start) || !body_bool(c, "standby_on", false, false, standby_on)
 			|| !body_string(c, "recording_dir", false, 1024, dir)
-			|| !body_bool(c, "recording_safety", false, false, safety) || !body_bool(c, "auto_adjust", false, false, adjust))
+			|| !body_bool(c, "recording_safety", false, false, safety) || !body_bool(c, "auto_adjust", false, false, adjust)
+			|| !body_bool(c, "force", false, false, force))
 		return;
 
 	int type = -1;
@@ -1561,6 +1563,28 @@ void ep_timer_new(Call &c)
 	}
 	if (!announce)
 		announce = start;
+
+	/* the same check as the timer menus: what cannot be recorded beside the
+	   timers there are is refused, unless asked for anyway (force) */
+	if (recording && !force) {
+		CTimerd::TimerList conflicts = timerConflicts(start, stop, channel);
+		if (!conflicts.empty()) {
+			std::string detail;
+			for (size_t i = 0; i < conflicts.size(); i++) {
+				char span[32];
+				struct tm a, b;
+				localtime_r(&conflicts[i].alarmTime, &a);
+				localtime_r(&conflicts[i].stopTime, &b);
+				strftime(span, sizeof(span), "%H:%M", &a);
+				std::string from = span;
+				strftime(span, sizeof(span), "%H:%M", &b);
+				std::string what = conflicts[i].epgTitle[0] ? conflicts[i].epgTitle : kind_name(conflicts[i].eventType);
+				detail += (detail.empty() ? "overlaps with " : ", ") + std::string("\"") + what + "\" " + from + "-" + span;
+			}
+			problem(c.out, 409, "timer-conflict", detail);
+			return;
+		}
+	}
 
 	CTimerd::CTimerEventRepeat rep = (CTimerd::CTimerEventRepeat) repeat;
 	int id = -1;
