@@ -304,7 +304,35 @@ async function viewChannels(main) {
 
 const PX_PER_MIN = 4;
 
-function eventDialog(ch, ev) {
+/* el is the programme in the guide; el.timerId the recording set for it */
+function eventDialog(ch, ev, el) {
+	const end = ev.start + ev.duration;
+	const running = ev.start <= now() && now() < end;
+	const timerId = el?.timerId;
+	let timerButton = null;
+	if (may("write") && timerId !== undefined)
+		timerButton = h("button", { class: "btn danger", onclick: async () => {
+			d.close();
+			/* a timer to come is set again as fast; a recording stopped is gone */
+			if (running && !await confirmDialog(`Stop the recording of "${ev.title}"?`, "Stop recording", true))
+				return;
+			try {
+				await api(`timers/${timerId}`, { method: "DELETE" });
+				el.classList.remove("timer");
+				delete el.timerId;
+				toast(running ? `Recording stopped: ${ev.title}` : `Timer deleted: ${ev.title}`);
+			} catch (e) { fail(e); }
+		} }, running ? "Stop recording" : "Delete timer");
+	else if (may("write"))
+		timerButton = h("button", { class: "btn primary", onclick: () => {
+			record(ch.id, ev).then((r) => {
+				if (el && r?.id !== undefined) {
+					el.classList.add("timer");
+					el.timerId = r.id;
+				}
+			}).catch(fail);
+			d.close();
+		} }, "Record");
 	const d = h("dialog", {},
 		h("h2", {}, ev.title),
 		h("p", { class: "dim small" }, `${ch.name} - ${day(ev.start)} ${hm(ev.start)}-${hm(ev.start + ev.duration)}`),
@@ -313,7 +341,7 @@ function eventDialog(ch, ev) {
 			h("button", { class: "btn", onclick: () => d.close() }, "Close"),
 			onBox ? null : h("button", { class: "btn", onclick: () => { stream(ch.id).catch(fail); d.close(); } }, "Stream"),
 			may("write") ? h("button", { class: "btn", onclick: () => { zap(ch).catch(fail); d.close(); } }, "Zap") : null,
-			may("write") ? h("button", { class: "btn primary", onclick: () => { record(ch.id, ev).catch(fail); d.close(); } }, "Record") : null));
+			timerButton));
 	d.addEventListener("close", () => d.remove());
 	document.body.append(d);
 	d.showModal();
@@ -332,10 +360,15 @@ async function viewEpg(main) {
 		const start = Math.floor(now() / 1800) * 1800;
 		/* as many hours as the window shows, and two more to scroll to */
 		const hours = Math.min(24, Math.max(8, Math.ceil((box.clientWidth - 150) / (60 * PX_PER_MIN)) + 2));
-		const [channels, grid] = await Promise.all([
+		const [channels, grid, timers] = await Promise.all([
 			all(`channels?bouquet=${id}&limit=500`),
 			all(`epg/grid?bouquet=${id}&from=${start}&to=${start + hours * 3600}&limit=100`),
+			api("timers").then((r) => r.items || [], () => []),
 		]);
+		/* a programme a recording is set for: by its event, or covered more than half */
+		const records = timers.filter((tm) => tm.kind === "record");
+		const recordFor = (ch, ev, end) => records.find((tm) => tm.channel_id === ch.id &&
+			((tm.epg_id && tm.epg_id === ev.id) || Math.min(tm.stop, end) - Math.max(tm.start, ev.start) > (end - ev.start) / 2));
 		const events = new Map(grid.map((r) => [r.channel_id, r.events || []]));
 		const width = hours * 60 * PX_PER_MIN;
 		const x = (t) => (t - start) / 60 * PX_PER_MIN;
@@ -360,17 +393,21 @@ async function viewEpg(main) {
 				/* a click on what runs now plays it (on the box itself: zaps
 				 * to it), the right button or a long press opens the choices */
 				const direct = running && (!onBox || may("write"));
-				line.append(h("div", { class: `event${running ? " running" : ""}`, style: `left:${left}px;width:${right - left - 2}px`,
+				const timer = recordFor(ch, ev, end);
+				const el = h("div", { class: `event${running ? " running" : ""}${timer ? " timer" : ""}`, style: `left:${left}px;width:${right - left - 2}px`,
 					title: `${hm(ev.start)} ${ev.title}${direct ? (onBox ? "\nClick: zap - right click: more" : "\nClick: stream - right click: more") : ""}`,
 					onclick: () => {
 						if (!direct)
-							eventDialog(ch, ev);
+							eventDialog(ch, ev, el);
 						else if (onBox)
 							zap(ch).catch(fail);
 						else
 							stream(ch.id).catch(fail);
 					},
-					oncontextmenu: (e) => { e.preventDefault(); eventDialog(ch, ev); } }, ev.title));
+					oncontextmenu: (e) => { e.preventDefault(); eventDialog(ch, ev, el); } }, ev.title);
+				if (timer)
+					el.timerId = timer.id;
+				line.append(el);
 			});
 			/* the channel logo, the name where there is none */
 			const head = h("div", { class: "rowh logo-head", title: ch.name });

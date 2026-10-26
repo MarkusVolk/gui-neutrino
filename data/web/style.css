@@ -309,6 +309,8 @@ svg.remote .key .glyph .line { fill: none; stroke: #d7dce5; stroke-width: 1.6; s
 }
 .epg .event:hover { border-color: var(--accent); }
 .epg .event.running { background: color-mix(in srgb, var(--accent) 25%, var(--raised)); }
+.epg .event.timer { background: color-mix(in srgb, var(--danger) 30%, var(--raised)); }
+.epg .event.running.timer { background: color-mix(in srgb, var(--danger) 40%, var(--raised)); }
 .epg .nowline { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--danger); z-index: 1; pointer-events: none; }
 
 /* timers */
