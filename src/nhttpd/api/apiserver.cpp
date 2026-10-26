@@ -1587,6 +1587,15 @@ void ep_timer_new(Call &c)
 		return;
 	}
 	time_t now = time(NULL);
+	/* a programme that runs already is recorded from now to its end and the
+	   safety time after; epg_start keeps its own start for the guide */
+	if (type == CTimerd::TIMER_RECORD && repeat == 0 && start < now && stop > now) {
+		if (!epg_start)
+			epg_start = start;
+		start = now;
+		if (announce && announce < now)
+			announce = now;
+	}
 	if (repeat == 0 && start < now - 120) {
 		problem(c.out, 400, "timer-in-the-past", "a one-time timer cannot start in the past");
 		return;
