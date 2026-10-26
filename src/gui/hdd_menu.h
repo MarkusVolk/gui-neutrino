@@ -75,7 +75,7 @@ class CHDDMenuHandler : public CMenuTarget
 
 		static devtool_s devtools[];
 
-		bool is_mounted(const char *dev);
+		static bool is_mounted(const char *dev);
 		void getBlkIds();
 		std::string getFmtType(std::string name, std::string part = "");
 		std::string getDefaultPart(std::string dev);
@@ -101,6 +101,20 @@ class CHDDMenuHandler : public CMenuTarget
 		~CHDDMenuHandler();
 
 		static CHDDMenuHandler* getInstance();
+
+		/* a partition as blkid reports it, for callers outside the menu */
+		struct Drive {
+			std::string devname;
+			std::string fmt;
+			std::string label;
+			bool mounted;
+		};
+		static void listDrives(std::vector<Drive> &drives);
+		bool mountDrive(const std::string &name) { return mount_dev(name); }
+		bool umountDrive(const std::string &name) { return umount_dev(name); }
+		/* records into dir and, without a timeshift dir of its own, timeshifts there too */
+		static void applyRecordPath(const std::string &dir);
+
 		int exec( CMenuTarget* parent,  const std::string &actionkey);
 		int doMenu();
 		int filterDevName(const char * name);

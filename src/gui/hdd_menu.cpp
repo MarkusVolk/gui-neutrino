@@ -235,22 +235,20 @@ static bool mounted_outside_media(const std::string &devname)
 	return outside;
 }
 
-void CHDDMenuHandler::getBlkIds()
+void CHDDMenuHandler::listDrives(std::vector<Drive> &drives)
 {
 	pid_t pid;
 	std::string blkid = find_executable("blkid");
-	printf("CHDDMenuHandler::getBlkIds: blkid = %s\n", blkid.c_str());
+	printf("CHDDMenuHandler::listDrives: blkid = %s\n", blkid.c_str());
 	if (blkid.empty())
 		return;
-	std::string pcmd = blkid + " -s TYPE -s LABEL";
-
-	FILE* f = my_popen(pid, pcmd.c_str(), "r");
+	/* busybox blkid prints nothing when asked for single tags with -s */
+	FILE* f = my_popen(pid, blkid.c_str(), "r");
 	if (!f) {
-		printf("getBlkIds: cmd [%s] failed\n", pcmd.c_str());
+		printf("listDrives: cmd [%s] failed\n", blkid.c_str());
 		return;
 	}
 
-	hdd_list.clear();
 	char buff[512];
 	while (fgets(buff, sizeof(buff), f)) {
 		std::string ret = buff;
@@ -260,7 +258,8 @@ void CHDDMenuHandler::getBlkIds()
 			label = ret.substr(lpos + 8);
 			label = label.substr(0, label.find("\""));
 		}
-		std::string search = "TYPE=\"";
+		/* " TYPE=" so that PTTYPE of a whole disk is not taken for a filesystem */
+		std::string search = " TYPE=\"";
 		size_t pos = ret.find(search);
 		if (pos == std::string::npos)
 			continue;
@@ -275,18 +274,34 @@ void CHDDMenuHandler::getBlkIds()
 			continue;
 		*e = 0;
 
-		hdd_s hdd;
-		hdd.devname = std::string(buff + 5);
-		if (g_info.hw_caps->has_internal_mmc && strncmp(hdd.devname.c_str(), "mmcblk", 6) == 0)
+		Drive drive;
+		drive.devname = std::string(buff + 5);
+		if (g_info.hw_caps->has_internal_mmc && strncmp(drive.devname.c_str(), "mmcblk", 6) == 0)
 			continue;
-		hdd.mounted = is_mounted(buff + 5);
-		hdd.fmt = ret;
-		hdd.desc = hdd.devname + (label.empty() ? "" : " " + label) + " (" + hdd.fmt + ")";
-		printf("device: %s filesystem %s (%s)\n", hdd.devname.c_str(), hdd.fmt.c_str(), hdd.mounted ? "mounted" : "not mounted" );
-		hdd_list.push_back(hdd);
+		drive.mounted = is_mounted(buff + 5);
+		drive.fmt = ret;
+		drive.label = label;
+		printf("device: %s filesystem %s (%s)\n", drive.devname.c_str(), drive.fmt.c_str(), drive.mounted ? "mounted" : "not mounted" );
+		drives.push_back(drive);
 	}
 	fclose(f);
 	waitpid(pid, NULL, 0); /* beware of the zombie apocalypse! */
+}
+
+void CHDDMenuHandler::getBlkIds()
+{
+	std::vector<Drive> drives;
+	listDrives(drives);
+
+	hdd_list.clear();
+	for (std::vector<Drive>::const_iterator it = drives.begin(); it != drives.end(); ++it) {
+		hdd_s hdd;
+		hdd.devname = it->devname;
+		hdd.mounted = it->mounted;
+		hdd.fmt = it->fmt;
+		hdd.desc = hdd.devname + (it->label.empty() ? "" : " " + it->label) + " (" + hdd.fmt + ")";
+		hdd_list.push_back(hdd);
+	}
 }
 
 std::string CHDDMenuHandler::getDefaultPart(std::string dev)
@@ -520,18 +535,23 @@ void CHDDMenuHandler::setRecordPath(std::string &dev)
 	bool old_menu = in_menu;
 	in_menu = false;
 	int res = ShowMsg(LOCALE_RECORDINGMENU_DEFDIR, LOCALE_HDD_SET_RECDIR, CMsgBox::mbrNo, CMsgBox::mbYes | CMsgBox::mbNo);
-	if(res == CMsgBox::mbrYes) {
-		setSettingsText(g_settings.network_nfs_recordingdir, newpath);
-		CRecordManager::getInstance()->SetDirectory(g_settings.network_nfs_recordingdir);
-		if(g_settings.timeshiftdir.empty())
-		{
-			std::string timeshiftDir = g_settings.network_nfs_recordingdir + "/.timeshift";
-			safe_mkdir(timeshiftDir.c_str());
-			printf("New timeshift dir: %s\n", timeshiftDir.c_str());
-			CRecordManager::getInstance()->SetTimeshiftDirectory(timeshiftDir);
-		}
-	}
+	if(res == CMsgBox::mbrYes)
+		applyRecordPath(newpath);
 	in_menu = old_menu;
+}
+
+void CHDDMenuHandler::applyRecordPath(const std::string &dir)
+{
+	safe_mkdir(dir.c_str());
+	setSettingsText(g_settings.network_nfs_recordingdir, dir);
+	CRecordManager::getInstance()->SetDirectory(g_settings.network_nfs_recordingdir);
+	if(g_settings.timeshiftdir.empty())
+	{
+		std::string timeshiftDir = g_settings.network_nfs_recordingdir + "/.timeshift";
+		safe_mkdir(timeshiftDir.c_str());
+		printf("New timeshift dir: %s\n", timeshiftDir.c_str());
+		CRecordManager::getInstance()->SetTimeshiftDirectory(timeshiftDir);
+	}
 }
 
 int CHDDMenuHandler::handleMsg(const neutrino_msg_t msg, neutrino_msg_data_t data)
