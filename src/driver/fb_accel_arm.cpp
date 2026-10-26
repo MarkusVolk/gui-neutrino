@@ -300,24 +300,6 @@ CFbAccelARM::~CFbAccelARM()
 	}
 }
 
-void CFbAccelARM::setOsdResolutions()
-{
-	osd_resolution_t res;
-	osd_resolutions.clear();
-	res.xRes = 1280;
-	res.yRes = 720;
-	res.bpp  = 32;
-	res.mode = OSDMODE_720;
-	osd_resolutions.push_back(res);
-	if (fullHdAvailable()) {
-		res.xRes = 1920;
-		res.yRes = 1080;
-		res.bpp  = 32;
-		res.mode = OSDMODE_1080;
-		osd_resolutions.push_back(res);
-	}
-}
-
 /* original interface: 1 == pixel alpha, 2 == global alpha premultiplied */
 void CFbAccelARM::setBlendMode(uint8_t mode)
 {
@@ -338,17 +320,9 @@ int CFbAccelARM::setMode(unsigned int nxRes, unsigned int nyRes, unsigned int nb
 	if (!available&&!active)
 		return -1;
 
-	if (osd_resolutions.empty())
-		setOsdResolutions();
-
 	unsigned int nxRes_ = nxRes;
 	unsigned int nyRes_ = nyRes;
 	unsigned int nbpp_  = nbpp;
-	if (!fullHdAvailable()) {
-		nxRes_ = 1280;
-		nyRes_ = 720;
-		nbpp_  = 32;
-	}
 	screeninfo.xres=nxRes_;
 	screeninfo.yres=nyRes_;
 	screeninfo.xres_virtual=nxRes_;
@@ -401,29 +375,6 @@ int CFbAccelARM::setMode(unsigned int nxRes, unsigned int nyRes, unsigned int nb
 fb_pixel_t * CFbAccelARM::getBackBufferPointer() const
 {
 	return backbuffer;
-}
-
-int CFbAccelARM::scale2Res(int size)
-{
-	/*
-	   The historic resolution 1280x720 is default for some values/sizes.
-	   So let's scale these values to other resolutions.
-	*/
-
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-	if (screeninfo.xres == 1920)
-		size += size/2;
-#endif
-
-	return size;
-}
-
-bool CFbAccelARM::fullHdAvailable()
-{
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-	return true;
-#endif
-	return false;
 }
 
 #if ENABLE_ARM_ACC

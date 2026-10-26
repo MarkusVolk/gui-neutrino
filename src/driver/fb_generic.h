@@ -44,14 +44,6 @@ typedef uint32_t fb_pixel_t;
 
 typedef struct fb_var_screeninfo t_fb_var_screeninfo;
 
-typedef struct osd_resolution_t
-{
-	uint32_t yRes;
-	uint32_t xRes;
-	uint32_t bpp;
-	uint32_t mode;
-} osd_resolution_struct_t;
-
 typedef struct gradientData_t
 {
 	fb_pixel_t* gradientBuf;
@@ -345,11 +337,18 @@ class CFrameBuffer : public sigc::trackable
 		 */
 		std::recursive_mutex overlay_paint_mutex;
 
-		virtual int scale2Res(int size) { return size; };
-		virtual bool fullHdAvailable() { return false; };
-		virtual void setOsdResolutions();
-		std::vector<osd_resolution_t> osd_resolutions;
-		size_t getIndexOsdResolution(uint32_t mode);
+		/* The OSD is laid out for 1280x720 and drawn at the size of the
+		   output, so a size given for 720 lines grows with the OSD's height. */
+		int scale2Res(int size) const { return yRes > 0 ? (size * (int) yRes + 360) / 720 : size; };
+		/* the icons are drawn for an OSD of 1080 lines (the menu keys at 32
+		   pixels fit its rows) and follow the OSD's height */
+		int scaleIcon(int size) const { return yRes > 0 ? (size * (int) yRes + 540) / 1080 : size; };
+		/* the OSD size for an output of out_w x out_h pixels: a box offers
+		   1280x720 and 1920x1080, see the GL framebuffer for any size */
+		virtual void osdSizeFor(int out_w, int out_h, int &w, int &h);
+		/* the area the OSD is shown in, where the framebuffer knows it (a
+		   window); generation goes up whenever it changes */
+		virtual bool getOutputSize(int &, int &, unsigned &) { return false; };
 
 		enum
 			{

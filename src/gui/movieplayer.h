@@ -204,7 +204,6 @@ class CMoviePlayerGui : public CMenuTarget
 	int position;
 	int duration;
 	int currentVideoSystem;
-	uint32_t currentOsdResolution;
 
 	unsigned short numpida;
 	unsigned short vpid;

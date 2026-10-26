@@ -77,6 +77,7 @@
 
 #include <neutrino.h>
 #include <gui/osd_helpers.h>
+#include <driver/framebuffer.h>
 
 #ifdef PEDANTIC_VALGRIND_SETUP
 #define VALGRIND_PARANOIA(x) memset(&x, 0, sizeof(x))
@@ -2209,7 +2210,7 @@ bool CZapit::ParseCommand(CBasicMessage::Header &rmsg, int connfd)
 		CZapitMessages::commandInt msg;
 		CBasicServer::receive_data(connfd, &msg, sizeof(msg));
 		COsdHelpers::getInstance()->setVideoSystem(msg.val);
-		COsdHelpers::getInstance()->changeOsdResolution(0, true);
+		COsdHelpers::getInstance()->applyOsdSize();
 		CNeutrinoApp::getInstance()->g_settings_video_Mode(msg.val);
                 break;
         }
@@ -2303,17 +2304,16 @@ bool CZapit::ParseCommand(CBasicMessage::Header &rmsg, int connfd)
 	}
 #endif
 
+	/* the OSD takes the size of the output by itself; 1 answers an OSD of 1080 lines */
 	case CZapitMessages::CMD_SET_OSD_RES: {
 		CZapitMessages::commandInt msg;
 		CBasicServer::receive_data(connfd, &msg, sizeof(msg));
-		mosd=(int) msg.val;
-		COsdHelpers::getInstance()->changeOsdResolution(mosd);
 		break;
 	}
 
 	case CZapitMessages::CMD_GET_OSD_RES: {
 		CZapitMessages::commandInt msg;
-		mosd = COsdHelpers::getInstance()->getOsdResolution();
+		mosd = CFrameBuffer::getInstance()->getScreenHeight(true) >= 1080 ? 1 : 0;
 		msg.val = mosd;
 		CBasicServer::send_data(connfd, &msg, sizeof(msg));
 		break;

@@ -572,7 +572,7 @@ void CVideoSettings::setupVideoSystem(bool do_ask)
 {
 	dprintf(DEBUG_NORMAL, "[CVideoSettings] [%s - %d], setup video system...\n", __func__, __LINE__);
 	COsdHelpers::getInstance()->setVideoSystem(g_settings.video_Mode); // FIXME
-	COsdHelpers::getInstance()->changeOsdResolution(0, true, false);
+	COsdHelpers::getInstance()->applyOsdSize();
 
 	if (do_ask)
 	{
@@ -583,7 +583,7 @@ void CVideoSettings::setupVideoSystem(bool do_ask)
 			{
 				g_settings.video_Mode = prev_video_mode;
 				COsdHelpers::getInstance()->setVideoSystem(g_settings.video_Mode);
-				COsdHelpers::getInstance()->changeOsdResolution(0, true, false);
+				COsdHelpers::getInstance()->applyOsdSize();
 			}
 			else
 				prev_video_mode = g_settings.video_Mode;
@@ -796,7 +796,7 @@ void CVideoSettings::nextMode(void)
 			g_settings.video_Mode = VIDEOMENU_VIDEOMODE_OPTIONS[curmode].key;
 			//CVFD::getInstance()->ShowText(text);
 			COsdHelpers::getInstance()->setVideoSystem(g_settings.video_Mode);
-			COsdHelpers::getInstance()->changeOsdResolution(0, true, false);
+			COsdHelpers::getInstance()->applyOsdSize();
 			//return;
 			disp_cur = 1;
 		}

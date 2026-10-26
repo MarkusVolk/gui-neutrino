@@ -469,7 +469,6 @@ colormenu.font Selecteer lettertype gebruikersinterface
 colormenu.font_ttx Selecteer lettertype teletekst
 colormenu.menucolors Kleuren
 colormenu.osd_preset Voorinstellingen TV
-colormenu.osd_resolution OSD-resolutie
 colormenu.progressbar_active Kleur actief deel
 colormenu.progressbar_passive Achtergrond
 colormenu.shadow_color Schaduwkleur
@@ -1726,7 +1725,6 @@ menu.hint_osd Kleuren, Lettertypes, scherm afmeting\ngebruikersinterface vormgev
 menu.hint_osd_behavior_infobar Infobalk tonen afhankelijk van de ingestelde tijd, of handmatig aan of uit.
 menu.hint_osd_language Selecteer OSD taal
 menu.hint_osd_preset Voorgedefinieerde scherm marges voor CRT en LCD TV
-menu.hint_osd_resolution OSD-resolutie wijzigen
 menu.hint_osd_timing Na deze tijd zal OSD uitschakelen
 menu.hint_other_fonts Wijzig andere font formaten
 menu.hint_parentallock_changepin Verander PIN code

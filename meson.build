@@ -241,7 +241,6 @@ foreach def : [
 	['DYNAMIC_DEMUX', get_option('dynamicdemux')],
 	['ENABLE_TESTING', get_option('testing')],
 	['ENABLE_FRIBIDI', enable_fribidi],
-	['ENABLE_CHANGE_OSD_RESOLUTION', get_option('change-osd-resolution')],
 	['ENABLE_LCD4LINUX', enable_lcd4linux],
 	['ENABLE_GRAPHLCD', enable_graphlcd],
 ]

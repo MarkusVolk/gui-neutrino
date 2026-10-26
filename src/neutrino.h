@@ -105,6 +105,11 @@ private:
 	uint32_t			deferred_recheck_timer;
 	bool				webchannels_boot_check_done;
 	uint32_t			webchannels_retry_timer;
+	/* a window that changes its size: the OSD follows once the size holds */
+	uint32_t			osd_size_timer;
+	unsigned			osd_size_seen;
+	unsigned			osd_size_applied;
+	void				checkOsdSize();
 	bool 				pbBlinkChange;
 	bool				channels_changed;
 	bool				favorites_changed;
@@ -119,7 +124,6 @@ private:
 	bool				channelList_allowed;
 	bool				channelList_painted;
 	int				first_mode_found;
-	int				osd_resolution_tmp;
 	bool				frameBufferInitialized;
 
 	void SDT_ReloadChannels();
@@ -159,6 +163,8 @@ public:
 	void saveSetup(const char * fname);
 	int loadSetup(const char * fname);
 	void setScreenSettings();
+	/* the margins set on the OSD as it is now become those of the preset */
+	void storeScreenSettings();
 	void upgradeSetup(const char * fname);
 	void loadKeys(const char * fname = NULL);
 	void saveKeys(const char * fname = NULL);

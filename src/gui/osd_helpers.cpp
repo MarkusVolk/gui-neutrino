@@ -23,7 +23,6 @@ extern cVideo *videoDecoder;
 
 COsdHelpers::COsdHelpers()
 {
-	g_settings_osd_resolution_save	= 0;
 }
 
 COsdHelpers::~COsdHelpers()
@@ -39,107 +38,97 @@ COsdHelpers* COsdHelpers::getInstance()
 	return osdh;
 }
 
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-void COsdHelpers::changeOsdResolution(uint32_t mode, bool automode/*=false*/, bool forceOsdReset/*=false*/)
+/* lines of the picture the video system puts out */
+static int videoSystemHeight(int vs)
 {
-	OnBeforeChangeResolution();
-	size_t idx = 0;
-	bool resetOsd = false;
-	uint32_t modeNew;
+	switch (vs) {
+	case VIDEO_STD_720P50:
+	case VIDEO_STD_720P60:
+		return 720;
+	case VIDEO_STD_1080I50:
+	case VIDEO_STD_1080I60:
+	case VIDEO_STD_1080P24:
+	case VIDEO_STD_1080P25:
+	case VIDEO_STD_1080P30:
+	case VIDEO_STD_1080P50:
+	case VIDEO_STD_1080P60:
+	case VIDEO_STD_1080P2397:
+	case VIDEO_STD_1080P2997:
+		return 1080;
+	case VIDEO_STD_2160P24:
+	case VIDEO_STD_2160P25:
+	case VIDEO_STD_2160P30:
+	case VIDEO_STD_2160P50:
+		return 2160;
+	default:
+		return 576;
+	}
+}
 
+void COsdHelpers::getOutputSize(int &w, int &h)
+{
+	unsigned generation;
+	if (CFrameBuffer::getInstance()->getOutputSize(w, h, generation))
+		return;
+	/* a box: the hardware scales the OSD plane to what the video system puts out */
+	h = videoSystemHeight(getVideoSystem());
+	if (h > 720 && !g_info.hw_caps->can_osd_1080)
+		h = 720;
+	w = h * 16 / 9;
+}
+
+bool COsdHelpers::applyOsdSize(bool force/*=false*/)
+{
 	CFrameBuffer *frameBuffer = CFrameBuffer::getInstance();
+	int out_w, out_h, w, h;
+	getOutputSize(out_w, out_h);
+	frameBuffer->osdSizeFor(out_w, out_h, w, h);
+	if (!force && w == (int) frameBuffer->getScreenWidth(true) && h == (int) frameBuffer->getScreenHeight(true))
+		return false;
+	printf("[osd] output %dx%d, OSD %dx%d\n", out_w, out_h, w, h);
 
-	if (automode) {
-		if (g_settings.video_Mode == VIDEO_STD_AUTO)
-			modeNew = OSDMODE_1080;
-		else
-			modeNew = g_settings_osd_resolution_save;
+	OnBeforeChangeResolution();
+
+	bool ivVisible = false;
+	if (g_InfoViewer && g_InfoViewer->is_visible) {
+		g_InfoViewer->killTitle();
+		ivVisible = true;
 	}
-	else {
-		modeNew = mode;
+
+	if (frameBuffer->setMode(w, h, 8 * sizeof(fb_pixel_t)) == 0) {
+		if (InfoClock)
+			InfoClock->StopInfoClock(true);
+		frameBuffer->Clear();
+		frameBuffer->clearIconCache();
+		CNeutrinoApp::getInstance()->setScreenSettings();
+		CNeutrinoApp::getInstance()->SetupFonts(CNeutrinoFonts::FONTSETUP_NEUTRINO_FONT);
+		CVolumeHelper::getInstance()->refresh();
+		if (InfoClock)
+			CInfoClock::getInstance()->ClearDisplay();
+		if (FileTimeOSD)
+			FileTimeOSD->Init();
+		if (CNeutrinoApp::getInstance()->channelList)
+			CNeutrinoApp::getInstance()->channelList->ResetModules();
+		if (InfoClock)
+			InfoClock->enableInfoClock();
 	}
-
-	int videoSystem = getVideoSystem();
-
-	if ((g_settings.video_Mode == VIDEO_STD_AUTO) &&
-	    (g_settings.enabled_auto_modes[videoSystem] == 1) &&
-	    (!isVideoSystem1080(videoSystem)))
-		modeNew = OSDMODE_720;
-
-//	if (!isVideoSystem1080(videoSystem))
-//		modeNew = OSDMODE_720;
-
-	idx = frameBuffer->getIndexOsdResolution(modeNew);
-	/* what the framebuffer has, which need not be what was asked for */
-	if (idx < frameBuffer->osd_resolutions.size())
-		modeNew = frameBuffer->osd_resolutions[idx].mode;
-	resetOsd = (modeNew != getOsdResolution()) ? true : false;
-#if 1
-	printf(">>>>>[%s:%d] osd mode: %s => %s, automode: %s, forceOsdReset: %s\n", __func__, __LINE__,
-		(g_settings.osd_resolution == OSDMODE_720)?"OSDMODE_720":"OSDMODE_1080",
-		(modeNew == OSDMODE_720)?"OSDMODE_720":"OSDMODE_1080",
-		(automode)?"true":"false",
-		(forceOsdReset)?"true":"false");
-#endif
-	if (forceOsdReset)
-		resetOsd = true;
-
-	if (frameBuffer->fullHdAvailable()) {
-		if (frameBuffer->osd_resolutions.empty())
-			return;
-
-		bool ivVisible = false;
-		if (g_InfoViewer && g_InfoViewer->is_visible) {
-			g_InfoViewer->killTitle();
-			ivVisible = true;
-		}
-
-		int switchFB = frameBuffer->setMode(frameBuffer->osd_resolutions[idx].xRes,
-						    frameBuffer->osd_resolutions[idx].yRes,
-						    frameBuffer->osd_resolutions[idx].bpp);
-
-		if (switchFB == 0) {
-//printf("\n>>>>>[%s:%d] New res: %dx%dx%d\n \n", __func__, __LINE__, resW, resH, bpp);
-			g_settings.osd_resolution = modeNew;
-			if (InfoClock)
-				InfoClock->StopInfoClock(true);
-			frameBuffer->Clear();
-			if (resetOsd) {
-				CNeutrinoApp::getInstance()->setScreenSettings();
-				CNeutrinoApp::getInstance()->SetupFonts(CNeutrinoFonts::FONTSETUP_NEUTRINO_FONT);
-				CVolumeHelper::getInstance()->refresh();
-				if (InfoClock)
-					CInfoClock::getInstance()->ClearDisplay();
-				if (FileTimeOSD)
-					FileTimeOSD->Init();
-				if (CNeutrinoApp::getInstance()->channelList)
-					CNeutrinoApp::getInstance()->channelList->ResetModules();
-			}
-			if (InfoClock)
-				InfoClock->enableInfoClock();
-		}
-		if (g_InfoViewer) {
-			g_InfoViewer->ResetModules();
-			g_InfoViewer->start();
-		}
-		if (ivVisible) {
-			CNeutrinoApp::getInstance()->StopSubtitles();
-			g_InfoViewer->showTitle(CNeutrinoApp::getInstance()->channelList->getActiveChannel(), true, 0, true);
-			CNeutrinoApp::getInstance()->StartSubtitles();
-		}
-		if (g_RadiotextWin) {
-			delete g_RadiotextWin;
-			g_RadiotextWin = new CRadioTextGUI();
-			g_RadiotextWin->allowPaint(false);
-		}
+	if (g_InfoViewer) {
+		g_InfoViewer->ResetModules();
+		g_InfoViewer->start();
+	}
+	if (ivVisible) {
+		CNeutrinoApp::getInstance()->StopSubtitles();
+		g_InfoViewer->showTitle(CNeutrinoApp::getInstance()->channelList->getActiveChannel(), true, 0, true);
+		CNeutrinoApp::getInstance()->StartSubtitles();
+	}
+	if (g_RadiotextWin) {
+		delete g_RadiotextWin;
+		g_RadiotextWin = new CRadioTextGUI();
+		g_RadiotextWin->allowPaint(false);
 	}
 	OnAfterChangeResolution();
+	return true;
 }
-#else
-void COsdHelpers::changeOsdResolution(uint32_t, bool, bool)
-{
-}
-#endif
 
 int COsdHelpers::isVideoSystem1080(int res)
 {
@@ -180,20 +169,6 @@ int COsdHelpers::isVideoSystem1080(int res)
 int COsdHelpers::getVideoSystem()
 {
 	return videoDecoder->GetVideoSystem();
-}
-
-uint32_t COsdHelpers::getOsdResolution()
-{
-	CFrameBuffer *frameBuffer = CFrameBuffer::getInstance();
-	if (frameBuffer->osd_resolutions.size() == 1)
-		return 0;
-
-	uint32_t yRes = frameBuffer->getScreenHeight(true);
-	for (size_t i = 0; i < frameBuffer->osd_resolutions.size(); i++) {
-		if (frameBuffer->osd_resolutions[i].yRes == yRes)
-			return frameBuffer->osd_resolutions[i].mode;
-	}
-	return 0;
 }
 
 #define DEBUGINFO_SETVIDEOSYSTEM

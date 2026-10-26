@@ -469,7 +469,6 @@ colormenu.font Select GUI font
 colormenu.font_ttx Select teletext font
 colormenu.menucolors Themes
 colormenu.osd_preset Screen selection
-colormenu.osd_resolution OSD resolution
 colormenu.progressbar_active Active part color
 colormenu.progressbar_passive Background
 colormenu.shadow_color Shadow color
@@ -1734,7 +1733,6 @@ menu.hint_osd Colors, fonts, screen size\nGUI look and feel options
 menu.hint_osd_behavior_infobar Show infobar depending on time set or manually on or off.
 menu.hint_osd_language Select OSD language
 menu.hint_osd_preset Choose between screen A and B for different screen setup
-menu.hint_osd_resolution Change OSD resolution
 menu.hint_osd_timing Show OSD element depending on time set or manually on or off.
 menu.hint_other_fonts Change other font sizes
 menu.hint_parentallock_changepin Change PIN code

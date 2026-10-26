@@ -42,6 +42,9 @@ extern GLFramebuffer *glfb;
 #include <gui/color_custom.h>
 #include <gui/osd_helpers.h>
 
+#include <algorithm>
+#include <cstdlib>
+
 #define LOGTAG "[fb_glfb] "
 
 CFbAccelGLFB::CFbAccelGLFB()
@@ -65,7 +68,7 @@ void CFbAccelGLFB::init(const char *)
 	lbb = lfb = reinterpret_cast<fb_pixel_t*>(glfb->getOSDBuffer()->data());
 
 	memset(lfb, 0, available);
-	setMode(720, 576, 8 * sizeof(fb_pixel_t));
+	setMode(screeninfo.xres, screeninfo.yres, 8 * sizeof(fb_pixel_t));
 
 	blit_thread = false;
 
@@ -164,15 +167,7 @@ void CFbAccelGLFB::_blit()
 /* the size of the OSD; the display's mode is the video system's business */
 int CFbAccelGLFB::setMode(unsigned int nxRes, unsigned int nyRes, unsigned int)
 {
-	if (osd_resolutions.empty())
-		setOsdResolutions();
-
-	/* only what is on offer: at start this is called with a size nobody has */
-	bool offered = false;
-	for (size_t i = 0; i < osd_resolutions.size(); i++)
-		if (osd_resolutions[i].xRes == nxRes && osd_resolutions[i].yRes == nyRes)
-			offered = true;
-	if (glfb && offered && (nxRes != screeninfo.xres || nyRes != screeninfo.yres))
+	if (glfb && nxRes > 0 && nyRes > 0 && (nxRes != screeninfo.xres || nyRes != screeninfo.yres))
 	{
 		if (!glfb->setOSDResolution(nxRes, nyRes))
 		{
@@ -205,45 +200,36 @@ fb_pixel_t * CFbAccelGLFB::getBackBufferPointer() const
 
 /*
    The GL framebuffer starts with the size libstb-hal was given (GLFB_RESOLUTION,
-   1280x720 unless set) and can be switched to the other of the two sizes the
-   OSD is laid out for, as on the boxes with a real framebuffer.
+   1280x720 unless set) and then takes the size of the area it is shown in: the
+   window or the screen, fitted to the output's aspect ratio. The OSD is drawn at
+   most at 1920x1080, larger areas are scaled by GL, and at least 720 lines high,
+   so that a small window still shows text that can be read.
 */
-void CFbAccelGLFB::setOsdResolutions()
+void CFbAccelGLFB::osdSizeFor(int out_w, int out_h, int &w, int &h)
 {
-	osd_resolution_t res;
-	osd_resolutions.clear();
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-	res.xRes = 1280;
-	res.yRes = 720;
-	res.bpp  = 32;
-	res.mode = OSDMODE_720;
-	osd_resolutions.push_back(res);
-	res.xRes = 1920;
-	res.yRes = 1080;
-	res.bpp  = 32;
-	res.mode = OSDMODE_1080;
-	osd_resolutions.push_back(res);
-#else
-	res.xRes = screeninfo.xres;
-	res.yRes = screeninfo.yres;
-	res.bpp  = 32;
-	res.mode = screeninfo.xres >= 1920 ? OSDMODE_1080 : OSDMODE_720;
-	osd_resolutions.push_back(res);
-#endif
+	if (out_w <= 0 || out_h <= 0) {
+		w = 1280;
+		h = 720;
+		return;
+	}
+	double scale = std::min(1.0, std::min(1920.0 / out_w, 1080.0 / out_h));
+	double fw = out_w * scale, fh = out_h * scale;
+	if (fh < 720) {
+		fw = fw * 720 / fh;
+		fh = 720;
+	}
+	w = std::min(1920, (int) (fw + 0.5));
+	h = std::min(1080, (int) (fh + 0.5));
+	/* a window of nearly 16:9 gets exactly 16:9, not 1919x1080 */
+	int w169 = (h * 16 + 4) / 9;
+	if (std::abs(w - w169) * 100 <= w169 && w169 <= 1920)
+		w = w169;
 }
 
-int CFbAccelGLFB::scale2Res(int size)
+bool CFbAccelGLFB::getOutputSize(int &w, int &h, unsigned &generation)
 {
-	if (screeninfo.xres >= 1920)
-		size += size/2;
-
-	return size;
-}
-
-bool CFbAccelGLFB::fullHdAvailable()
-{
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-	return true;
-#endif
-	return screeninfo.xres >= 1920;
+	if (!glfb)
+		return false;
+	glfb->getOutputSize(w, h, generation);
+	return w > 0 && h > 0;
 }

@@ -4,11 +4,6 @@
 
 #include <sigc++/signal.h>
 
-enum {
-	OSDMODE_720  = 0,
-	OSDMODE_1080 = 1
-};
-
 class COsdHelpers : public sigc::trackable
 {
 	private:
@@ -18,12 +13,14 @@ class COsdHelpers : public sigc::trackable
 		~COsdHelpers();
 		static COsdHelpers* getInstance();
 
-		int g_settings_osd_resolution_save;
-
-		void changeOsdResolution(uint32_t mode, bool automode=false, bool forceOsdReset=false);
+		/* the size of the area the OSD is shown in: the window or screen
+		   where the framebuffer knows it, else that of the video system */
+		void getOutputSize(int &w, int &h);
+		/* draws the OSD at the size that suits the output and sets up what
+		   depends on it; false when the size stays as it is (and not forced) */
+		bool applyOsdSize(bool force = false);
 		int  isVideoSystem1080(int res);
 		int  getVideoSystem();
-		uint32_t getOsdResolution();
 		int setVideoSystem(int newSystem, bool remember = true);
 		sigc::signal<void> OnAfterChangeResolution;
 		sigc::signal<void> OnBeforeChangeResolution;

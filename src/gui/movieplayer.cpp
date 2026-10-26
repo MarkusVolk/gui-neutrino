@@ -922,7 +922,6 @@ void CMoviePlayerGui::Init(void)
 	playing = false;
 	stopped = true;
 	currentVideoSystem = -1;
-	currentOsdResolution = 0;
 	is_audio_playing = false;
 
 	frameBuffer = CFrameBuffer::getInstance();
@@ -1059,11 +1058,7 @@ void CMoviePlayerGui::cutNeutrino()
 	if (playing)
 		return;
 
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-	COsdHelpers *coh     = COsdHelpers::getInstance();
-	currentVideoSystem   = coh->getVideoSystem();
-	currentOsdResolution = coh->getOsdResolution();
-#endif
+	currentVideoSystem = COsdHelpers::getInstance()->getVideoSystem();
 
 	playing = true;
 	/* set g_InfoViewer update timer to 1 sec, should be reset to default from restoreNeutrino->set neutrino mode  */
@@ -1104,18 +1099,16 @@ void CMoviePlayerGui::restoreNeutrino()
 	if (!playing)
 		return;
 
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
 	if ((currentVideoSystem > -1) &&
 	    (g_settings.video_Mode == VIDEO_STD_AUTO) &&
 	    (g_settings.enabled_auto_modes[currentVideoSystem] == 1)) {
 		COsdHelpers *coh = COsdHelpers::getInstance();
 		if (currentVideoSystem != coh->getVideoSystem()) {
 			coh->setVideoSystem(currentVideoSystem, false);
-			coh->changeOsdResolution(currentOsdResolution, false, true);
+			coh->applyOsdSize();
 		}
 		currentVideoSystem = -1;
 	}
-#endif
 
 	playing = false;
 

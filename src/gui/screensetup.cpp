@@ -113,52 +113,7 @@ int CScreenSetup::exec(CMenuTarget *parent, const std::string &)
 				g_settings.screen_EndX = x_coord[1];
 				g_settings.screen_StartY = y_coord[0];
 				g_settings.screen_EndY = y_coord[1];
-				switch (g_settings.osd_resolution)
-				{
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-					case 1:
-					{
-						switch (g_settings.screen_preset)
-						{
-							case COsdSetup::PRESET_SCREEN_B:
-								g_settings.screen_StartX_b_1 = g_settings.screen_StartX;
-								g_settings.screen_StartY_b_1 = g_settings.screen_StartY;
-								g_settings.screen_EndX_b_1   = g_settings.screen_EndX;
-								g_settings.screen_EndY_b_1   = g_settings.screen_EndY;
-								break;
-							case COsdSetup::PRESET_SCREEN_A:
-							default:
-								g_settings.screen_StartX_a_1 = g_settings.screen_StartX;
-								g_settings.screen_StartY_a_1 = g_settings.screen_StartY;
-								g_settings.screen_EndX_a_1   = g_settings.screen_EndX;
-								g_settings.screen_EndY_a_1   = g_settings.screen_EndY;
-								break;
-						}
-					}
-					break;
-#endif
-					case 0:
-					default:
-					{
-						switch (g_settings.screen_preset)
-						{
-							case COsdSetup::PRESET_SCREEN_B:
-								g_settings.screen_StartX_b_0 = g_settings.screen_StartX;
-								g_settings.screen_StartY_b_0 = g_settings.screen_StartY;
-								g_settings.screen_EndX_b_0   = g_settings.screen_EndX;
-								g_settings.screen_EndY_b_0   = g_settings.screen_EndY;
-								break;
-							case COsdSetup::PRESET_SCREEN_A:
-							default:
-								g_settings.screen_StartX_a_0 = g_settings.screen_StartX;
-								g_settings.screen_StartY_a_0 = g_settings.screen_StartY;
-								g_settings.screen_EndX_a_0   = g_settings.screen_EndX;
-								g_settings.screen_EndY_a_0   = g_settings.screen_EndY;
-								break;
-						}
-					}
-					break;
-				}
+				CNeutrinoApp::getInstance()->storeScreenSettings();
 
 				if (g_InfoViewer) /* recalc infobar position */
 					g_InfoViewer->start();

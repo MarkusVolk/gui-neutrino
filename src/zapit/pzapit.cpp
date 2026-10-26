@@ -63,9 +63,6 @@ int usage (const char * basename)
 		<< "\t-esb\t\t\tenter standby" << std::endl
 		<< "\t-lsb\t\t\tleave standby" << std::endl
 		<< "\t-osd\t\t\tget osd resolution" << std::endl
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-		<< "\t-osd <resolution>\tset osd resolution" << std::endl
-#endif
 		<< "\t-var\t\t\tget aspect ratio" << std::endl
 		<< "\t-var <aspectratio>\tset aspect ratio" << std::endl
 		<< "\t-vm43\t\t\tget 4:3 mode" << std::endl
@@ -248,13 +245,6 @@ int main (int argc, char** argv)
 		else if (!strncmp(argv[i], "-osd", 4))
 		{
 			osd = true;
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-			if (i < argc - 1)
-			{
-				sscanf(argv[++i], "%d", &mosd);
-				continue;
-			}
-#endif
 			continue;
 		}
 		else if (!strncmp(argv[i], "-p", 2))
@@ -507,11 +497,6 @@ int main (int argc, char** argv)
 
 	if (osd)
 	{
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-		if (mosd > -1)
-			zapit.setOSDres(mosd);
-		else
-#endif
 		{
 			zapit.getOSDres(&mosd);
 			printf("%d\n", mosd);

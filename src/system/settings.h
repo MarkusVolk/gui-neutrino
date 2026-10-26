@@ -888,26 +888,17 @@ struct SNeutrinoSettings
 	int screenshot_video;
 	int auto_cover;
 
-	// screen configuration
-	int osd_resolution;
-
+	// screen configuration: the margins of Screen 1 (a) and 2 (b), kept for
+	// an OSD of 1280x720 and drawn at the OSD's size
 	int screen_StartX_a_0;
 	int screen_StartY_a_0;
 	int screen_EndX_a_0;
 	int screen_EndY_a_0;
-	int screen_StartX_a_1;
-	int screen_StartY_a_1;
-	int screen_EndX_a_1;
-	int screen_EndY_a_1;
 
 	int screen_StartX_b_0;
 	int screen_StartY_b_0;
 	int screen_EndX_b_0;
 	int screen_EndY_b_0;
-	int screen_StartX_b_1;
-	int screen_StartY_b_1;
-	int screen_EndX_b_1;
-	int screen_EndY_b_1;
 
 	int screen_preset;
 

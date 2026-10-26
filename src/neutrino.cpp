@@ -87,6 +87,7 @@
 #include "gui/mediaplayer.h"
 #include "gui/movieplayer.h"
 #include "gui/osd_helpers.h"
+#include "gui/widget/remote_ui.h"
 #include "gui/osd_setup.h"
 #include "gui/osdlang_setup.h"
 #include "gui/personalize.h"
@@ -284,7 +285,6 @@ CNeutrinoApp::CNeutrinoApp()
 		hal_set_video_system(video_mode);
 	}
 #endif
-	osd_resolution_tmp        = -1;
 	frameBufferInitialized    = false;
 
 	frameBuffer = CFrameBuffer::getInstance();
@@ -303,6 +303,9 @@ CNeutrinoApp::CNeutrinoApp()
 	deferred_recheck_timer	= 0;
 	webchannels_boot_check_done = false;
 	webchannels_retry_timer	= 0;
+	osd_size_timer		= 0;
+	osd_size_seen		= 0;
+	osd_size_applied	= 0;
 	current_muted		= 0;
 	recordingstatus		= 0;
 	channels_changed	= false;
@@ -1066,29 +1069,17 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	g_settings.auto_cover = configfile.getInt32("auto_cover", 0);
 
 	// screen configuration
-	int osd_res = g_info.hw_caps->osd_default_height == 1080 ? OSDMODE_1080 : OSDMODE_720;
-	g_settings.osd_resolution = (osd_resolution_tmp == -1) ? configfile.getInt32("osd_resolution", osd_res) : osd_resolution_tmp;
-	COsdHelpers::getInstance()->g_settings_osd_resolution_save = g_settings.osd_resolution;
-
 	// default for fullpixel
 	g_settings.screen_StartX_a_0 = configfile.getInt32("screen_StartX_a_0", 0);
 	g_settings.screen_StartY_a_0 = configfile.getInt32("screen_StartY_a_0", 0);
 	g_settings.screen_EndX_a_0 = configfile.getInt32("screen_EndX_a_0", 1280 - g_settings.screen_StartX_a_0 - 1);
 	g_settings.screen_EndY_a_0 = configfile.getInt32("screen_EndY_a_0", 720 - g_settings.screen_StartY_a_0 - 1);
-	g_settings.screen_StartX_a_1 = configfile.getInt32("screen_StartX_a_1", 0);
-	g_settings.screen_StartY_a_1 = configfile.getInt32("screen_StartY_a_1", 0);
-	g_settings.screen_EndX_a_1 = configfile.getInt32("screen_EndX_a_1", 1920 - g_settings.screen_StartX_a_1 - 1);
-	g_settings.screen_EndY_a_1 = configfile.getInt32("screen_EndY_a_1", 1080 - g_settings.screen_StartY_a_1 - 1);
 
 	// default for non fullpixel
 	g_settings.screen_StartX_b_0 = configfile.getInt32("screen_StartX_b_0", 22);
 	g_settings.screen_StartY_b_0 = configfile.getInt32("screen_StartY_b_0", 12);
 	g_settings.screen_EndX_b_0 = configfile.getInt32("screen_EndX_b_0", 1259 - g_settings.screen_StartX_b_0 - 1);
 	g_settings.screen_EndY_b_0 = configfile.getInt32("screen_EndY_b_0", 708 - g_settings.screen_StartY_b_0 - 1);
-	g_settings.screen_StartX_b_1 = configfile.getInt32("screen_StartX_b_1", 33);
-	g_settings.screen_StartY_b_1 = configfile.getInt32("screen_StartY_b_1", 18);
-	g_settings.screen_EndX_b_1 = configfile.getInt32("screen_EndX_b_1", 1888 - g_settings.screen_StartX_b_1 - 1);
-	g_settings.screen_EndY_b_1 = configfile.getInt32("screen_EndY_b_1", 1062 - g_settings.screen_StartY_b_1 - 1);
 
 	g_settings.screen_preset = configfile.getInt32("screen_preset", COsdSetup::PRESET_SCREEN_A);
 
@@ -1463,54 +1454,40 @@ int CNeutrinoApp::loadSetup(const char *fname)
 
 void CNeutrinoApp::setScreenSettings()
 {
-	g_settings.screen_width = frameBuffer->getScreenWidth(true);
-	g_settings.screen_height = frameBuffer->getScreenHeight(true);
+	int w = g_settings.screen_width = frameBuffer->getScreenWidth(true);
+	int h = g_settings.screen_height = frameBuffer->getScreenHeight(true);
 
-	switch (g_settings.osd_resolution)
-	{
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-		case 1:
-		{
-			switch (g_settings.screen_preset)
-			{
-				case COsdSetup::PRESET_SCREEN_B:
-					g_settings.screen_StartX = g_settings.screen_StartX_b_1;
-					g_settings.screen_StartY = g_settings.screen_StartY_b_1;
-					g_settings.screen_EndX   = g_settings.screen_EndX_b_1;
-					g_settings.screen_EndY   = g_settings.screen_EndY_b_1;
-					break;
-				case COsdSetup::PRESET_SCREEN_A:
-				default:
-					g_settings.screen_StartX = g_settings.screen_StartX_a_1;
-					g_settings.screen_StartY = g_settings.screen_StartY_a_1;
-					g_settings.screen_EndX   = g_settings.screen_EndX_a_1;
-					g_settings.screen_EndY   = g_settings.screen_EndY_a_1;
-					break;
-			}
-		}
-		break;
-#endif
-		case 0:
-		default:
-		{
-			switch (g_settings.screen_preset)
-			{
-				case COsdSetup::PRESET_SCREEN_B:
-					g_settings.screen_StartX = g_settings.screen_StartX_b_0;
-					g_settings.screen_StartY = g_settings.screen_StartY_b_0;
-					g_settings.screen_EndX   = g_settings.screen_EndX_b_0;
-					g_settings.screen_EndY   = g_settings.screen_EndY_b_0;
-					break;
-				case COsdSetup::PRESET_SCREEN_A:
-				default:
-					g_settings.screen_StartX = g_settings.screen_StartX_a_0;
-					g_settings.screen_StartY = g_settings.screen_StartY_a_0;
-					g_settings.screen_EndX   = g_settings.screen_EndX_a_0;
-					g_settings.screen_EndY   = g_settings.screen_EndY_a_0;
-					break;
-			}
-		}
-		break;
+	bool b = g_settings.screen_preset == COsdSetup::PRESET_SCREEN_B;
+	int sx = b ? g_settings.screen_StartX_b_0 : g_settings.screen_StartX_a_0;
+	int sy = b ? g_settings.screen_StartY_b_0 : g_settings.screen_StartY_a_0;
+	int ex = b ? g_settings.screen_EndX_b_0 : g_settings.screen_EndX_a_0;
+	int ey = b ? g_settings.screen_EndY_b_0 : g_settings.screen_EndY_a_0;
+
+	/* from 1280x720 to the OSD as it is; the end is the last pixel inside */
+	g_settings.screen_StartX = (sx * w + 640) / 1280;
+	g_settings.screen_StartY = (sy * h + 360) / 720;
+	g_settings.screen_EndX = std::min(w - 1, ((ex + 1) * w + 640) / 1280 - 1);
+	g_settings.screen_EndY = std::min(h - 1, ((ey + 1) * h + 360) / 720 - 1);
+}
+
+void CNeutrinoApp::storeScreenSettings()
+{
+	int w = std::max(1, g_settings.screen_width);
+	int h = std::max(1, g_settings.screen_height);
+	int sx = (g_settings.screen_StartX * 1280 + w / 2) / w;
+	int sy = (g_settings.screen_StartY * 720 + h / 2) / h;
+	int ex = ((g_settings.screen_EndX + 1) * 1280 + w / 2) / w - 1;
+	int ey = ((g_settings.screen_EndY + 1) * 720 + h / 2) / h - 1;
+	if (g_settings.screen_preset == COsdSetup::PRESET_SCREEN_B) {
+		g_settings.screen_StartX_b_0 = sx;
+		g_settings.screen_StartY_b_0 = sy;
+		g_settings.screen_EndX_b_0 = ex;
+		g_settings.screen_EndY_b_0 = ey;
+	} else {
+		g_settings.screen_StartX_a_0 = sx;
+		g_settings.screen_StartY_a_0 = sy;
+		g_settings.screen_EndX_a_0 = ex;
+		g_settings.screen_EndY_a_0 = ey;
 	}
 }
 
@@ -2054,25 +2031,15 @@ void CNeutrinoApp::saveSetup(const char *fname)
 	configfile.setInt32("auto_cover", g_settings.auto_cover);
 
 	// screen configuration
-	configfile.setInt32("osd_resolution", COsdHelpers::getInstance()->g_settings_osd_resolution_save);
-
 	configfile.setInt32("screen_StartX_a_0", g_settings.screen_StartX_a_0);
 	configfile.setInt32("screen_StartY_a_0", g_settings.screen_StartY_a_0);
 	configfile.setInt32("screen_EndX_a_0", g_settings.screen_EndX_a_0);
 	configfile.setInt32("screen_EndY_a_0", g_settings.screen_EndY_a_0);
-	configfile.setInt32("screen_StartX_a_1", g_settings.screen_StartX_a_1);
-	configfile.setInt32("screen_StartY_a_1", g_settings.screen_StartY_a_1);
-	configfile.setInt32("screen_EndX_a_1", g_settings.screen_EndX_a_1);
-	configfile.setInt32("screen_EndY_a_1", g_settings.screen_EndY_a_1);
 
 	configfile.setInt32("screen_StartX_b_0", g_settings.screen_StartX_b_0);
 	configfile.setInt32("screen_StartY_b_0", g_settings.screen_StartY_b_0);
 	configfile.setInt32("screen_EndX_b_0", g_settings.screen_EndX_b_0);
 	configfile.setInt32("screen_EndY_b_0", g_settings.screen_EndY_b_0);
-	configfile.setInt32("screen_StartX_b_1", g_settings.screen_StartX_b_1);
-	configfile.setInt32("screen_StartY_b_1", g_settings.screen_StartY_b_1);
-	configfile.setInt32("screen_EndX_b_1", g_settings.screen_EndX_b_1);
-	configfile.setInt32("screen_EndY_b_1", g_settings.screen_EndY_b_1);
 
 	configfile.setInt32("screen_preset", g_settings.screen_preset);
 
@@ -2828,39 +2795,13 @@ void CNeutrinoApp::CmdParser(int argc, char **argv)
 void CNeutrinoApp::SetupFrameBuffer()
 {
 	frameBuffer->init();
-	int setFbMode = 0;
-	osd_resolution_tmp = -1;
-#ifdef ENABLE_CHANGE_OSD_RESOLUTION
-	frameBuffer->setOsdResolutions();
-	if (frameBuffer->osd_resolutions.empty()) {
-		dprintf(DEBUG_NORMAL, "Error while setting framebuffer mode\n");
-		exit(CNeutrinoApp::EXIT_ERROR);
-	}
-
-	uint32_t ort;
-	configfile.loadConfig(NEUTRINO_SETTINGS_FILE);
-	ort = configfile.getInt32("osd_resolution", 0);
-
-	size_t resCount = frameBuffer->osd_resolutions.size();
-
-	if (ort > (resCount - 1))
-		osd_resolution_tmp = ort = 0;
-
-	if (resCount == 1)
-		ort = 0;
-
-	setFbMode = frameBuffer->setMode(frameBuffer->osd_resolutions[ort].xRes,
-					 frameBuffer->osd_resolutions[ort].yRes,
-					 frameBuffer->osd_resolutions[ort].bpp);
-
-/*
-	setFbMode = 0;
-	COsdHelpers::getInstance()->changeOsdResolution(0, true);
-*/
-#else
-	/* all other hardware ignores setMode parameters */
-	setFbMode = frameBuffer->setMode(0, 0, 0);
-#endif
+	/* a first size; the OSD follows the output once the video system is set up */
+	int w, h;
+	/* this runs before run() sets g_info.hw_caps */
+	hw_caps_t *caps = get_hwcaps();
+	int dh = caps && caps->osd_default_height > 0 ? caps->osd_default_height : 720;
+	frameBuffer->osdSizeFor(dh * 16 / 9, dh, w, h);
+	int setFbMode = frameBuffer->setMode(w, h, 8 * sizeof(fb_pixel_t));
 
 	if (setFbMode == -1) {
 		dprintf(DEBUG_NORMAL, "Error while setting framebuffer mode\n");
@@ -3152,7 +3093,7 @@ int CNeutrinoApp::run(int argc, char **argv)
 TIMER_START();
 	cs_api_init();
 	cs_register_messenger(CSSendMessage);
-#if defined(HAVE_CST_HARDWARE) && defined(ENABLE_CHANGE_OSD_RESOLUTION)
+#if defined(HAVE_CST_HARDWARE)
 	cs_new_auto_videosystem();
 #endif
 
@@ -3237,7 +3178,7 @@ TIMER_START();
 	ZapStart_arg.webtv_xml = &g_settings.webtv_xml;
 	ZapStart_arg.webradio_xml = &g_settings.webradio_xml;
 
-	ZapStart_arg.osd_resolution = g_settings.osd_resolution;
+	ZapStart_arg.osd_resolution = frameBuffer->getScreenHeight(true) >= 1080 ? 1 : 0;
 
 	CCamManager::getInstance()->SetCITuner(g_settings.ci_tuner);
 	/* create decoders, read channels */
@@ -3278,6 +3219,9 @@ TIMER_START();
 		startlogo = frameBuffer->showFrame("start.jpg");
 
 	g_RCInput = new CRCInput();
+#if HAVE_GENERIC_HARDWARE
+	osd_size_timer = g_RCInput->addTimer(250*1000, false);
+#endif
 
 	InitZapitClient();
 	g_Zapit->setStandby(false);
@@ -4319,6 +4263,26 @@ bool CNeutrinoApp::backKey(const neutrino_msg_t msg)
 	return false;
 }
 
+/* A window is resized in many small steps: the OSD takes the new size once it
+   held for a tick, and not under an open menu, dialog or hint, which would go
+   on painting at the old size; it follows when that is closed. */
+void CNeutrinoApp::checkOsdSize()
+{
+	int w, h;
+	unsigned generation;
+	if (!frameBuffer->getOutputSize(w, h, generation) || generation == osd_size_applied)
+		return;
+	if (generation != osd_size_seen) {
+		osd_size_seen = generation;
+		return;
+	}
+	if (CRemoteUi::top() || frameBuffer->Locked()
+			|| frameBuffer->isObscured(0, 0, frameBuffer->getScreenWidth(true), frameBuffer->getScreenHeight(true)))
+		return;
+	osd_size_applied = generation;
+	COsdHelpers::getInstance()->applyOsdSize();
+}
+
 int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 {
 	int res = 0;
@@ -4416,7 +4380,7 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		    (coh->getVideoSystem() != videoSystem)) {
 			coh->setVideoSystem(videoSystem, false);
 			if (frameBufferInitialized)
-				coh->changeOsdResolution(0, true, false);
+				coh->applyOsdSize();
 		}
 		return messages_return::handled;
 	}
@@ -4443,6 +4407,10 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		}
 	}
 	if ((msg == NeutrinoMessages::EVT_TIMER)) {
+		if (osd_size_timer && data == osd_size_timer) {
+			checkOsdSize();
+			return messages_return::handled;
+		}
 		if(data == scrambled_timer) {
 			scrambled_timer = 0;
 			if(g_settings.scrambled_message && videoDecoder->getBlank() && videoDecoder->getPlayState()) {
@@ -7141,5 +7109,23 @@ void CNeutrinoApp::migrateConfig(const char *fname)
 		/* always remove old key */
 		configfile.deleteKey(from);
 	}
+	/* The OSD had two sizes with margins of their own. It takes the size of the
+	   output now and keeps one set for 1280x720: a set made for 1920x1080, the
+	   size last chosen, moves there (both sides by 2/3), and the old keys go. */
+	const char *names[] = { "StartX_a", "StartY_a", "EndX_a", "EndY_a", "StartX_b", "StartY_b", "EndX_b", "EndY_b" };
+	bool from_1080 = migconf.getInt32("osd_resolution", 0) == 1;
+	for (size_t n = 0; n < sizeof(names) / sizeof(names[0]); n++) {
+		std::string key = std::string("screen_") + names[n];
+		int v = migconf.getInt32(key + "_1", magic);
+		if (v == magic)
+			continue;
+		if (from_1080) {
+			bool end = names[n][0] == 'E';
+			configfile.setInt32(key + "_0", end ? ((v + 1) * 2 + 1) / 3 - 1 : (v * 2 + 1) / 3);
+		}
+		configfile.deleteKey(key + "_1");
+	}
+	if (migconf.getInt32("osd_resolution", magic) != magic)
+		configfile.deleteKey("osd_resolution");
 	/* more complex migration, including converting values etc. could be done here */
 }

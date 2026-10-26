@@ -469,7 +469,6 @@ colormenu.font Výber písma
 colormenu.font_ttx Výber teletextového písma
 colormenu.menucolors Farby menu
 colormenu.osd_preset Druh TV
-colormenu.osd_resolution OSD rozlíšenie
 colormenu.progressbar_active Farebne aktívna časť
 colormenu.progressbar_passive Na pozadí
 colormenu.shadow_color Farba tieňa
@@ -1726,7 +1725,6 @@ menu.hint_osd Farby, písma, veľkosť obrazu\nvzhľad a možnosti GUI
 menu.hint_osd_behavior_infobar Zobraziť infobar v závislosti od nastaveného času alebo ručne zapnúť či vypnúť
 menu.hint_osd_language Výber OSD jazyka
 menu.hint_osd_preset Prekonfigurovanie okrajov obrazovky pre CRT a LCD TV
-menu.hint_osd_resolution Zmena rozlíšenia OSD
 menu.hint_osd_timing Po tejto dobe OSD zmizne
 menu.hint_other_fonts Zmena veľkostí ďaľšieho písma
 menu.hint_parentallock_changepin Zmena PIN kódu

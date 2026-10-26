@@ -86,5 +86,4 @@ option('keyboard-no-rc', type : 'boolean', value : false, description : 'Keyboar
 option('dynamicdemux', type : 'boolean', value : false, description : 'Dynamic demux')
 option('cleanup', type : 'boolean', value : false, description : 'Clean up on exit')
 option('testing', type : 'boolean', value : false, description : 'Development code')
-option('change-osd-resolution', type : 'boolean', value : true, description : 'Allow changing the OSD resolution')
 option('webif', type : 'boolean', value : true, description : 'Install the bundled web interface')
