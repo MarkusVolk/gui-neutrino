@@ -1185,6 +1185,7 @@ CRecordManager::CRecordManager()
 	StreamPmtPid = false;
 	StreamSubtitlePids = false;
 	StopSectionsd = false;
+	sectionsdPaused = false;
 	//recordingstatus = 0;
 	recmap.clear();
 	nextmap.clear();
@@ -2151,6 +2152,7 @@ bool CRecordManager::CutBackNeutrino(const t_channel_id channel_id, CFrontend * 
 		if(StopSectionsd) {
 			printf("%s: g_Sectionsd->setPauseScanning(true)\n", __FUNCTION__);
 			g_Sectionsd->setPauseScanning(true);
+			sectionsdPaused = true;
 		}
 
 		/* after this zapit send EVT_RECORDMODE_ACTIVATED, so neutrino getting NeutrinoMessages::EVT_RECORDMODE */
@@ -2174,14 +2176,21 @@ bool CRecordManager::CutBackNeutrino(const t_channel_id channel_id, CFrontend * 
 
 void CRecordManager::RestoreNeutrino(void)
 {
+	/* The guide's scan paused for a recording beside another one goes on
+	   once only the timeshift is left: it runs all the time, and waiting
+	   for no recording at all kept the scan paused until the next start.
+	   StopSectionsd tells of the last recording started only. */
+	bool only_timeshift = recmap.empty() || (recmap.size() == 1 && autoshift);
+	if (sectionsdPaused && only_timeshift && CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_standby) {
+		g_Sectionsd->setPauseScanning(false);
+		sectionsdPaused = false;
+	}
+
 	if(!recmap.empty())
 		return;
 
 	/* after this zapit send EVT_RECORDMODE_DEACTIVATED, so neutrino getting NeutrinoMessages::EVT_RECORDMODE */
 	g_Zapit->setRecordMode( false );
-
-	if((CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_standby) && StopSectionsd)
-		g_Sectionsd->setPauseScanning(false);
 }
 
 CRecordInstance* CRecordManager::getRecordInstance(std::string file)

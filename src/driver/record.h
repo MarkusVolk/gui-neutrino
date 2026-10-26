@@ -176,6 +176,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool		StreamSubtitlePids;
 		bool		StreamPmtPid;
 		bool		StopSectionsd;
+		bool		sectionsdPaused;
 		int		last_mode;
 		bool		autoshift;
 		uint32_t	shift_timer;
