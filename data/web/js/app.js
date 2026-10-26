@@ -803,7 +803,7 @@ async function viewMounts(main) {
 
 	const renderDrives = () => {
 		if (!state.drives.length) {
-			drives.replaceChildren(h("div", { class: "empty" }, "No drives"));
+			drives.replaceChildren(h("div", { class: "card empty" }, "No drives"));
 			return;
 		}
 		drives.replaceChildren(...state.drives.map((d) => {
@@ -828,7 +828,8 @@ async function viewMounts(main) {
 
 	const renderShares = () => {
 		if (!state.shares.length) {
-			shares.replaceChildren(h("div", { class: "empty" }, state.can_mount ? "No network shares" : "No network shares mounted"));
+			shares.replaceChildren(h("div", { class: "cards" },
+				h("div", { class: "card empty" }, state.can_mount ? "No network shares" : "No network shares mounted")));
 			return;
 		}
 		shares.replaceChildren(...state.shares.map((s) => {
