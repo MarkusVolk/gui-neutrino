@@ -86,7 +86,7 @@ int CFollowScreenings::exec(CMenuTarget* /*parent*/, const std::string & actionK
 		CChannelEventList::iterator e;
 		for (e = followlist.begin(); e != followlist.end(); e++, ix++)
 			if (static_cast<time_t>(a) == e->startTime) {
-				time_t start = e->startTime - (ANNOUNCETIME + 120);
+				time_t start = e->startTime;
 				time_t stop = e->startTime + e->duration;
 				bool forceAdd = false;
 				CTimerd::TimerList overlappingTimers = Timer.getOverlappingTimers(start, stop);

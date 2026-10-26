@@ -266,6 +266,8 @@ public:
 	bool shutdown();
 	void shutdownOnWakeup(int currEventId);
 	void getRecordingSafety(int &pre, int &post){pre=m_extraTimeStart;post=m_extraTimeEnd;}
+	static bool needOneTuner(t_channel_id a, t_channel_id b);
+	bool handsOver(int eventID, time_t from, time_t to);
 	void setRecordingSafety(int pre, int post);
 	void loadRecordingSafety();
 	void cancelShutdownOnWakeup();

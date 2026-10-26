@@ -46,6 +46,8 @@
 #include <system/set_threadname.h>
 
 #include <driver/display.h>
+#include <zapit/femanager.h>
+#include <zapit/getservices.h>
 
 extern bool timeset;
 time_t timer_minutes;
@@ -108,6 +110,84 @@ static void timerWait(const struct timespec *abstime)
 }
 
 //------------------------------------------------------------
+/* the times a recording's programme takes, without its safety times */
+static void programmeTimes(const CTimerEvent_Record *r, int pre, int post, time_t &from, time_t &to)
+{
+	from = r->alarmTime + (r->recordingSafety ? pre : 0);
+	to = r->stopTime - (r->recordingSafety ? post : 0);
+}
+
+/* Two recordings that need the one tuner and meet only in their safety
+   times hand over: the earlier stops and the later starts where the later
+   programme begins, its announcement put off by as much. Worked out at
+   every pass, so that the timers keep their own times and one that is
+   removed gives the other its safety time back. */
+static void handOver(CTimerEventMap &events, int pre, int post,
+		std::map<int, time_t> &announce, std::map<int, time_t> &alarm, std::map<int, time_t> &stop)
+{
+	std::vector<CTimerEvent_Record *> recs;
+	for (CTimerEventMap::iterator p = events.begin(); p != events.end(); ++p) {
+		CTimerEvent *e = p->second;
+		if (e->eventType == CTimerd::TIMER_RECORD && e->stopTime &&
+		    (e->eventState == CTimerd::TIMERSTATE_SCHEDULED || e->eventState == CTimerd::TIMERSTATE_PREANNOUNCE ||
+		     e->eventState == CTimerd::TIMERSTATE_ISRUNNING))
+			recs.push_back(static_cast<CTimerEvent_Record *>(e));
+	}
+	for (size_t i = 0; i < recs.size(); i++) {
+		for (size_t j = 0; j < recs.size(); j++) {
+			CTimerEvent_Record *a = recs[i], *b = recs[j];
+			time_t a_from, a_to, b_from, b_to;
+			programmeTimes(a, pre, post, a_from, a_to);
+			programmeTimes(b, pre, post, b_from, b_to);
+			if (i == j || a_to > b_from || a->stopTime <= b->alarmTime || b_from >= b_to)
+				continue;
+			if (!CTimerManager::needOneTuner(a->eventInfo.channel_id, b->eventInfo.channel_id))
+				continue;
+			if (!stop.count(a->eventID) || stop[a->eventID] > b_from)
+				stop[a->eventID] = b_from;
+			if (!alarm.count(b->eventID) || alarm[b->eventID] < b_from) {
+				alarm[b->eventID] = b_from;
+				if (b->announceTime)
+					announce[b->eventID] = b->announceTime + (b_from - b->alarmTime);
+			}
+		}
+	}
+}
+
+/* whether two recordings cannot run at once: with one tuner on different
+   transponders, or one of them through the CI; a web channel takes none */
+bool CTimerManager::needOneTuner(t_channel_id a, t_channel_id b)
+{
+	if (IS_WEBCHAN(a) || IS_WEBCHAN(b))
+		return false;
+	bool useCI = false;
+	{
+		CServiceManager::ChannelGuard guard;
+		CZapitChannel *ca = CServiceManager::getInstance()->FindChannel(a);
+		CZapitChannel *cb = CServiceManager::getInstance()->FindChannel(b);
+		useCI = (ca && ca->bUseCI) || (cb && cb->bUseCI);
+	}
+	if (CFEManager::getInstance()->getEnabledCount() != 1 && !useCI)
+		return false;
+	return useCI || !SAME_TRANSPONDER(a, b);
+}
+
+/* whether a recording of the programme from..to and the recording eventID
+   meet only in their safety times, so that timerd hands one over to the other */
+bool CTimerManager::handsOver(int id, time_t from, time_t to)
+{
+	pthread_mutex_lock(&tm_eventsMutex);
+	bool ret = false;
+	CTimerEventMap::iterator e = events.find(id);
+	if (e != events.end() && e->second->eventType == CTimerd::TIMER_RECORD && e->second->stopTime) {
+		time_t r_from, r_to;
+		programmeTimes(static_cast<CTimerEvent_Record *>(e->second), m_extraTimeStart, m_extraTimeEnd, r_from, r_to);
+		ret = from < to && r_from < r_to && (r_to <= from || to <= r_from);
+	}
+	pthread_mutex_unlock(&tm_eventsMutex);
+	return ret;
+}
+
 void* CTimerManager::timerThread(void *arg)
 {
 	struct timespec wait;
@@ -149,6 +229,24 @@ void* CTimerManager::timerThread(void *arg)
 			pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,NULL);
 			pthread_mutex_lock(&tm_eventsMutex);
 
+			std::map<int, time_t> announce, alarm, stop;
+			handOver(timerManager->events, timerManager->m_extraTimeStart, timerManager->m_extraTimeEnd, announce, alarm, stop);
+
+			/* the recordings that end go first, so that one handed over
+			   finds the tuner free */
+			for (CTimerEventMap::iterator s = timerManager->events.begin(); s != timerManager->events.end(); ++s)
+			{
+				event = s->second;
+				time_t stopTime = stop.count(event->eventID) ? stop[event->eventID] : event->stopTime;
+				if (stopTime > 0 && event->eventState == CTimerd::TIMERSTATE_ISRUNNING && stopTime <= now)
+				{
+					dprintf("stopping event\n");
+					event->stopEvent();
+					event->setState(CTimerd::TIMERSTATE_HASFINISHED);
+					timerManager->m_saveEvents = true;
+				}
+			}
+
 			CTimerEventMap::iterator pos = timerManager->events.begin();
 			for(;pos != timerManager->events.end();)
 			{
@@ -163,8 +261,10 @@ void* CTimerManager::timerThread(void *arg)
 				if (timerd_debug)
 					event->printEvent();
 
+				time_t announceTime = announce.count(event->eventID) ? announce[event->eventID] : event->announceTime;
+				time_t alarmTime = alarm.count(event->eventID) ? alarm[event->eventID] : event->alarmTime;
 				if(event->announceTime > 0 && event->eventState == CTimerd::TIMERSTATE_SCHEDULED ) // if event wants to be announced
-					if( event->announceTime <= now )	// check if event announcetime has come
+					if( announceTime <= now )	// check if event announcetime has come
 					{
 						event->setState(CTimerd::TIMERSTATE_PREANNOUNCE);
 						dprintf("announcing event\n");
@@ -173,7 +273,7 @@ void* CTimerManager::timerThread(void *arg)
 					}
 
 				if(event->alarmTime > 0 && (event->eventState == CTimerd::TIMERSTATE_SCHEDULED || event->eventState == CTimerd::TIMERSTATE_PREANNOUNCE) )	// if event wants to be fired
-					if( event->alarmTime <= now )	// check if event alarmtime has come
+					if( alarmTime <= now )	// check if event alarmtime has come
 					{
 						event->setState(CTimerd::TIMERSTATE_ISRUNNING);
 						dprintf("firing event\n");

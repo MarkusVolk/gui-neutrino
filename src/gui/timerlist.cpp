@@ -81,6 +81,7 @@
 #include <zapit/femanager.h>
 
 #include <timerdclient/timerdclient.h>
+#include <timerd/timermanager.h>
 
 #include <eitd/sectionsd.h>
 
@@ -1972,7 +1973,7 @@ bool CTimerList::askUserOnRemoteTimerConflict(time_t announceTime, time_t stopTi
 		return true;
 }
 
-CTimerd::TimerList timerConflicts(time_t announceTime, time_t stopTime, t_channel_id channel_id)
+CTimerd::TimerList timerConflicts(time_t start, time_t stop, t_channel_id channel_id)
 {
 	CTimerd::TimerList conflicts;
 	if (channel_id && IS_WEBCHAN(channel_id))
@@ -1985,13 +1986,17 @@ CTimerd::TimerList timerConflicts(time_t announceTime, time_t stopTime, t_channe
 		return conflicts;
 
 	CTimerdClient Timer;
-	CTimerd::TimerList overlapping = Timer.getOverlappingTimers(announceTime, stopTime);
+	CTimerd::TimerList overlapping = Timer.getOverlappingTimers(start, stop);
 	CRecordManager::getInstance()->RemoveTimeshiftTimers(overlapping);
 	for (CTimerd::TimerList::iterator i = overlapping.begin(); i != overlapping.end(); ++i) {
 		bool record = i->eventType == CTimerd::TIMER_RECORD || i->eventType == CTimerd::TIMER_IMMEDIATE_RECORD;
 		if (record && IS_WEBCHAN(i->channel_id))
 			continue;
 		if (record && channel_id && !useCI && SAME_TRANSPONDER(channel_id, i->channel_id))
+			continue;
+		/* meeting only in the safety times, timerd hands one recording over to the other */
+		if (record && channel_id && i->eventType == CTimerd::TIMER_RECORD &&
+		    CTimerManager::getInstance()->handsOver(i->eventID, start, stop))
 			continue;
 		conflicts.push_back(*i);
 	}

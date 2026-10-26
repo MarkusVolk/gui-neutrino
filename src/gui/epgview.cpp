@@ -1148,8 +1148,8 @@ int CEpgData::show(const t_channel_id channel_id, uint64_t a_id, time_t* a_start
 											  epgData.epg_times.startzeit - (ANNOUNCETIME + 120 ),
 											  TIMERD_APIDS_CONF, true, epgData.epg_times.startzeit - (ANNOUNCETIME + 120) > time(NULL), recDir, false) == -1)
 							{
-								if (askUserOnTimerConflict(epgData.epg_times.startzeit - (ANNOUNCETIME + 120),
-											   epgData.epg_times.startzeit + epgData.epg_times.dauer))
+								if (askUserOnTimerConflict(epgData.epg_times.startzeit,
+											   epgData.epg_times.startzeit + epgData.epg_times.dauer, channel_id))
 								{
 									g_Timerd->addRecordTimerEvent(channel_id,
 												      epgData.epg_times.startzeit,

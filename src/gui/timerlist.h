@@ -116,7 +116,8 @@ class CTimerList : public CMenuTarget, public CListHelpers
    run beside: with one tuner, or on a channel through the CI, every other in
    that time but recordings on the same transponder; a web channel takes no
    tuner, and the timeshift gives way */
-CTimerd::TimerList timerConflicts(time_t announceTime, time_t stopTime, t_channel_id channel_id = 0);
+/* start and stop of the recording without its safety times */
+CTimerd::TimerList timerConflicts(time_t start, time_t stop, t_channel_id channel_id = 0);
 bool askUserOnTimerConflict(time_t announceTime, time_t stopTime, t_channel_id channel_id = 0);
 
 #endif
