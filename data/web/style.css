@@ -289,6 +289,8 @@ svg.remote .key .glyph .line { fill: none; stroke: #d7dce5; stroke-width: 1.6; s
 .epg .times { position: sticky; top: 0; z-index: 2; height: 28px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .epg .times span { position: absolute; top: 5px; font-size: 12px; color: var(--dim); }
 .epg .rowh { position: sticky; left: 0; z-index: 1; width: 150px; height: 46px; padding: 6px 10px; background: var(--panel); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.epg .rowh.logo-head { display: flex; align-items: center; justify-content: center; padding: 10px 22px; }
+.epg .rowh.logo-head img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .epg .line { display: flex; }
 .epg .events { position: relative; height: 46px; border-bottom: 1px solid var(--line); }
 .epg .event {

@@ -348,7 +348,12 @@ async function viewEpg(main) {
 				line.append(h("div", { class: `event${running ? " running" : ""}`, style: `left:${left}px;width:${right - left - 2}px`,
 					title: `${hm(ev.start)} ${ev.title}`, onclick: () => eventDialog(ch, ev) }, ev.title));
 			});
-			grid_el.append(h("div", { class: "line" }, h("div", { class: "rowh", title: ch.name }, ch.name), line));
+			/* the channel logo, the name where there is none */
+			const head = h("div", { class: "rowh logo-head", title: ch.name });
+			const logo = h("img", { src: `/api/v1/channels/${ch.id}/logo`, alt: ch.name, loading: "lazy" });
+			logo.onerror = () => { head.classList.remove("logo-head"); head.replaceChildren(ch.name); };
+			head.append(logo);
+			grid_el.append(h("div", { class: "line" }, head, line));
 		}
 		grid_el.append(h("div", { class: "nowline", style: `left:${150 + x(t)}px` }));
 		box.replaceChildren(grid_el);
