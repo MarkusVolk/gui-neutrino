@@ -47,6 +47,30 @@ function fullScreen() {
 	stayAwake();
 }
 
+/* one button: full screen, and once there (or where a browser has no full
+ * screen), the full interface */
+const full = document.getElementById("full");
+const canFull = () => !!document.documentElement.requestFullscreen && !document.fullscreenElement;
+
+function updateFull() {
+	full.textContent = canFull() ? "Full screen" : "Full interface";
+}
+
+function toggleFull() {
+	if (canFull())
+		fullScreen();
+	else
+		location.href = "/";
+}
+
+/* the first touch of a key goes full screen as well */
+function firstTouch(ev) {
+	if (ev.target.closest("#full"))
+		return;
+	document.removeEventListener("pointerdown", firstTouch);
+	fullScreen();
+}
+
 function noAccess() {
 	const secure = httpsUrl();
 	if (secure)
@@ -88,8 +112,10 @@ async function ready() {
 }
 
 async function start() {
-	document.getElementById("full").addEventListener("click", fullScreen);
-	document.addEventListener("pointerdown", fullScreen, { once: true });
+	full.addEventListener("click", toggleFull);
+	document.addEventListener("fullscreenchange", updateFull);
+	document.addEventListener("pointerdown", firstTouch);
+	updateFull();
 	document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && document.fullscreenElement) stayAwake(); });
 	try {
 		await session();
