@@ -309,6 +309,24 @@ async function viewChannels(main) {
 
 const PX_PER_MIN = 4;
 
+/* the long description of a programme, asked of the box once */
+const longTexts = new Map();
+function longText(ev) {
+	if (!ev.id)
+		return Promise.resolve("");
+	if (!longTexts.has(ev.id))
+		longTexts.set(ev.id, api(`epg/events/${ev.id}?start=${ev.start}`).then((e) => e.info2 || "", () => ""));
+	return longTexts.get(ev.id);
+}
+
+/* a text cut at a word, for a tooltip */
+function shortText(text, max) {
+	if (text.length <= max)
+		return text;
+	const cut = text.lastIndexOf(" ", max);
+	return `${text.slice(0, cut > max / 2 ? cut : max)} …`;
+}
+
 /* el is the programme in the guide; el.timerId the recording set for it */
 function eventDialog(ch, ev, el) {
 	const end = ev.start + ev.duration;
@@ -399,8 +417,11 @@ async function viewEpg(main) {
 				 * to it), the right button or a long press opens the choices */
 				const direct = running && (!onBox || may("write"));
 				const timer = recordFor(ch, ev, end);
+				const tip = (long) => `${hm(ev.start)}-${hm(end)} ${ev.title}${ev.description ? `\n${shortText(ev.description, 300)}` : ""}` +
+					`${long ? `\n\n${shortText(long, 600)}` : ""}` +
+					`${direct ? (onBox ? "\n\nClick: zap - right click: more" : "\n\nClick: stream - right click: more") : ""}`;
 				const el = h("div", { class: `event${running ? " running" : ""}${timer ? " timer" : ""}`, style: `left:${left}px;width:${right - left - 2}px`,
-					title: `${hm(ev.start)} ${ev.title}${direct ? (onBox ? "\nClick: zap - right click: more" : "\nClick: stream - right click: more") : ""}`,
+					title: tip(""),
 					onclick: () => {
 						if (!direct)
 							eventDialog(ch, ev, el);
@@ -412,6 +433,11 @@ async function viewEpg(main) {
 					oncontextmenu: (e) => { e.preventDefault(); eventDialog(ch, ev, el); } }, ev.title);
 				if (timer)
 					el.timerId = timer.id;
+				/* the long description comes on the first hover, the grid has only the short one */
+				el.addEventListener("mouseenter", () => longText(ev).then((text) => {
+					if (text)
+						el.title = tip(text);
+				}), { once: true });
 				line.append(el);
 			});
 			/* the channel logo, the name where there is none */

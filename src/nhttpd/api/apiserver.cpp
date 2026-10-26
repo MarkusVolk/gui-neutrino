@@ -1316,6 +1316,34 @@ void ep_screenshot(Call &c)
 //-----------------------------------------------------------------------------
 // programme guide
 //-----------------------------------------------------------------------------
+/* one programme with its long description, which the grid leaves out */
+void ep_epg_event(Call &c)
+{
+	uint64_t id;
+	if (!parse_hex(c.args[0], id) || !id) {
+		problem(c.out, 400, "bad-int", "the event id is a hexadecimal identifier");
+		return;
+	}
+	uint64_t start = 0;
+	if (c.has("start") && !parse_uint(c.q("start"), start)) {
+		problem(c.out, 400, "bad-int", "parameter start is a time in seconds");
+		return;
+	}
+	CEPGData epg;
+	if (!CEitManager::getInstance()->getEPGid(id, (time_t) start, &epg)) {
+		problem(c.out, 404, "no-such-event", "the guide has no such programme");
+		return;
+	}
+	Json::Value v(Json::objectValue);
+	v["id"] = hex_id(epg.eventID);
+	v["title"] = epg.title;
+	v["info1"] = epg.info1;
+	v["info2"] = epg.info2;
+	v["start"] = (Json::Int64) epg.epg_times.startzeit;
+	v["duration"] = (Json::UInt) epg.epg_times.dauer;
+	send_json(c.out, 200, v);
+}
+
 void ep_epg_current(Call &c)
 {
 	if (!c.has("channel")) {
@@ -3149,6 +3177,7 @@ const Route routes[] = {
 	{ "GET",	"/api/v1/osd/screenshot",	L_READ,		ep_screenshot },
 	{ "GET",	"/api/v1/epg/current",		L_READ,		ep_epg_current },
 	{ "GET",	"/api/v1/epg/grid",		L_READ,		ep_epg_grid },
+	{ "GET",	"/api/v1/epg/events/{}",	L_READ,		ep_epg_event },
 	{ "GET",	"/api/v1/timers",		L_READ,		ep_timers },
 	{ "POST",	"/api/v1/timers",		L_WRITE,	ep_timer_new },
 	{ "DELETE",	"/api/v1/timers/{}",		L_WRITE,	ep_timer_delete },
