@@ -648,7 +648,11 @@ void CTimerManager::loadEventsFromConfig()
 					{
 						CTimerEvent_Record *event=
 						new CTimerEvent_Record(&config, savedIDs[i]);
-						if((event->alarmTime >= now) || (event->stopTime > now))
+						/* a recording ends with the Neutrino that ran it: a timer
+						   saved while it recorded, a timeshift above all, records
+						   nothing after a restart and is not kept as running */
+						bool was_running = event->eventState == CTimerd::TIMERSTATE_ISRUNNING;
+						if (!was_running && ((event->alarmTime >= now) || (event->stopTime > now)))
 						{
 							addEvent(event,false);
 						}
@@ -660,8 +664,9 @@ void CTimerManager::loadEventsFromConfig()
 						}
 						else
 						{
-							dprintf("record timer (%d) too old %d/%d\n",
-								i,(int)now,(int) event->alarmTime);
+							dprintf("record timer (%d) %s %d/%d\n",
+								i, was_running ? "ended with the last run" : "too old",
+								(int)now,(int) event->alarmTime);
 							delete event;
 						}
 						break;
