@@ -238,6 +238,12 @@ CBouquetList   * RADIOfavList;
 CBouquetList   * RADIOallList;
 CBouquetList   * RADIOwebList;
 
+/* The timer messages that come while Neutrino starts, before InitZapper()
+   has the channel lists their zap needs: a message box on the way, the
+   start wizard or the hint on missing settings, hands them on already */
+static bool zapper_ready = false;
+static std::vector<std::pair<neutrino_msg_t, neutrino_msg_data_t> > early_timer_msgs;
+
 CBouquetList   * AllFavBouquetList;
 
 CPlugins       * g_Plugins;
@@ -3395,6 +3401,11 @@ TIMER_START();
 	}
 
 	InitZapper();
+	zapper_ready = true;
+	for (size_t i = 0; i < early_timer_msgs.size(); i++)
+		if (!g_RCInput->postMsg(early_timer_msgs[i].first, early_timer_msgs[i].second, false))
+			delete[] (unsigned char*) early_timer_msgs[i].second;
+	early_timer_msgs.clear();
 
 	CHDDDestExec * hdd = new CHDDDestExec();
 	hdd->exec(NULL, "");
@@ -4287,6 +4298,12 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 {
 	int res = 0;
 	neutrino_msg_t msg = _msg;
+
+	if (!zapper_ready && (msg == NeutrinoMessages::ANNOUNCE_RECORD || msg == NeutrinoMessages::RECORD_START ||
+	    msg == NeutrinoMessages::ANNOUNCE_ZAPTO || msg == NeutrinoMessages::ZAPTO)) {
+		early_timer_msgs.push_back(std::make_pair(msg, data));
+		return messages_return::handled;
+	}
 
 	if(msg == NeutrinoMessages::EVT_WEBTV_RESTART) {
 		t_channel_id chid = *(t_channel_id *) data;
