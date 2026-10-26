@@ -1,9 +1,9 @@
 install_data(
-	'ats.png',
-	'ats_gray.png',
-	'muted.png',
-	'rclock.png',
-	'rec.png',
-	'rec_gray.png',
+	'ats.svg',
+	'ats_gray.svg',
+	'muted.svg',
+	'rclock.svg',
+	'rec.svg',
+	'rec_gray.svg',
 	install_dir : iconsdir,
 )

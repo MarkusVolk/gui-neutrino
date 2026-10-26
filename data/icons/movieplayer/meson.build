@@ -1,9 +1,15 @@
 install_data(
 	'mp_b-skip.png',
+	'mp_b-skip.svg',
 	'mp_f-skip.png',
+	'mp_f-skip.svg',
 	'mp_pause.png',
+	'mp_pause.svg',
 	'mp_play.png',
+	'mp_play.svg',
 	'mp_play_repeat_all.png',
+	'mp_play_repeat_all.svg',
 	'mp_play_repeat_track.png',
+	'mp_play_repeat_track.svg',
 	install_dir : iconsdir,
 )

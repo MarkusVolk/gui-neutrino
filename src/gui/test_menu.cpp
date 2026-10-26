@@ -1414,7 +1414,7 @@ int CTestMenu::exec(CMenuTarget *parent, const std::string &actionKey)
 	else if (actionKey == "blink_image")
 	{
 		if (pic == NULL)
-			pic = new CComponentsPicture(50, 50, 50, 50, ICONSDIR "/btn_pause.png");
+			pic = new CComponentsPicture(50, 50, 50, 50, NEUTRINO_ICON_BUTTON_PAUSE);
 
 		pic->paintBlink(500);
 		sleep(10);

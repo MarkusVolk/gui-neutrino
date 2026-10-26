@@ -1,5 +1,5 @@
 install_data(
-	'deutsch.png',
-	'english.png',
+	'deutsch.svg',
+	'english.svg',
 	install_dir : iconsdir,
 )

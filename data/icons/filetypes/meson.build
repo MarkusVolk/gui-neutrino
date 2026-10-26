@@ -1,8 +1,8 @@
 install_data(
-	'file.png',
-	'folder.png',
-	'movie.png',
-	'mp3.png',
-	'picture.png',
+	'file.svg',
+	'folder.svg',
+	'movie.svg',
+	'mp3.svg',
+	'picture.svg',
 	install_dir : iconsdir,
 )

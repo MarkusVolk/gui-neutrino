@@ -1,10 +1,10 @@
 install_data(
-	'hourglass0.png',
-	'hourglass1.png',
-	'hourglass2.png',
-	'hourglass3.png',
-	'hourglass4.png',
-	'hourglass5.png',
-	'hourglass6.png',
+	'hourglass0.svg',
+	'hourglass1.svg',
+	'hourglass2.svg',
+	'hourglass3.svg',
+	'hourglass4.svg',
+	'hourglass5.svg',
+	'hourglass6.svg',
 	install_dir : iconsdir,
 )
