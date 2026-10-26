@@ -14,6 +14,7 @@ const ICONS = {
 	trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
 	refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
 	phone: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+	camera: '<path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
 	cloud: '<path d="M7 18h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.34 9.5 4.25 4.25 0 0 0 7 18z"/>',
 	puzzle: '<path d="M10 4a2 2 0 1 1 4 0v2h4v4h-2a2 2 0 1 0 0 4h2v4h-4v-2a2 2 0 1 0-4 0v2H6v-4H4a2 2 0 1 1 0-4h2V6h4z"/>',
 };
@@ -171,22 +172,44 @@ async function viewRemote(main) {
 				h("p", { class: "dim small" }, "Keyboard: arrows, Enter = OK, Esc = Exit, 0-9, + / - volume, r g y b colour keys. ",
 					h("a", { href: "/remote.html" }, "Remote only"), " fills a phone screen."))));
 
+	/* the box answers a key before it paints, so the OSD is fetched right
+	 * away and again while it settles; one request at a time, and a picture
+	 * never replaces a newer one */
 	let timers = [];
+	let busy = false, again = false, asked = 0, shown = 0;
 	const shot = () => {
+		if (busy) {
+			again = true;
+			return;
+		}
+		busy = true;
+		again = false;
+		const n = ++asked;
 		const img = new Image();
-		img.onload = () => {
-			const c = document.createElement("canvas");
-			c.width = 32; c.height = 18;
-			const g = c.getContext("2d");
-			g.drawImage(img, 0, 0, 32, 18);
-			const empty = !g.getImageData(0, 0, 32, 18).data.some((v, i) => i % 4 === 3 && v > 0);
-			osd.replaceChildren(empty ? h("span", { class: "hint" }, "No menu on the screen") : img);
+		const done = () => {
+			busy = false;
+			if (again)
+				shot();
 		};
+		img.onload = () => {
+			if (n > shown) {
+				shown = n;
+				const c = document.createElement("canvas");
+				c.width = 32; c.height = 18;
+				const g = c.getContext("2d");
+				g.drawImage(img, 0, 0, 32, 18);
+				const empty = !g.getImageData(0, 0, 32, 18).data.some((v, i) => i % 4 === 3 && v > 0);
+				osd.replaceChildren(empty ? h("span", { class: "hint" }, "No menu on the screen") : img);
+			}
+			done();
+		};
+		img.onerror = done;
 		img.src = osdUrl();
 	};
 	const follow = () => {
 		timers.forEach(clearTimeout);
-		timers = [setTimeout(shot, 250), setTimeout(shot, 2000)];
+		shot();
+		timers = [150, 450, 2000].map((t) => setTimeout(shot, t));
 	};
 	const press = (name) => key(name).then(follow, fail);
 
@@ -615,6 +638,32 @@ const VIEWS = {
 	signin: ["Sign in", viewSignIn, "public"],
 };
 
+/* the picture on the TV with the OSD over it, saved as a PNG file */
+async function screenshot(btn) {
+	btn.disabled = true;
+	try {
+		const r = await fetch("/api/v1/osd/screenshot?osd=true&video=true&format=png", { credentials: "same-origin" });
+		if (!r.ok) {
+			let problem = {};
+			try { problem = await r.json(); } catch { /* not JSON */ }
+			throw new ApiError(r.status, problem);
+		}
+		const url = URL.createObjectURL(await r.blob());
+		const now = new Date();
+		const p = (n) => String(n).padStart(2, "0");
+		const a = h("a", { href: url, download: `neutrino-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}.png` });
+		document.body.append(a);
+		a.click();
+		a.remove();
+		setTimeout(() => URL.revokeObjectURL(url), 10000);
+		toast("Screenshot saved");
+	} catch (e) {
+		fail(e);
+	} finally {
+		btn.disabled = false;
+	}
+}
+
 function frame() {
 	const nav = h("nav", {}, Object.entries(VIEWS).filter(([k]) => k !== "signin").map(([k, [title]]) =>
 		h("a", { href: `#/${k}`, "data-view": k, html: `${icon(k)}<span>${title}</span>` })));
@@ -623,6 +672,7 @@ function frame() {
 			h("div", { class: "brand" }, h("img", { src: "/icons/icon.svg", alt: "" }), "Neutrino"),
 			h("span", { class: "box", id: "boxname" }),
 			h("span", { class: "spacer" }),
+			h("button", { class: "btn icon", title: "Screenshot of the TV", html: icon("camera"), onclick: (ev) => screenshot(ev.currentTarget) }),
 			h("a", { class: "btn icon", href: "/remote.html", title: "Remote only (phone)", html: icon("phone") })),
 		nav,
 		h("main", { id: "main" }));
