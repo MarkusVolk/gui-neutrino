@@ -418,8 +418,7 @@ async function viewEpg(main) {
 				const direct = running && (!onBox || may("write"));
 				const timer = recordFor(ch, ev, end);
 				const tip = (long) => `${hm(ev.start)}-${hm(end)} ${ev.title}${ev.description ? `\n${shortText(ev.description, 300)}` : ""}` +
-					`${long ? `\n\n${shortText(long, 600)}` : ""}` +
-					`${direct ? (onBox ? "\n\nClick: zap - right click: more" : "\n\nClick: stream - right click: more") : ""}`;
+					`${long ? `\n\n${shortText(long, 600)}` : ""}`;
 				const el = h("div", { class: `event${running ? " running" : ""}${timer ? " timer" : ""}`, style: `left:${left}px;width:${right - left - 2}px`,
 					title: tip(""),
 					onclick: () => {
