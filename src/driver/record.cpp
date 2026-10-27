@@ -2079,15 +2079,17 @@ bool CRecordManager::AskToStop(const t_channel_id channel_id, const int recid)
 	else
 		inst = FindInstance(channel_id);
 
+	bool timeshift = false;
 	if(inst) {
 		inst->GetRecordString(title, duration);
 		title += " " + duration;
+		timeshift = inst->Timeshift();
 	}
 	mutex.unlock();
 	if(inst == NULL)
 		return false;
 
-	if(ShowMsg(FindTimeshift() ? LOCALE_SHUTDOWN_TIMESHIFT_QUERY : LOCALE_SHUTDOWN_RECORDING_QUERY, title.c_str(),
+	if(ShowMsg(timeshift ? LOCALE_SHUTDOWN_TIMESHIFT_QUERY : LOCALE_SHUTDOWN_RECORDING_QUERY, title.c_str(),
 				CMsgBox::mbrYes, CMsgBox::mbYes | CMsgBox::mbNo, NULL, 450, 30) == CMsgBox::mbrYes) {
 		mutex.lock();
 		if (recid)
