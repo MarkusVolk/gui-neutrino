@@ -223,7 +223,6 @@ public:
 	/* lock_held: the caller holds the channel lock, the full reload does */
 	void invalidateChannelLists(bool lock_held = false);
 	void setCurrentMuted(int m) { current_muted = m; }
-	int recordingstatus;
 	void MakeSectionsdConfig(CSectionsdClient::epg_config& config);
 	void SendSectionsdConfig(void);
 	void reloadSetup();

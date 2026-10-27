@@ -190,7 +190,6 @@ CTimeOSD	*FileTimeOSD;
 Zapit_config zapitCfg;
 char zapit_lat[21]="#";
 char zapit_long[21]="#";
-bool autoshift = false;
 uint32_t scrambled_timer;
 uint32_t fst_timer;
 t_channel_id standby_channel_id = 0;
@@ -313,7 +312,6 @@ CNeutrinoApp::CNeutrinoApp()
 	osd_size_seen		= 0;
 	osd_size_applied	= 0;
 	current_muted		= 0;
-	recordingstatus		= 0;
 	channels_changed	= false;
 	favorites_changed	= false;
 	bouquets_changed	= false;
@@ -4146,7 +4144,7 @@ void CNeutrinoApp::zapTo(t_channel_id channel_id)
 
 bool CNeutrinoApp::wakeupFromStandby(void)
 {
-	bool alive = recordingstatus || CEpgScan::getInstance()->Running() ||
+	bool alive = CRecordManager::getInstance()->RecordingStatus() || CEpgScan::getInstance()->Running() ||
 		CStreamManager::getInstance()->StreamStatus();
 
 	if ((mode == NeutrinoModes::mode_standby) && !alive) {
@@ -4168,7 +4166,7 @@ bool CNeutrinoApp::wakeupFromStandby(void)
    stopTime already passed), counts scheduled/running and recurring ones. */
 bool CNeutrinoApp::hasPendingRecording(void)
 {
-	if (recordingstatus)
+	if (CRecordManager::getInstance()->RecordingStatus())
 		return true;
 	if (!g_Timerd)
 		return false;
@@ -4196,7 +4194,7 @@ void CNeutrinoApp::tryDeferredDeepStandby(void)
 {
 	if (!deferred_deepstandby || mode != NeutrinoModes::mode_standby)
 		return;
-	bool alive = recordingstatus || CEpgScan::getInstance()->Running() ||
+	bool alive = CRecordManager::getInstance()->RecordingStatus() || CEpgScan::getInstance()->Running() ||
 		CStreamManager::getInstance()->StreamStatus();
 	if (alive || hasPendingRecording())
 		return;
@@ -4210,7 +4208,7 @@ void CNeutrinoApp::tryDeferredDeepStandby(void)
 
 void CNeutrinoApp::standbyToStandby(void)
 {
-	bool alive = recordingstatus || CEpgScan::getInstance()->Running() ||
+	bool alive = CRecordManager::getInstance()->RecordingStatus() || CEpgScan::getInstance()->Running() ||
 		CStreamManager::getInstance()->StreamStatus();
 
 	if ((mode == NeutrinoModes::mode_standby) && !alive) {
@@ -4698,13 +4696,11 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		/* sent by rcinput, when got msg from zapit about record activated/deactivated */
 		/* should be sent when no record running */
 		printf("NeutrinoMessages::EVT_RECORDMODE: %s\n", ( data ) ? "on" : "off");
-		recordingstatus = data;
 		CEpgScan::getInstance()->Next();
 		standbyToStandby();
-		autoshift = CRecordManager::getInstance()->TimeshiftOnly();
 		CVFD::getInstance()->ShowIcon(FP_ICON_CAM1, CRecordManager::getInstance()->RecordingStatus());
 
-		if( ( !g_InfoViewer->is_visible ) && data && !autoshift)
+		if( ( !g_InfoViewer->is_visible ) && data && CRecordManager::getInstance()->RecordingStatus())
 			g_RCInput->postMsg( NeutrinoMessages::SHOW_INFOBAR, 0 );
 
 		return messages_return::handled;
@@ -4765,7 +4761,6 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		}
 		if (g_settings.recording_type != CNeutrinoApp::RECORDING_OFF) {
 			CRecordManager::getInstance()->Record(eventinfo);
-			autoshift = CRecordManager::getInstance()->TimeshiftOnly();
 		}
 
 		delete[] (unsigned char*) data;
@@ -4775,7 +4770,6 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		CTimerd::RecordingStopInfo* recinfo = (CTimerd::RecordingStopInfo*)data;
 		printf("NeutrinoMessages::RECORD_STOP: eventID %d channel_id %" PRIx64 "\n", recinfo->eventID, recinfo->channel_id);
 		CRecordManager::getInstance()->Stop(recinfo);
-		autoshift = CRecordManager::getInstance()->TimeshiftOnly();
 
 		delete[] (unsigned char*) data;
 		return messages_return::handled;
@@ -5129,7 +5123,7 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 	else if (msg == NeutrinoMessages::EVT_SERVICES_UPD) {
 		SDTreloadChannels = true;
 		g_InfoViewer->SDT_freq_update = true;
-		if( !g_InfoViewer->is_visible && !autoshift){
+		if( !g_InfoViewer->is_visible && !CRecordManager::getInstance()->TimeshiftOnly()){
 			g_RCInput->postMsg(NeutrinoMessages::SHOW_INFOBAR , 0);
 		}
 		return messages_return::handled;
@@ -5690,7 +5684,7 @@ void CNeutrinoApp::standbyMode(bool bOnOff, bool fromDeepStandby)
 
 		CEpgScan::getInstance()->Start(true);
 
-		bool alive = recordingstatus || CEpgScan::getInstance()->Running() || CStreamManager::getInstance()->StreamStatus();
+		bool alive = CRecordManager::getInstance()->RecordingStatus() || CEpgScan::getInstance()->Running() || CStreamManager::getInstance()->StreamStatus();
 		if (!alive && cpuFreq)
 			cpuFreq->SetCpuFreq(g_settings.standby_cpufreq * 1000 * 1000);
 
@@ -5740,7 +5734,7 @@ void CNeutrinoApp::standbyMode(bool bOnOff, bool fromDeepStandby)
 			init_cec_setting = false;
 		}
 
-		if(!recordingstatus && g_settings.ci_standby_reset) {
+		if(!CRecordManager::getInstance()->RecordingStatus() && g_settings.ci_standby_reset) {
 			g_CamHandler->exec(NULL, "ca_ci_reset0");
 			g_CamHandler->exec(NULL, "ca_ci_reset1");
 		}
@@ -5779,7 +5773,7 @@ void CNeutrinoApp::standbyMode(bool bOnOff, bool fromDeepStandby)
 			tvMode( false );
 		}
 		t_channel_id live_channel_id = CZapit::getInstance()->GetCurrentChannelID();
-		if(!recordingstatus) { //only switch to standby_channel_id when not recording
+		if(!CRecordManager::getInstance()->RecordingStatus()) { //only switch to standby_channel_id when not recording
 			live_channel_id = standby_channel_id;
 		}
 #if 0

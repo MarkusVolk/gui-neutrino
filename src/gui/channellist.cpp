@@ -104,7 +104,6 @@ extern CBouquetList   * AllFavBouquetList;
 extern CBouquetList   * TVfavList;
 extern CBouquetList   * RADIOfavList;
 
-extern bool autoshift;
 static CComponentsPIP	*cc_minitv = NULL;
 extern CBouquetManager *g_bouquetManager;
 extern int old_b_id;
@@ -1340,7 +1339,7 @@ void CChannelList::zapToChannel(CZapitChannel *channel, bool force)
 	}
 	if(new_zap_mode != 2 /* not active */) {
 		/* remove recordModeActive from infobar */
-		if(g_settings.timeshift_auto && !CNeutrinoApp::getInstance()->recordingstatus)
+		if(g_settings.timeshift_auto && !CRecordManager::getInstance()->RecordingStatus())
 			g_InfoViewer->handleMsg(NeutrinoMessages::EVT_RECORDMODE, 0);
 
 		g_RCInput->postMsg( NeutrinoMessages::SHOW_INFOBAR, 0 );
@@ -1388,7 +1387,7 @@ int CChannelList::showLiveBouquet(int key)
 	// current transponder bouquet
 	if (key == g_settings.key_current_transponder)
 	{
-		bool isRecord = (!autoshift && CNeutrinoApp::getInstance()->recordingstatus);
+		bool isRecord = CRecordManager::getInstance()->RecordingStatus();
 		CChannelList * origList = CNeutrinoApp::getInstance()->channelList;
 		CChannelList liveList(isRecord ? g_Locale->getText(LOCALE_CHANNELLIST_RECORDABLE_CHANNELS) : g_Locale->getText(LOCALE_CHANNELLIST_CURRENT_TP), false, true);
 		liveList.setLiveBouquet();
@@ -2543,7 +2542,7 @@ bool CChannelList::SameTP(t_channel_id channel_id)
 {
 	bool iscurrent = true;
 
-	if(CNeutrinoApp::getInstance()->recordingstatus) {
+	if(CRecordManager::getInstance()->RecordingStatus()) {
 		if (IS_WEBCHAN(channel_id))
 			return true;
 
@@ -2560,7 +2559,7 @@ bool CChannelList::SameTP(CZapitChannel * channel)
 {
 	bool iscurrent = true;
 
-	if(CNeutrinoApp::getInstance()->recordingstatus) {
+	if(CRecordManager::getInstance()->RecordingStatus()) {
 		if(channel == NULL)
 			channel = (*chanlist)[selected];
 
