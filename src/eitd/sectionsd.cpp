@@ -314,12 +314,15 @@ static bool deleteEvent(const t_event_id uniqueKey)
 }
 
 /* Which of two overlapping events stays: the lower rank. That is the table
-   id, present/following before the schedule, but the following event of
-   another transponder (0x4f) gives way to a schedule: it can be a
-   placeholder lasting a day that would keep the schedule out. */
+   id, present/following before the schedule, and on-air data before the
+   saved guide read at start (0x80 set). The following event of another
+   transponder (0x4f) gives way to every schedule, a saved one as well: it
+   can be a placeholder lasting a day that would keep the schedule out. */
 static unsigned tableRank(unsigned char table_id)
 {
-	return table_id == 0x4f ? 0x70 : table_id;
+	if ((table_id & 0x7f) == 0x4f)
+		return 0x100 | table_id;
+	return table_id;
 }
 
 /* if cn == true (if called by cnThread), then myCurrentEvent and myNextEvent is updated, too */
@@ -558,7 +561,7 @@ debug(DEBUG_ERROR, "addEvent: ch %012" PRIx64 " running %d (%s) got_CN %d", evt.
 				   transponder is not added over it */
 				if (tableRank((*later)->table_id) < tableRank(e->table_id))
 				{
-					if (e->table_id == 0x4f)
+					if ((e->table_id & 0x7f) == 0x4f)
 					{
 						unlockEvents();
 						delete eptr;
