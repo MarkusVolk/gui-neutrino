@@ -655,10 +655,10 @@ bool readEventsFromDir(std::string &epgdir, int &ev_count)
 	return true;
 }
 
+/* startXMLReader() has counted this reader already */
 void *insertEventsfromFile(void * data)
 {
 	set_threadname(__func__);
-	readerStarted();
 	std::string indexname;
 	std::string filename;
 	std::string epgname;

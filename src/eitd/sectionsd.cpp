@@ -1371,10 +1371,14 @@ static void startXMLReader(const std::string &epgdir)
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
+	/* counted before the thread runs: a save asked for right after the
+	   read finds the reader busy, not the guide in memory still empty */
+	readerStarted();
 	if (pthread_create (&thrInsertXML, &attr, insertEventsfromFile, (void *)dir ))
 	{
 		perror("sectionsd: pthread_create()");
 		free(dir);
+		readerFinished();
 	}
 
 	pthread_attr_destroy(&attr);

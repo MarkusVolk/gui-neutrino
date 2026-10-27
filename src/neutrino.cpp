@@ -5465,6 +5465,13 @@ void CNeutrinoApp::ExitRun(int exit_code, bool ask)
 void CNeutrinoApp::saveEpg(int _mode)
 {
 	struct stat my_stat;
+	/* InitZapper starts reading the saved guide; a save before it would
+	   keep only what came on air since and delete the files of the rest.
+	   A save while the guide is being read sectionsd refuses itself. */
+	if (!zapper_ready) {
+		printf("[neutrino] guide not read yet, not saved\n");
+		return;
+	}
 	/* a box saves only to a mounted drive, a PC into its own cache */
 	if (g_info.hw_caps->media_in_home) {
 		std::error_code ec;
