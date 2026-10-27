@@ -1589,6 +1589,16 @@ bool CRecordManager::InstanceStatus(const t_channel_id channel_id)
 	return ret;
 }
 
+/* the tuner a recording of this channel holds, NULL without one */
+CFrontend * CRecordManager::GetRecordFrontend(const t_channel_id channel_id)
+{
+	mutex.lock();
+	CRecordInstance * inst = FindRecording(channel_id);
+	CFrontend * fe = inst ? inst->frontend : NULL;
+	mutex.unlock();
+	return fe;
+}
+
 bool CRecordManager::TimeshiftOnly()
 {
 	mutex.lock();

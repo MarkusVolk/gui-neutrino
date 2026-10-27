@@ -249,6 +249,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool TimeshiftStatus(const t_channel_id channel_id = 0);
 		bool InstanceStatus(const t_channel_id channel_id = 0);
 		bool TimeshiftOnly();
+		CFrontend * GetRecordFrontend(const t_channel_id channel_id);
 		void RemoveTimeshiftTimers(CTimerd::TimerList &list);
 		bool Timeshift() { return (autoshift || shift_timer); };
 		bool SameTransponder(const t_channel_id channel_id);

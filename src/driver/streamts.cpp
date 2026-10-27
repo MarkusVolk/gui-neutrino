@@ -86,6 +86,7 @@ CStreamInstance::CStreamInstance(int clientfd, t_channel_id chid, stream_pids_t 
 	dmx = NULL;
 	buf = NULL;
 	frontend = NULL;
+	live_locked = NULL;
 	is_e2_stream = false;
 }
 
@@ -269,9 +270,12 @@ void CStreamInstance::run()
 		CCamManager::getInstance()->Start(channel_id, CCamManager::STREAM);
 
 #if !HAVE_CST_HARDWARE
-	CFrontend *live_fe = CZapit::getInstance()->GetLiveFrontend();
-	if(live_fe)
-		CFEManager::getInstance()->unlockFrontend(live_fe);
+	/* the live tuner FindFrontend kept from a zap until the stream holds
+	   its own; a stream of the live or a recorded channel took none */
+	if (live_locked) {
+		CFEManager::getInstance()->unlockFrontend(live_locked);
+		live_locked = NULL;
+	}
 	if(frontend)
 		CFEManager::getInstance()->lockFrontend(frontend);
 	//CZapit::getInstance()->SetRecordMode(true);
@@ -381,16 +385,20 @@ bool CStreamManager::SetPort(int newport)
 	return ret;
 }
 
-CFrontend * CStreamManager::FindFrontend(CZapitChannel * channel)
+CFrontend * CStreamManager::FindFrontend(CZapitChannel * channel, CFrontend * &live_locked)
 {
 	std::set<CFrontend*> frontends;
 	CFrontend * frontend = NULL;
+	live_locked = NULL;
 	CFEManager::getInstance()->Open();
 
 	t_channel_id chid = channel->getChannelID();
-	if (CRecordManager::getInstance()->RecordingStatus(chid)) {
-		printf("CStreamManager::%s: channel %" PRIx64 " recorded, aborting..\n", __func__, chid);
-		return frontend;
+	/* a recording holds a tuner on the channel's transponder already, the
+	   stream reads a demux of its own from it without a zap */
+	CFrontend *rec_fe = CRecordManager::getInstance()->GetRecordFrontend(chid);
+	if (rec_fe) {
+		printf("CStreamManager::%s: channel %" PRIx64 " recorded, streaming from fe %d\n", __func__, chid, rec_fe->getNumber());
+		return rec_fe;
 	}
 
 	t_channel_id live_channel_id = 0;
@@ -461,13 +469,18 @@ CFrontend * CStreamManager::FindFrontend(CZapitChannel * channel)
 	if (unlock && live_fe)
 #endif
 		CFEManager::getInstance()->unlockFrontend(live_fe);
+#if !HAVE_CST_HARDWARE
+	else if (unlock && live_fe)
+		live_locked = live_fe;
+#endif
 
 	CFEManager::getInstance()->Unlock();
 	return frontend;
 }
 
-bool CStreamManager::Parse(int fd, stream_pids_t &pids, t_channel_id &chid, CFrontend * &frontend, bool &is_e2)
+bool CStreamManager::Parse(int fd, stream_pids_t &pids, t_channel_id &chid, CFrontend * &frontend, CFrontend * &live_locked, bool &is_e2)
 {
+	live_locked = NULL;
 	char cbuf[512];
 	char *bp;
 
@@ -576,7 +589,7 @@ bool CStreamManager::Parse(int fd, stream_pids_t &pids, t_channel_id &chid, CFro
 	if (IS_WEBCHAN(chid))
 		return true;
 
-	frontend = FindFrontend(channel);
+	frontend = FindFrontend(channel, live_locked);
 	if (!frontend) {
 		printf("CStreamManager::Parse: no free frontend\n");
 		return false;
@@ -664,6 +677,7 @@ bool CStreamManager::AddClient(int connfd)
 
 	t_channel_id channel_id = 0;
 	CFrontend *frontend = NULL;
+	CFrontend *live_locked = NULL;
 	bool is_e2 = false;
 
 	/* Mark setup in progress before Parse's zap emits EVT_ZAP_COMPLETE,
@@ -674,17 +688,22 @@ bool CStreamManager::AddClient(int connfd)
 		pending_starts++;
 	}
 
-	bool parsed = Parse(connfd, pids, channel_id, frontend, is_e2);
+	bool parsed = Parse(connfd, pids, channel_id, frontend, live_locked, is_e2);
 
 	OpenThreads::ScopedLock<OpenThreads::Mutex> m_lock(mutex);
 	pending_starts--;
-	if (!parsed)
+	if (!parsed) {
+		if (live_locked)
+			CFEManager::getInstance()->unlockFrontend(live_locked);
 		return false;
+	}
 
 	SetSendBuffer(connfd);
 
 	streammap_iterator_t it = streams.find(channel_id);
 	if (it != streams.end()) {
+		if (live_locked)
+			CFEManager::getInstance()->unlockFrontend(live_locked);
 		it->second->AddClient(connfd);
 	} else {
 		CStreamInstance * stream;
@@ -693,13 +712,17 @@ bool CStreamManager::AddClient(int connfd)
 		} else {
 			stream = new CStreamInstance(connfd, channel_id, pids);
 			stream->frontend = frontend;
+			stream->live_locked = live_locked;
 			stream->is_e2_stream = is_e2;
 		}
 
 		if (stream->Open() && stream->Start())
 			streams.insert(streammap_pair_t(channel_id, stream));
-		else
+		else {
+			if (stream->live_locked)
+				CFEManager::getInstance()->unlockFrontend(stream->live_locked);
 			delete stream;
+		}
 	}
 	return true;
 }

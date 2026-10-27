@@ -48,6 +48,7 @@ class CStreamInstance : public OpenThreads::Thread
 		bool	running;
 		cDemux * dmx;
 		CFrontend * frontend;
+		CFrontend * live_locked;
 		OpenThreads::Mutex mutex;
 		unsigned char * buf;
 
@@ -136,10 +137,10 @@ class CStreamManager : public OpenThreads::Thread
 		int pending_starts;
 
 		bool	Listen();
-		bool	Parse(int fd, stream_pids_t &pids, t_channel_id &chid, CFrontend * &frontend, bool &is_e2);
+		bool	Parse(int fd, stream_pids_t &pids, t_channel_id &chid, CFrontend * &frontend, CFrontend * &live_locked, bool &is_e2);
 		void	PreparePids(CZapitChannel * channel, stream_pids_t &pids, bool is_e2);
 		void	CheckStandby(bool enter);
-		CFrontend * FindFrontend(CZapitChannel * channel);
+		CFrontend * FindFrontend(CZapitChannel * channel, CFrontend * &live_locked);
 		bool	StopAll();
 		void	RemoveClient(int fd);
 		void	run();
