@@ -195,6 +195,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool RecordingRunningLocked();
 		void ShowRecordIcon();
 		CRecordInstance * FindInstance(t_channel_id);
+		CRecordInstance * FindRecording(t_channel_id);
 		CRecordInstance * FindInstanceID(int recid);
 		CRecordInstance * FindTimeshift();
 
@@ -243,6 +244,8 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		void SetDirectory(std::string directory) { Directory	= directory; };
 		void SetTimeshiftDirectory(std::string directory) { TimeshiftDirectory	= directory; };
 		bool RecordingStatus(const t_channel_id channel_id = 0);
+		bool TimeshiftStatus(const t_channel_id channel_id = 0);
+		bool InstanceStatus(const t_channel_id channel_id = 0);
 		bool TimeshiftOnly();
 		bool RecordingRunning();
 		void RemoveTimeshiftTimers(CTimerd::TimerList &list);

@@ -1238,6 +1238,16 @@ CRecordInstance * CRecordManager::FindInstance(t_channel_id channel_id)
 	return NULL;
 }
 
+/* a recording, not the timeshift */
+CRecordInstance * CRecordManager::FindRecording(t_channel_id channel_id)
+{
+	for (recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++) {
+		if (it->second->GetChannelId() == channel_id && !it->second->Timeshift())
+			return it->second;
+	}
+	return NULL;
+}
+
 CRecordInstance * CRecordManager::FindInstanceID(int recid)
 {
 	for (recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++) {
@@ -1563,6 +1573,26 @@ bool CRecordManager::RecordingStatus(const t_channel_id channel_id)
 	return ret;
 }
 
+/* a timeshift running, on this channel if the id is not 0 */
+bool CRecordManager::TimeshiftStatus(const t_channel_id channel_id)
+{
+	mutex.lock();
+	CRecordInstance * inst = FindTimeshift();
+	bool ret = inst && (!channel_id || inst->GetChannelId() == channel_id);
+	mutex.unlock();
+	return ret;
+}
+
+/* any instance writing, a recording or the timeshift, for this channel id
+ * or global if the id is 0: for what needs a demux, a tuner or the disk */
+bool CRecordManager::InstanceStatus(const t_channel_id channel_id)
+{
+	mutex.lock();
+	bool ret = channel_id ? FindInstance(channel_id) != NULL : !recmap.empty();
+	mutex.unlock();
+	return ret;
+}
+
 bool CRecordManager::TimeshiftOnly()
 {
 	mutex.lock();
@@ -1697,7 +1727,7 @@ void CRecordManager::StopPostProcess()
 	RestoreNeutrino();
 	StartNextRecording();
 	RunStopScript();
-	if(!RecordingStatus())
+	if(!InstanceStatus())
 		g_RCInput->killTimer(check_timer);
 }
 

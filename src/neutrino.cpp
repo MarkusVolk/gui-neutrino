@@ -3916,7 +3916,7 @@ void CNeutrinoApp::RealRun()
 					CMoviePlayerGui::getInstance().setTimeshiftDelay(CMoviePlayerGui::getInstance().LiveDelay());
 				if(g_RemoteControl->is_video_started) {
 					t_channel_id live_channel_id = CZapit::getInstance()->GetCurrentChannelID();
-					if(CRecordManager::getInstance()->RecordingStatus(live_channel_id))
+					if(CRecordManager::getInstance()->InstanceStatus(live_channel_id))
 						CMoviePlayerGui::getInstance().exec(NULL, "timeshift_rewind");
 				}
 			}
@@ -5653,7 +5653,7 @@ void CNeutrinoApp::standbyMode(bool bOnOff, bool fromDeepStandby)
 		CMoviePlayerGui::getInstance().stopPlayBack();
 		bool stream_status = CStreamManager::getInstance()->StreamStatus();
 		if((g_settings.epg_scan_mode == CEpgScan::MODE_OFF) && !fromDeepStandby &&
-				!CRecordManager::getInstance()->RecordingStatus() && !stream_status) {
+				!CRecordManager::getInstance()->InstanceStatus() && !stream_status) {
 			g_Zapit->setStandby(true);
 		} else {
 			//g_Zapit->stopPlayBack();

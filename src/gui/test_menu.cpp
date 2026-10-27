@@ -2576,7 +2576,7 @@ void CTestMenu::showRecords()
 	if (!timer)
 		timer = new CComponentsTimer(1);
 
-	if (crm->RecordingStatus())
+	if (crm->InstanceStatus())
 	{
 		CComponentsForm *recordsbox = new CComponentsForm();
 		recordsbox->setWidth(0);
