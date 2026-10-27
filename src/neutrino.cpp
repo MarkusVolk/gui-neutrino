@@ -526,9 +526,10 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	g_settings.psi_tint = configfile.getInt32("video_psi_tint", 128);
 
 	// hdmi cec
-	g_settings.hdmi_cec_mode = configfile.getInt32("hdmi_cec_mode", 0);
-	g_settings.hdmi_cec_view_on = configfile.getInt32("hdmi_cec_view_on", 0);
-	g_settings.hdmi_cec_standby = configfile.getInt32("hdmi_cec_standby", 0);
+	/* a box with CEC switches the TV on and off with it */
+	g_settings.hdmi_cec_mode = configfile.getInt32("hdmi_cec_mode", g_info.hw_caps->can_cec ? VIDEO_HDMI_CEC_MODE_TUNER : VIDEO_HDMI_CEC_MODE_OFF);
+	g_settings.hdmi_cec_view_on = configfile.getInt32("hdmi_cec_view_on", g_info.hw_caps->can_cec ? 1 : 0);
+	g_settings.hdmi_cec_standby = configfile.getInt32("hdmi_cec_standby", g_info.hw_caps->can_cec ? 1 : 0);
 	g_settings.hdmi_cec_volume = configfile.getInt32("hdmi_cec_volume", 0);
 
 	// volume
@@ -956,10 +957,18 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	}
 
 	// ntp server for sectionsd
-	g_settings.network_ntpenable = configfile.getBool("network_ntpenable", false);
+#if HAVE_GENERIC_HARDWARE
+	/* the system of a PC or a TV keeps its clock itself */
+	const bool ntp_default = false;
+#else
+	/* a box has the time of the broadcast only, and a timer or the guide
+	   of a channel with a wrong clock goes wrong with it */
+	const bool ntp_default = true;
+#endif
+	g_settings.network_ntpenable = configfile.getBool("network_ntpenable", ntp_default);
 	setSettingsText(g_settings.network_ntpserver, configfile.getString("network_ntpserver", "0.de.pool.ntp.org"));
 	setSettingsText(g_settings.network_ntprefresh, configfile.getString("network_ntprefresh", "30"));
-	g_settings.network_ntpatboot = configfile.getBool("network_ntpatboot", false);
+	g_settings.network_ntpatboot = configfile.getBool("network_ntpatboot", ntp_default);
 
 	// personalize
 	for (int i = 0; i < SNeutrinoSettings::P_SETTINGS_MAX; i++) // settings.h, settings.cpp
