@@ -1182,7 +1182,7 @@ void CInfoViewer::loop(bool show_dot)
 				infoViewerBB->showIcon_Resolution();
 			}
 		} else if ((msg == NeutrinoMessages::EVT_RECORDMODE) && 
-			   (CMoviePlayerGui::getInstance().timeshift) && CRecordManager::getInstance()->TimeshiftOnly()) {
+			   (CMoviePlayerGui::getInstance().timeshift) && !CRecordManager::getInstance()->RecordingStatus()) {
 			res = CNeutrinoApp::getInstance()->handleMsg(msg, data);
 		} else if (!fileplay && !CMoviePlayerGui::getInstance().timeshift) {
 			CNeutrinoApp *neutrino = CNeutrinoApp::getInstance ();

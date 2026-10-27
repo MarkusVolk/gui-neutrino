@@ -5124,7 +5124,8 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 	else if (msg == NeutrinoMessages::EVT_SERVICES_UPD) {
 		SDTreloadChannels = true;
 		g_InfoViewer->SDT_freq_update = true;
-		if( !g_InfoViewer->is_visible && !CRecordManager::getInstance()->TimeshiftOnly()){
+		CRecordManager *crm = CRecordManager::getInstance();
+		if( !g_InfoViewer->is_visible && (!crm->TimeshiftStatus() || crm->RecordingStatus())){
 			g_RCInput->postMsg(NeutrinoMessages::SHOW_INFOBAR , 0);
 		}
 		return messages_return::handled;

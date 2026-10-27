@@ -1196,7 +1196,6 @@ CRecordManager::CRecordManager()
 	recmap.clear();
 	nextmap.clear();
 	durations.clear();
-	autoshift = false;
 	shift_timer = 0;
 	check_timer = 0;
 	error_display = true;
@@ -1337,7 +1336,7 @@ int CRecordManager::GetRecordMode(const t_channel_id channel_id)
 	if (channel_id == 0) {
 		if (RecordingRunningLocked())
 			recmode |= RECMODE_REC;
-		if (autoshift)
+		if (FindTimeshift())
 			recmode |= RECMODE_TSHIFT;
 	} else {
 		for (recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++) {
@@ -1430,8 +1429,6 @@ bool CRecordManager::Record(const CTimerd::RecordingInfo * const eventinfo, cons
 		if(error_msg == RECORD_OK) {
 			g_Zapit->setRecordMode(true);
 			recmap.insert(recmap_pair_t(inst->GetRecordingId(), inst));
-			if(timeshift)
-				autoshift = true;
 			ShowRecordIcon();
 		} else {
 			delete inst;
@@ -1446,8 +1443,6 @@ bool CRecordManager::Record(const CTimerd::RecordingInfo * const eventinfo, cons
 			error_msg = inst->Record();
 			if(error_msg == RECORD_OK) {
 				recmap.insert(recmap_pair_t(inst->GetRecordingId(), inst));
-				if(timeshift)
-					autoshift = true;
 				ShowRecordIcon();
 #if 0
 				// mimic old behavior for start/stop menu option chooser, still actual ?
@@ -1500,41 +1495,39 @@ bool CRecordManager::StartAutoRecord(bool silent)
 	return Record(live_channel_id, TimeshiftDirectory.c_str(), true, silent);
 }
 
-bool CRecordManager::StopAutoRecord(bool lock)
+/* the timeshift ends; the caller holds mutex. In the record path a
+ * recording takes its tuner over, nothing else is to follow. */
+bool CRecordManager::StopTimeshiftLocked()
 {
-	printf("%s: autoshift %d\n", __FUNCTION__, autoshift);
-
 	g_RCInput->killTimer (shift_timer);
 
-	if (!autoshift)
+	CRecordInstance * inst = FindTimeshift();
+	if (!inst)
 		return false;
 
-	if (lock)
-		mutex.lock();
-
-	CRecordInstance * inst = FindTimeshift();
-	if (inst)
-	{
-		std::string file = inst->GetFileName();
-		StopInstance(inst);
-		CMoviePlayerGui::getInstance().stopTimeshift();
-		/* the player deletes only a timeshift it played; one that was
-		 * recorded but never watched would stay until the next start */
-		if (file.size() > 5 && file.compare(file.size() - 5, 5, "_temp") == 0) {
-			unlink((file + ".ts").c_str());
-			unlink((file + ".xml").c_str());
-		}
+	std::string file = inst->GetFileName();
+	StopInstance(inst);
+	CMoviePlayerGui::getInstance().stopTimeshift();
+	/* the player deletes only a timeshift it played; one that was
+	 * recorded but never watched would stay until the next start */
+	if (file.size() > 5 && file.compare(file.size() - 5, 5, "_temp") == 0) {
+		unlink((file + ".ts").c_str());
+		unlink((file + ".xml").c_str());
 	}
+	return true;
+}
 
-	if (lock) {
-		mutex.unlock();
-		/* the record mode of zapit ends with the last instance; in the
-		   record path (lock false) a recording takes the tuner over */
-		if (inst)
-			StopPostProcess();
-	}
+bool CRecordManager::StopAutoRecord()
+{
+	mutex.lock();
+	bool stopped = StopTimeshiftLocked();
+	mutex.unlock();
+	printf("%s: %s\n", __FUNCTION__, stopped ? "timeshift stopped" : "no timeshift");
 
-	return (inst != NULL);
+	/* the record mode of zapit ends with the last instance */
+	if (stopped)
+		StopPostProcess();
+	return stopped;
 }
 
 void CRecordManager::StopAutoTimer()
@@ -1611,22 +1604,12 @@ bool CRecordManager::KeepTimeshift(const t_channel_id channel_id, bool from_star
 	mutex.lock();
 	CRecordInstance * inst = FindTimeshift();
 	bool kept = inst && inst->GetChannelId() == channel_id && inst->KeepTimeshift(from_start);
-	if (kept) {
-		autoshift = false;
+	if (kept)
 		ShowRecordIcon();
-	}
 	mutex.unlock();
 	if (kept)
 		RunStartScript();
 	return kept;
-}
-
-bool CRecordManager::TimeshiftOnly()
-{
-	mutex.lock();
-	int count = recmap.size();
-	mutex.unlock();
-	return (autoshift && (count == 1));
 }
 
 /* the channel is on the transponder of every recording; a timeshift gives
@@ -1650,10 +1633,6 @@ void CRecordManager::StopInstance(CRecordInstance * inst, bool remove_event)
 	/* first erase - then stop, because Stop() reset recording_id to 0 */
 	recmap.erase(inst->GetRecordingId());
 	inst->Stop(remove_event);
-
-	if(inst->Timeshift())
-		autoshift = false;
-
 	delete inst;
 	ShowRecordIcon();
 }
@@ -2195,7 +2174,7 @@ bool CRecordManager::CutBackNeutrino(const t_channel_id channel_id, CFrontend * 
 		}
 		else {
 			printf("%s mode %s last_mode %s getLastMode %s\n", __FUNCTION__, neutrinoMode_to_string(mode), neutrinoMode_to_string(last_mode), neutrinoMode_to_string(CNeutrinoApp::getInstance()->getLastMode()));
-			StopAutoRecord(false);
+			StopTimeshiftLocked();
 			if (mode != last_mode && (last_mode != NeutrinoModes::mode_standby || mode != CNeutrinoApp::getInstance()->getLastMode())) {
 				CNeutrinoApp::getInstance()->handleMsg( NeutrinoMessages::CHANGEMODE , mode | NeutrinoModes::norezap );
 				mode_changed = true;

@@ -94,7 +94,7 @@ int CSoftwareUpdate::showSoftwareUpdate()
 	}
 #endif
 
-	bool allow_update = true;//!CRecordManager::getInstance()->RecordingStatus() || CRecordManager::getInstance()->TimeshiftOnly();
+	bool allow_update = true;//!CRecordManager::getInstance()->RecordingStatus();
 
 	CFlashUpdate flash;
 	flash.enableNotify(false);

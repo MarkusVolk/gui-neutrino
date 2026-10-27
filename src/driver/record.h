@@ -179,7 +179,6 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool		sectionsdPaused;
 		bool		scriptStarted;
 		int		last_mode;
-		bool		autoshift;
 		uint32_t	shift_timer;
 		uint32_t	check_timer;
 		bool		error_display;
@@ -193,6 +192,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		void StartNextRecording();
 		void StopPostProcess();
 		void StopInstance(CRecordInstance * inst, bool remove_event = true);
+		bool StopTimeshiftLocked();
 		bool RecordingRunningLocked();
 		int RecordCountLocked();
 		void ShowRecordIcon();
@@ -225,7 +225,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool AskToStop(const t_channel_id channel_id, const int recid = 0);
 		int  exec(CMenuTarget* parent, const std::string & actionKey);
 		bool StartAutoRecord(bool silent = false);
-		bool StopAutoRecord(bool lock = true);
+		bool StopAutoRecord();
 		void StopAutoTimer();
 		bool CheckRecordingId_if_Timeshift(int recid);
 		recmap_t GetRecordMap()const{return recmap;}
@@ -248,11 +248,9 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool RecordingStatus(const t_channel_id channel_id = 0);
 		bool TimeshiftStatus(const t_channel_id channel_id = 0);
 		bool InstanceStatus(const t_channel_id channel_id = 0);
-		bool TimeshiftOnly();
 		CFrontend * GetRecordFrontend(const t_channel_id channel_id);
 		bool KeepTimeshift(const t_channel_id channel_id, bool from_start);
 		void RemoveTimeshiftTimers(CTimerd::TimerList &list);
-		bool Timeshift() { return (autoshift || shift_timer); };
 		bool SameTransponder(const t_channel_id channel_id);
 		int  handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data);
 		int GetRecordCount();
