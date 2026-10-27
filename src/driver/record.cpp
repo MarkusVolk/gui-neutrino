@@ -1186,6 +1186,7 @@ CRecordManager::CRecordManager()
 	StreamSubtitlePids = false;
 	StopSectionsd = false;
 	sectionsdPaused = false;
+	scriptStarted = false;
 	//recordingstatus = 0;
 	recmap.clear();
 	nextmap.clear();
@@ -1404,12 +1405,10 @@ bool CRecordManager::Record(const CTimerd::RecordingInfo * const eventinfo, cons
 	if (g_settings.recording_type == CNeutrinoApp::RECORDING_OFF /* || IS_WEBCHAN(eventinfo->channel_id) */)
 		return false;
 
-#if 1 // FIXME test
-	StopSectionsd = false;
-	if( !recmap.empty() )
-		StopSectionsd = true;
-#endif
-	RunStartScript();
+	/* a recording beside another recording pauses the guide's scan */
+	StopSectionsd = !timeshift && RecordingStatus();
+	if (!timeshift)
+		RunStartScript();
 
 	std::string newdir;
 	if(dir && strlen(dir))
@@ -1522,8 +1521,13 @@ bool CRecordManager::StopAutoRecord(bool lock)
 		}
 	}
 
-	if (lock)
+	if (lock) {
 		mutex.unlock();
+		/* the record mode of zapit ends with the last instance; in the
+		   record path (lock false) a recording takes the tuner over */
+		if (inst)
+			StopPostProcess();
+	}
 
 	return (inst != NULL);
 }
@@ -2061,11 +2065,13 @@ bool CRecordManager::AskToStop(const t_channel_id channel_id, const int recid)
 	return false;
 }
 
+/* the scripts run for recordings, not for the timeshift: the start script
+ * before the first one, the stop script after the last one */
 bool CRecordManager::RunStartScript(void)
 {
-	//FIXME only if no recordings yet or always ?
-	if(RecordingStatus())
+	if(scriptStarted || RecordingStatus())
 		return false;
+	scriptStarted = true;
 
 #if 0
 	printf("CRecordManager::%s: wakeup hdd...\n", __func__);
@@ -2076,9 +2082,9 @@ bool CRecordManager::RunStartScript(void)
 
 bool CRecordManager::RunStopScript(void)
 {
-	//FIXME only if no recordings left or always ?
-	if(RecordingStatus())
+	if(!scriptStarted || RecordingStatus())
 		return false;
+	scriptStarted = false;
 
 	return exec_controlscript(NEUTRINO_RECORDING_ENDED_SCRIPT);
 }
@@ -2206,11 +2212,9 @@ bool CRecordManager::CutBackNeutrino(const t_channel_id channel_id, CFrontend * 
 void CRecordManager::RestoreNeutrino(void)
 {
 	/* The guide's scan paused for a recording beside another one goes on
-	   once only the timeshift is left: it runs all the time, and waiting
-	   for no recording at all kept the scan paused until the next start.
-	   StopSectionsd tells of the last recording started only. */
-	bool only_timeshift = recmap.empty() || (recmap.size() == 1 && autoshift);
-	if (sectionsdPaused && only_timeshift && CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_standby) {
+	   once no recording is left, a timeshift may run on. StopSectionsd
+	   tells of the last recording started only. */
+	if (sectionsdPaused && !RecordingStatus() && CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_standby) {
 		g_Sectionsd->setPauseScanning(false);
 		sectionsdPaused = false;
 	}
