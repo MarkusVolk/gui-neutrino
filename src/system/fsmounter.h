@@ -100,6 +100,8 @@ class CFSMounter
 						  std::string options1, std::string options2, std::string *error = NULL);
 		static bool automount();
 		static CFSMounter::UMountRes umount(const char *const dir = NULL);
+		/* every share Neutrino mounted from its entries, before the network goes */
+		static void umountOwn();
 		static void getMountedFS(MountInfos &fs);
 		/* every mount except tmpfs, which never carries a share; use this when
 		   the question is "is anything on that directory", not "is it ours" */

@@ -5330,6 +5330,8 @@ void CNeutrinoApp::ExitRun(int exit_code, bool ask)
 	g_settings.shutdown_timer_record_type = timer_is_rec;
 	saveSetup(NEUTRINO_SETTINGS_FILE);
 
+	CFSMounter::umountOwn();
+
 	exec_controlscript(NEUTRINO_ENTER_DEEPSTANDBY_SCRIPT);
 
 	printf("entering off state\n");

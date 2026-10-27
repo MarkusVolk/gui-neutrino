@@ -717,6 +717,28 @@ CFSMounter::UMountRes CFSMounter::umount(const char *const dir)
 	return res;
 }
 
+/* The shares Neutrino mounted have no line in /etc/fstab, and the system's
+   shutdown unmounts only the network filesystems listed there before it stops
+   the network; a share left mounted then holds the reboot until its server
+   times out. A share still in use is detached and goes once it is free. */
+void CFSMounter::umountOwn()
+{
+	MountInfos mounts;
+	getMountedFS(mounts);
+	for (MountInfos::const_iterator it = mounts.begin(); it != mounts.end(); ++it)
+	{
+		if (getMountEntry(*it) == MOUNT_ENTRY_NONE)
+			continue;
+		if (umount2(it->mountPoint.c_str(), 0) != 0 && umount2(it->mountPoint.c_str(), MNT_DETACH) != 0)
+		{
+			printf("[CFSMounter] Error umounting %s: %s\n", it->mountPoint.c_str(), strerror(errno));
+			continue;
+		}
+		printf("[CFSMounter] umounted %s\n", it->mountPoint.c_str());
+		g_mount_generation++;
+	}
+}
+
 /* /proc/mounts names the filesystem type the kernel actually used, and nfs4 and
    smb3 are types of their own, not aliases of nfs and cifs. Both are the common
    case on current kernels, so a filter that only knows the old names hides them
