@@ -4137,9 +4137,7 @@ _repeat:
 
 void CNeutrinoApp::zapTo(t_channel_id channel_id)
 {
-	bool recordingStatus = CRecordManager::getInstance()->RecordingStatus(channel_id);
-	if (!recordingStatus || (recordingStatus && CRecordManager::getInstance()->TimeshiftOnly()) ||
-			(recordingStatus && channelList && channelList->SameTP(channel_id))) {
+	if (!CRecordManager::getInstance()->RecordingStatus() || (channelList && channelList->SameTP(channel_id))) {
 
 		dvbsub_stop();
 		g_Zapit->zapTo_serviceID_NOWAIT(channel_id);
@@ -4704,7 +4702,7 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		CEpgScan::getInstance()->Next();
 		standbyToStandby();
 		autoshift = CRecordManager::getInstance()->TimeshiftOnly();
-		CVFD::getInstance()->ShowIcon(FP_ICON_CAM1, CRecordManager::getInstance()->RecordingRunning());
+		CVFD::getInstance()->ShowIcon(FP_ICON_CAM1, CRecordManager::getInstance()->RecordingStatus());
 
 		if( ( !g_InfoViewer->is_visible ) && data && !autoshift)
 			g_RCInput->postMsg( NeutrinoMessages::SHOW_INFOBAR, 0 );
@@ -4788,7 +4786,7 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		if (g_Radiotext)
 			g_Radiotext->setPid(0);
 
-		if (!CRecordManager::getInstance()->GetRecordCount()) {
+		if (!CRecordManager::getInstance()->RecordingStatus()) {
 			CVFD::getInstance()->ShowIcon(FP_ICON_CAM1, false);
 		}
 		return messages_return::handled;
@@ -4809,8 +4807,7 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 	else if( msg == NeutrinoMessages::ZAPTO) {
 		CTimerd::EventInfo * eventinfo = (CTimerd::EventInfo *) data;
 		if (eventinfo->channel_id != CZapit::getInstance()->GetCurrentChannelID()){
-			if( (recordingstatus == 0) || (recordingstatus && CRecordManager::getInstance()->TimeshiftOnly()) ||
-					(recordingstatus && channelList && channelList->SameTP(eventinfo->channel_id)) ) {
+			if (!CRecordManager::getInstance()->RecordingStatus() || (channelList && channelList->SameTP(eventinfo->channel_id))) {
 				bool isTVMode = CServiceManager::getInstance()->IsChannelTVChannel(eventinfo->channel_id);
 
 				dvbsub_stop();
@@ -6079,7 +6076,7 @@ int CNeutrinoApp::exec(CMenuTarget* parent, const std::string & actionKey)
 		//cleanup progress bar cache
 		CProgressBarCache::pbcClear();
 
-		if (CRecordManager::getInstance()->RecordingRunning())
+		if (CRecordManager::getInstance()->RecordingStatus())
 			DisplayErrorMessage(g_Locale->getText(LOCALE_SERVICEMENU_RESTART_REFUSED_RECORDING));
 		else {
 			CRecordManager::getInstance()->StopAutoRecord();

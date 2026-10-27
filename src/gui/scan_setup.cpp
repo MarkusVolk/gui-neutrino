@@ -579,7 +579,7 @@ int CScanSetup::showScanMenu()
 	CMenuForwarder  * mf;
 	CMenuOptionChooser * mc;
 
-	allow_start = !CRecordManager::getInstance()->RecordingStatus() || CRecordManager::getInstance()->TimeshiftOnly();
+	allow_start = !CRecordManager::getInstance()->RecordingStatus();
 
 	//main
 	CMenuWidget * settings = new CMenuWidget(/*is_wizard ? LOCALE_SERVICEMENU_SCANTS :*/ LOCALE_SERVICEMENU_HEAD, NEUTRINO_ICON_SETTINGS, width, MN_WIDGET_ID_SCAN_MAIN);
@@ -795,7 +795,7 @@ int CScanSetup::showScanMenuFrontendSetup()
 	bool have_busy_frontends = false;
 
 	fe_restart = false;
-	allow_start = !CRecordManager::getInstance()->RecordingStatus() || CRecordManager::getInstance()->TimeshiftOnly();
+	allow_start = !CRecordManager::getInstance()->RecordingStatus();
 
 	CZapit::getInstance()->GetConfig(zapitCfg);
 	CMenuWidget * setupMenu = new CMenuWidget(LOCALE_SATSETUP_FE_SETUP, NEUTRINO_ICON_SETTINGS, width, MN_WIDGET_ID_SCAN_FE_SETUP);

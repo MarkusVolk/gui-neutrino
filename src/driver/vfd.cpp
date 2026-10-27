@@ -380,7 +380,7 @@ void CVFD::showTime(bool force)
 		}
 	}
 
-	int tmp_recstatus = CRecordManager::getInstance()->RecordingRunning();
+	int tmp_recstatus = CRecordManager::getInstance()->RecordingStatus();
 	if (tmp_recstatus) {
 		if(clearClock) {
 			clearClock = 0;

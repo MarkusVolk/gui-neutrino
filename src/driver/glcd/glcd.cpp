@@ -306,7 +306,7 @@ void cGLCD::Exec()
 	}
 
 	/* a timeshift is not shown as a recording */
-	recLocked = CRecordManager::getInstance()->RecordingRunning();
+	recLocked = CRecordManager::getInstance()->RecordingStatus();
 	tsLocked = false;
 
 	int icon_start_width = 0, icon_start_height = 0;

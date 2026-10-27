@@ -123,7 +123,7 @@ void SHTDCNT::shutdown_counter()
 		if(sleep_cnt > 0) {
 			sleeptimer_active = true;
 			sleep_cnt--;
-		} else if(sleeptimer_active && !CRecordManager::getInstance()->RecordingRunning()) {
+		} else if(sleeptimer_active && !CRecordManager::getInstance()->RecordingStatus()) {
 			sleeptimer_active = false;
 
 			exec_controlscript(NEUTRINO_ENTER_INACTIVITY_SCRIPT);

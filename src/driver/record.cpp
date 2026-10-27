@@ -1329,8 +1329,7 @@ int CRecordManager::GetRecordMode(const t_channel_id channel_id)
 	int recmode = RECMODE_OFF;
 	mutex.lock();
 	if (channel_id == 0) {
-		/* we can have only one timeshift instance, if there are more - some is record */
-		if ((!autoshift && !recmap.empty()) || recmap.size() > 1)
+		if (RecordingRunningLocked())
 			recmode |= RECMODE_REC;
 		if (autoshift)
 			recmode |= RECMODE_TSHIFT;
@@ -1556,19 +1555,12 @@ void CRecordManager::StartNextRecording()
 	}
 }
 
-/* return true, if there are any recording running for this channel id, or global if id is 0 */
+/* a recording running for this channel id, or global if the id is 0;
+ * the timeshift is no recording */
 bool CRecordManager::RecordingStatus(const t_channel_id channel_id)
 {
-	bool ret = false;
-
 	mutex.lock();
-
-	if(channel_id) {
-		CRecordInstance * inst = FindInstance(channel_id);
-		ret = (inst != NULL);
-	} else
-		ret = !recmap.empty();
-
+	bool ret = channel_id ? FindRecording(channel_id) != NULL : RecordingRunningLocked();
 	mutex.unlock();
 	return ret;
 }
@@ -1601,19 +1593,16 @@ bool CRecordManager::TimeshiftOnly()
 	return (autoshift && (count == 1));
 }
 
-/* FIXME no check for multi-tuner */
+/* the channel is on the transponder of every recording; a timeshift gives
+ * its tuner up. FIXME no check for multi-tuner */
 bool CRecordManager::SameTransponder(const t_channel_id channel_id)
 {
 	bool same = true;
 	mutex.lock();
-	int count = recmap.size();
-	if(count) {
-		if(autoshift && count == 1)
-			same = true;
-		else {
-			recmap_iterator_t fit = recmap.begin();
-			t_channel_id id = fit->second->GetChannelId();
-			same = (SAME_TRANSPONDER(channel_id, id));
+	for (recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++) {
+		if (!it->second->Timeshift() && !SAME_TRANSPONDER(channel_id, it->second->GetChannelId())) {
+			same = false;
+			break;
 		}
 	}
 	mutex.unlock();
@@ -1633,18 +1622,28 @@ void CRecordManager::StopInstance(CRecordInstance * inst, bool remove_event)
 	ShowRecordIcon();
 }
 
-/* a recording other than the timeshift; the caller holds mutex */
-bool CRecordManager::RecordingRunningLocked()
+/* the number of recordings, the timeshift left out; the caller holds mutex */
+int CRecordManager::RecordCountLocked()
 {
-	return (!autoshift && !recmap.empty()) || recmap.size() > 1;
+	int count = 0;
+	for (recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++) {
+		if (!it->second->Timeshift())
+			count++;
+	}
+	return count;
 }
 
-bool CRecordManager::RecordingRunning()
+bool CRecordManager::RecordingRunningLocked()
+{
+	return RecordCountLocked() > 0;
+}
+
+int CRecordManager::GetRecordCount()
 {
 	mutex.lock();
-	bool running = RecordingRunningLocked();
+	int count = RecordCountLocked();
 	mutex.unlock();
-	return running;
+	return count;
 }
 
 /* the record symbol of the front display is for recordings, not for a timeshift */
@@ -1913,7 +1912,7 @@ int CRecordManager::exec(CMenuTarget* parent, const std::string & actionKey )
 		return menu_return::RETURN_EXIT_ALL;
 	} else if(actionKey == "Stop_record")
 	{
-		if(!RecordingRunning()) {
+		if(!RecordingStatus()) {
 			ShowHint(LOCALE_MAINMENU_RECORDING_STOP, g_Locale->getText(LOCALE_RECORDINGMENU_RECORD_IS_NOT_RUNNING), 450, 2);
 			return menu_return::RETURN_EXIT_ALL;
 		}
@@ -2242,6 +2241,8 @@ CRecordInstance* CRecordManager::getUseCI()
 	mutex.lock();
 	for(recmap_iterator_t it = recmap.begin(); it != recmap.end(); it++) {
 		CRecordInstance * inst = it->second;
+		if (inst->Timeshift())
+			continue;
 		CZapitChannel * channel = CServiceManager::getInstance()->FindChannel(inst->GetChannelId());
 		if (channel && channel->bUseCI) {
 			mutex.unlock();

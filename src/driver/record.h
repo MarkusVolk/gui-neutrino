@@ -193,6 +193,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		void StopPostProcess();
 		void StopInstance(CRecordInstance * inst, bool remove_event = true);
 		bool RecordingRunningLocked();
+		int RecordCountLocked();
 		void ShowRecordIcon();
 		CRecordInstance * FindInstance(t_channel_id);
 		CRecordInstance * FindRecording(t_channel_id);
@@ -247,13 +248,11 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool TimeshiftStatus(const t_channel_id channel_id = 0);
 		bool InstanceStatus(const t_channel_id channel_id = 0);
 		bool TimeshiftOnly();
-		bool RecordingRunning();
 		void RemoveTimeshiftTimers(CTimerd::TimerList &list);
 		bool Timeshift() { return (autoshift || shift_timer); };
 		bool SameTransponder(const t_channel_id channel_id);
 		int  handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data);
-		// mimic old behavior for start/stop menu option chooser, still actual ?
-		int GetRecordCount() { return recmap.size(); };
+		int GetRecordCount();
 		void StartTimeshift();
 		bool PrepareTimeshift();
 		int GetRecordMode(const t_channel_id channel_id=0);

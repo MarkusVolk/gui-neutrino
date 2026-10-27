@@ -2339,9 +2339,9 @@ bool free_for_umount(Call &c, const std::string &dir)
 {
 	CRecordManager *rm = CRecordManager::getInstance();
 	bool here = below(g_settings.network_nfs_recordingdir, dir) || below(g_settings.timeshiftdir, dir);
-	if (!here || !rm->RecordingStatus())
+	if (!here || !rm->InstanceStatus())
 		return true;
-	if (!rm->TimeshiftOnly()) {
+	if (rm->RecordingStatus()) {
 		problem(c.out, 409, "busy", "a recording writes to " + dir);
 		return false;
 	}
@@ -2805,7 +2805,7 @@ void ep_record_dir(Call &c)
 		problem(c.out, 400, "bad-string", "path is not on a mounted, writable drive or share");
 		return;
 	}
-	if (CRecordManager::getInstance()->RecordingStatus() && !CRecordManager::getInstance()->TimeshiftOnly()) {
+	if (CRecordManager::getInstance()->RecordingStatus()) {
 		problem(c.out, 409, "busy", "a recording is running");
 		return;
 	}

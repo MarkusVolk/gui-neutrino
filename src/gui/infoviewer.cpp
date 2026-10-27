@@ -320,7 +320,7 @@ void CInfoViewer::initClock()
 void CInfoViewer::showRecordIcon (const bool show)
 {
 	CRecordManager *crm = CRecordManager::getInstance();
-	recordModeActive = crm->RecordingRunning();
+	recordModeActive = crm->RecordingStatus();
 
 	if (!recordModeActive)
 	{
@@ -1182,7 +1182,7 @@ void CInfoViewer::loop(bool show_dot)
 				infoViewerBB->showIcon_Resolution();
 			}
 		} else if ((msg == NeutrinoMessages::EVT_RECORDMODE) && 
-			   (CMoviePlayerGui::getInstance().timeshift) && (CRecordManager::getInstance()->GetRecordCount() == 1)) {
+			   (CMoviePlayerGui::getInstance().timeshift) && CRecordManager::getInstance()->TimeshiftOnly()) {
 			res = CNeutrinoApp::getInstance()->handleMsg(msg, data);
 		} else if (!fileplay && !CMoviePlayerGui::getInstance().timeshift) {
 			CNeutrinoApp *neutrino = CNeutrinoApp::getInstance ();

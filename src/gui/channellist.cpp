@@ -744,7 +744,7 @@ int CChannelList::show()
 			}
 		}
 		else if(!edit_state && !empty && msg == CRCInput::RC_stop ) { //stop recording
-			if(CRecordManager::getInstance()->RecordingStatus((*chanlist)[selected]->getChannelID())){
+			if(CRecordManager::getInstance()->InstanceStatus((*chanlist)[selected]->getChannelID())){
 				int recmode = CRecordManager::getInstance()->GetRecordMode((*chanlist)[selected]->getChannelID());
 				bool timeshift = recmode & CRecordManager::RECMODE_TSHIFT;
 				bool tsplay = CMoviePlayerGui::getInstance().timeshift;
@@ -1919,8 +1919,7 @@ void CChannelList::paintButtonBar(bool is_current)
 
 	struct button_label Button[NUM_LIST_BUTTONS_SORT];
 	/* the record key keeps a timeshift as recording, it does not stop it */
-	bool do_record = CRecordManager::getInstance()->RecordingStatus(getActiveChannel_ChannelID()) &&
-			 !CRecordManager::getInstance()->TimeshiftOnly();
+	bool do_record = CRecordManager::getInstance()->RecordingStatus(getActiveChannel_ChannelID());
 
 	int bcnt = 0;
 	for (int i = 0; i < NUM_LIST_BUTTONS_SORT; i++) {
@@ -2566,10 +2565,6 @@ bool CChannelList::SameTP(CZapitChannel * channel)
 			channel = (*chanlist)[selected];
 
 		if (IS_WEBCHAN(channel->getChannelID()))
-			return true;
-
-		/* a zap ends a timeshift, and it starts again on the new channel */
-		if (CRecordManager::getInstance()->TimeshiftOnly())
 			return true;
 
 		// Usable CI channel while recording

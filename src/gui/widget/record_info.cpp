@@ -78,10 +78,10 @@ void CRecInfo::init()
 	std::string s_records = "0x";
 
 	CRecordManager *crm = CRecordManager::getInstance();
-	bool recordModeActive = crm->RecordingStatus();
+	bool recordModeActive = crm->InstanceStatus();
 	if (recordModeActive)
 	{
-		// get current record count
+		// get current record count, the timeshift left out
 		int records = crm->GetRecordCount();
 
 		// get global record mode
@@ -110,9 +110,6 @@ void CRecInfo::init()
 			else
 				ts_icon = NEUTRINO_ICON_AUTO_SHIFT_GRAY;
 		}
-
-		if (rec_mode == CRecordManager::RECMODE_REC_TSHIFT)
-			records--; // subtract ts
 
 		s_records = to_string(records) + "x";
 	}

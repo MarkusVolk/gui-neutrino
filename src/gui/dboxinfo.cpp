@@ -775,7 +775,7 @@ void CDBoxInfoWidget::paint()
 					}
 					fm->RenderString(x + mpOffset + space, ypos+ mheight, _w, tmp, COL_MENUCONTENT_TEXT);
 					if ((*it).second && icon_w>0 && icon_h>0)
-						frameBuffer->paintIcon(crm->RecordingRunning() ? NEUTRINO_ICON_MARKER_RECORD : NEUTRINO_ICON_MARKER_RECORD_GRAY, x + nameWidth - icon_w + width_i/2, ypos + (mheight/2 - icon_h/2));
+						frameBuffer->paintIcon(crm->RecordingStatus() ? NEUTRINO_ICON_MARKER_RECORD : NEUTRINO_ICON_MARKER_RECORD_GRAY, x + nameWidth - icon_w + width_i/2, ypos + (mheight/2 - icon_h/2));
 				}
 				if (pbw-pbw_fix > 8) /* smaller progressbar is not useful ;) */
 				{

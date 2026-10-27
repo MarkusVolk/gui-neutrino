@@ -418,7 +418,7 @@ void CControlAPI::SetModeCGI(CyhookHandler *hh)
 	{
 		if (hh->ParamList["1"] == "status")	// display recoding status
 		{
-			if (CRecordManager::getInstance()->RecordingRunning())
+			if (CRecordManager::getInstance()->RecordingStatus())
 				hh->WriteLn("on");
 			else
 				hh->WriteLn("off");

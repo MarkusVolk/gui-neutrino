@@ -968,7 +968,7 @@ _show_menu:
 
 	for (std::map<std::string, std::string>::iterator it = devtitle.begin(); it != devtitle.end(); ++it) {
 		std::string dev = it->first.substr(0, 2);
-		bool enabled = !CRecordManager::getInstance()->RecordingRunning() && dev != "sr";
+		bool enabled = !CRecordManager::getInstance()->RecordingStatus() && dev != "sr";
 		std::string key = "d" + it->first;
 		mf = new CMenuForwarder(it->first, enabled, it->second, this, key.c_str());
 		mf->setHint("", LOCALE_MENU_HINT_HDD_TOOLS);
@@ -999,10 +999,10 @@ _show_menu:
 			if (it->mounted) {
 				std::string dst = MOUNT_BASE + it->devname;
 				if (!stat(dst.c_str(), &stat_buf) && rec_st.st_dev == stat_buf.st_dev)
-					rec_icon = CRecordManager::getInstance()->RecordingRunning() ? NEUTRINO_ICON_MARKER_RECORD : NEUTRINO_ICON_MARKER_RECORD_GRAY;
+					rec_icon = CRecordManager::getInstance()->RecordingStatus() ? NEUTRINO_ICON_MARKER_RECORD : NEUTRINO_ICON_MARKER_RECORD_GRAY;
 			}
 			std::string key = "m" + it->devname;
-			bool enabled = !rec_icon || !CRecordManager::getInstance()->RecordingRunning();
+			bool enabled = !rec_icon || !CRecordManager::getInstance()->RecordingStatus();
 			/* do not allow to unmount the rootfs, and skip filesystems without kernel support */
 			memset(&dev_st, 0, sizeof(dev_st));
 			if (stat(("/dev/" + it->devname).c_str(), &dev_st) != -1

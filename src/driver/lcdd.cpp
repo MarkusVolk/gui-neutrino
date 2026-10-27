@@ -556,7 +556,7 @@ void CLCD::showTime()
 		}
 		else
 		{
-			if (CRecordManager::getInstance()->RecordingRunning() && clearClock == 1)
+			if (CRecordManager::getInstance()->RecordingStatus() && clearClock == 1)
 			{
 				if (!invert)
 					strftime((char *) &timestr, 20, "%H:%M", t);
