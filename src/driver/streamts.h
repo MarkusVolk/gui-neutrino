@@ -54,6 +54,7 @@ class CStreamInstance : public OpenThreads::Thread
 		t_channel_id channel_id;
 		stream_pids_t pids;
 		stream_fds_t fds;
+		std::map<int, size_t> lost;
 #if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(61, 1, 100)
 		virtual bool Send(ssize_t r, const unsigned char * _buf = NULL);
 #else

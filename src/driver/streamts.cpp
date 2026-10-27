@@ -74,6 +74,7 @@
 #define TS_SIZE 188
 #define DMX_BUFFER_SIZE (2048*TS_SIZE)
 #define IN_SIZE (250*TS_SIZE)
+#define STREAM_SNDBUF (2*1024*1024)
 
 CStreamInstance::CStreamInstance(int clientfd, t_channel_id chid, stream_pids_t &_pids)
 {
@@ -162,8 +163,20 @@ bool CStreamInstance::Send(ssize_t r, unsigned char *_buf)
 			}
 		} while ((count > 0) && (i-- > 0));
 
-		if (count)
-			printf("CStreamInstance::%s: send error, fd %d: (%zd from %zd)\n", __FUNCTION__, *it, r - count, r);
+		/* One line when a client starts losing data and one when it takes
+		 * data again, not one per buffer. */
+		OpenThreads::ScopedLock<OpenThreads::Mutex> m_lock(mutex);
+		std::map<int, size_t>::iterator lit = lost.find(*it);
+		if (count) {
+			if (lit == lost.end()) {
+				printf("CStreamInstance::%s: fd %d does not keep up, dropping data\n", __FUNCTION__, *it);
+				lost[*it] = count;
+			} else
+				lit->second += count;
+		} else if (lit != lost.end()) {
+			printf("CStreamInstance::%s: fd %d keeps up again, %zu bytes lost\n", __FUNCTION__, *it, lit->second);
+			lost.erase(lit);
+		}
 	}
 
 	return true;
@@ -191,6 +204,7 @@ void CStreamInstance::AddClient(int clientfd)
 void CStreamInstance::RemoveClient(int clientfd)
 {
 	OpenThreads::ScopedLock<OpenThreads::Mutex> m_lock(mutex);
+	lost.erase(clientfd);
 	if (fds.erase(clientfd) > 0)
 		close(clientfd);
 	printf("CStreamInstance::RemoveClient: %d (count %d)\n", clientfd, (int)fds.size());
@@ -629,6 +643,20 @@ void CStreamManager::PreparePids(CZapitChannel *channel, stream_pids_t &pids, bo
 
 }
 
+/* Sends never block the demux reader, so the socket buffer is all a
+ * client has to ride out a stall, a WLAN client especially. SO_SNDBUF is
+ * capped by net.core.wmem_max (160 KB on the boxes, a quarter of a second
+ * of HD); SO_SNDBUFFORCE passes the cap when running as root. */
+static void SetSendBuffer(int fd)
+{
+	int size = STREAM_SNDBUF;
+#ifdef SO_SNDBUFFORCE
+	if (setsockopt(fd, SOL_SOCKET, SO_SNDBUFFORCE, &size, sizeof(size)) == 0)
+		return;
+#endif
+	setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));
+}
+
 bool CStreamManager::AddClient(int connfd)
 {
 	stream_pids_t pids;
@@ -653,6 +681,8 @@ bool CStreamManager::AddClient(int connfd)
 	if (!parsed)
 		return false;
 
+	SetSendBuffer(connfd);
+
 	streammap_iterator_t it = streams.find(channel_id);
 	if (it != streams.end()) {
 		it->second->AddClient(connfd);
@@ -666,9 +696,6 @@ bool CStreamManager::AddClient(int connfd)
 			stream->is_e2_stream = is_e2;
 		}
 
-		int sendsize = 10*IN_SIZE;
-		unsigned int m = sizeof(sendsize);
-		setsockopt(connfd, SOL_SOCKET, SO_SNDBUF, (void *)&sendsize, m);
 		if (stream->Open() && stream->Start())
 			streams.insert(streammap_pair_t(channel_id, stream));
 		else
