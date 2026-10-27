@@ -4723,10 +4723,11 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		t_channel_id live_channel_id = CZapit::getInstance()->GetCurrentChannelID();
 		/* special case for nhttpd: start direct record, if no eventID */
 		if (eventinfo->eventID == 0) {
-			int rec_mode = CRecordManager::getInstance()->GetRecordMode(live_channel_id);
-			/* start only if not recorded yet */
-			if (rec_mode == CRecordManager::RECMODE_OFF || rec_mode == CRecordManager::RECMODE_TSHIFT)
-				CRecordManager::getInstance()->Record(live_channel_id);
+			CRecordManager *crm = CRecordManager::getInstance();
+			/* start only if not recorded yet; a timeshift becomes the
+			   recording from now on */
+			if (!crm->RecordingStatus(live_channel_id) && !crm->KeepTimeshift(live_channel_id, false))
+				crm->Record(live_channel_id);
 			delete[] (unsigned char*) data;
 			return messages_return::handled;
 		}

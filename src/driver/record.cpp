@@ -941,13 +941,17 @@ time_t CRecordInstance::RecordingEnd(time_t now)
  * buffered: the file gets a second name in the recording directory and is
  * written on as a recording. The timeshift name stays while the timeshift may
  * still be played and goes when the recording stops. */
-bool CRecordInstance::KeepTimeshift()
+bool CRecordInstance::KeepTimeshift(bool from_start)
 {
 	if (!autoshift)
 		return false;
 	CZapitChannel * channel = CServiceManager::getInstance()->FindChannel(channel_id);
 	if (channel == NULL)
 		return false;
+
+	/* a recording from now on keeps the buffered part before it too and
+	   starts playing at the mark */
+	recMovieInfo->bookmarks.start = from_start ? 0 : (int) (time(NULL) - start_time);
 
 	std::string tsname = filename;
 	std::string tsdir = Directory;
@@ -990,6 +994,7 @@ bool CRecordInstance::KeepTimeshift()
 	}
 	if (!linked) {
 		perror("[record] keep timeshift");
+		recMovieInfo->bookmarks.start = 0;
 		autoshift = true;
 		Directory = tsdir;
 		strcpy(filename, tsname.c_str());
@@ -1599,6 +1604,23 @@ CFrontend * CRecordManager::GetRecordFrontend(const t_channel_id channel_id)
 	return fe;
 }
 
+/* the timeshift of the channel goes on as a recording, from its start or
+ * from now on with the start marked, and no recording starts beside it */
+bool CRecordManager::KeepTimeshift(const t_channel_id channel_id, bool from_start)
+{
+	mutex.lock();
+	CRecordInstance * inst = FindTimeshift();
+	bool kept = inst && inst->GetChannelId() == channel_id && inst->KeepTimeshift(from_start);
+	if (kept) {
+		autoshift = false;
+		ShowRecordIcon();
+	}
+	mutex.unlock();
+	if (kept)
+		RunStartScript();
+	return kept;
+}
+
 bool CRecordManager::TimeshiftOnly()
 {
 	mutex.lock();
@@ -1894,24 +1916,22 @@ int CRecordManager::exec(CMenuTarget* parent, const std::string & actionKey )
 		t_channel_id live_channel_id = CZapit::getInstance()->GetCurrentChannelID();
 
 		bool tostart = true;
-		CRecordInstance * inst = FindInstance(live_channel_id);
-		if (inst && inst->Timeshift()) {
-			/* from the start keeps what the timeshift has buffered */
+		if (TimeshiftStatus(live_channel_id)) {
+			/* the timeshift becomes the recording; from the start keeps
+			   what it has buffered as the recording's beginning */
 			int res = ShowMsg(LOCALE_MAINMENU_RECORDING, g_Locale->getText(LOCALE_RECORDING_TIMESHIFT_FROM_START),
 					  CMsgBox::mbrYes, CMsgBox::mbYes | CMsgBox::mbNo | CMsgBox::mbCancel, NULL, 450);
 			if (res == CMsgBox::mbrCancel)
 				return menu_return::RETURN_EXIT_ALL;
-			if (res == CMsgBox::mbrYes && inst->KeepTimeshift()) {
-				mutex.lock();
-				autoshift = false;
-				ShowRecordIcon();
-				mutex.unlock();
+			if (KeepTimeshift(live_channel_id, res == CMsgBox::mbrYes)) {
 				if (CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_ts && !g_InfoViewer->is_visible)
 					CNeutrinoApp::getInstance()->showInfo();
 				return menu_return::RETURN_EXIT_ALL;
 			}
-			inst = NULL;
 		}
+		mutex.lock();
+		CRecordInstance * inst = FindRecording(live_channel_id);
+		mutex.unlock();
 		if (inst) {
 			std::string title, duration;
 			inst->GetRecordString(title, duration);
@@ -2086,7 +2106,7 @@ bool CRecordManager::AskToStop(const t_channel_id channel_id, const int recid)
  * before the first one, the stop script after the last one */
 bool CRecordManager::RunStartScript(void)
 {
-	if(scriptStarted || RecordingStatus())
+	if(scriptStarted)
 		return false;
 	scriptStarted = true;
 

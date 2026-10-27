@@ -137,7 +137,7 @@ class CRecordInstance
 		virtual record_error_msg_t Record();
 		virtual bool Stop(bool remove_event = true);
 		bool Update();
-		bool KeepTimeshift();
+		bool KeepTimeshift(bool from_start);
 
 		void SetRecordingId(int id) { recording_id = id; };
 		int GetRecordingId(void) { return recording_id; };
@@ -250,6 +250,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool InstanceStatus(const t_channel_id channel_id = 0);
 		bool TimeshiftOnly();
 		CFrontend * GetRecordFrontend(const t_channel_id channel_id);
+		bool KeepTimeshift(const t_channel_id channel_id, bool from_start);
 		void RemoveTimeshiftTimers(CTimerd::TimerList &list);
 		bool Timeshift() { return (autoshift || shift_timer); };
 		bool SameTransponder(const t_channel_id channel_id);
