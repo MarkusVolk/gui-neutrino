@@ -70,6 +70,7 @@ void CLuaInstVideo::LuaVideoRegister(lua_State *L)
 		{ "createChannelIDfromUrl", CLuaInstVideo::createChannelIDfromUrl },
 		{ "getNeutrinoMode",        CLuaInstVideo::getNeutrinoMode },
 		{ "setSinglePlay",          CLuaInstVideo::setSinglePlay },
+		{ "setSkipRanges",          CLuaInstVideo::setSkipRanges },
 		{ "__gc",                   CLuaInstVideo::VideoDelete },
 #ifdef SCREENSHOT
 		{ "Screenshot",				CLuaInstVideo::Screenshot },
@@ -205,7 +206,12 @@ int CLuaInstVideo::PlayFile(lua_State *L)
 	if (D != NULL && !D->infoFunc.empty())
 		CMoviePlayerGui::getInstance().setLuaInfoFunc(L, true);
 	CMoviePlayerGui::getInstance().SetFile(st, sf, si1, si2,sf2);
+	if (D != NULL)
+		CMoviePlayerGui::getInstance().setSkipRanges(D->skipRanges);
 	CMoviePlayerGui::getInstance().exec(NULL, "http_lua");
+	CMoviePlayerGui::getInstance().setSkipRanges(std::vector<std::pair<int, int> >());
+	if (D != NULL)
+		D->skipRanges.clear();
 	CMoviePlayerGui::getInstance().setLuaInfoFunc(L, false);
 	if (D != NULL && !D->infoFunc.empty())
 		D->infoFunc = "";
@@ -332,6 +338,37 @@ int CLuaInstVideo::getNeutrinoMode(lua_State *L)
 	if (!D) return 0;
 	lua_pushinteger(L, (lua_Integer)CNeutrinoApp::getInstance()->getMode());
 	return 1;
+}
+
+/* v:setSkipRanges({ {start, end}, ... }) in seconds: the parts the next
+   PlayFile plays over, such as sponsor segments; they hold for that one */
+int CLuaInstVideo::setSkipRanges(lua_State *L)
+{
+	CLuaVideo *D = VideoCheckData(L, 1);
+	if (!D) return 0;
+	D->skipRanges.clear();
+	if (!lua_istable(L, 2))
+		return 0;
+	for (int i = 1; ; i++) {
+		lua_rawgeti(L, 2, i);
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			break;
+		}
+		if (lua_istable(L, -1)) {
+			lua_rawgeti(L, -1, 1);
+			lua_rawgeti(L, -2, 2);
+			if (lua_isnumber(L, -2) && lua_isnumber(L, -1)) {
+				int start = (int) (lua_tonumber(L, -2) * 1000);
+				int end = (int) (lua_tonumber(L, -1) * 1000);
+				if (end > start)
+					D->skipRanges.push_back(std::make_pair(start, end));
+			}
+			lua_pop(L, 2);
+		}
+		lua_pop(L, 1);
+	}
+	return 0;
 }
 
 int CLuaInstVideo::setSinglePlay(lua_State *L)

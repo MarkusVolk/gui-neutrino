@@ -1021,6 +1021,7 @@ void CMoviePlayerGui::Init(void)
 	isLuaPlay = false;
 	haveLuaInfoFunc = false;
 	blockedFromPlugin = false;
+	skip_last = -1;
 
 	CScreenSaver::getInstance()->resetIdleTime();
 }
@@ -3363,6 +3364,21 @@ void CMoviePlayerGui::PlayFileLoop(void)
 			bool posok = playback && playback->GetPosition(position, duration, isWebChannel);
 			mutex.unlock();
 			if (posok) {
+			/* a part a plugin named is played over when playing runs into it;
+			   a jump into its middle leaves it be */
+			for (size_t i = 0; i < skip_ranges.size(); i++) {
+				if (skip_last < skip_ranges[i].first && position >= skip_ranges[i].first && position < skip_ranges[i].second) {
+					printf("CMoviePlayerGui::%s: skipping %d..%d ms\n", __func__, skip_ranges[i].first, skip_ranges[i].second);
+					clearSubtitle();
+					mutex.lock();
+					if (playback)
+						playback->SetPosition(skip_ranges[i].second, true);
+					mutex.unlock();
+					position = skip_ranges[i].second;
+					break;
+				}
+			}
+			skip_last = position;
 			FileTimeOSD->update(position, duration);
 			if (duration > 100)
 				file_prozent = (unsigned char) (position / (duration / 100));

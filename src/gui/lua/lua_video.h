@@ -20,6 +20,10 @@
 #ifndef _LUAVIDEO_H
 #define _LUAVIDEO_H
 
+#include <string>
+#include <utility>
+#include <vector>
+
 #if LUA_COMPAT_5_2
 void lua_rawsetp (lua_State *L, int i, const void *p);
 #endif
@@ -29,6 +33,7 @@ class CLuaVideo
 	public:
 		bool singlePlay;
 		std::string infoFunc;
+		std::vector<std::pair<int, int> > skipRanges;
 		CLuaVideo() { singlePlay=false; infoFunc=""; };
 		~CLuaVideo() {};
 };
@@ -64,6 +69,7 @@ class CLuaInstVideo
 		static int createChannelIDfromUrl(lua_State *L);
 		static int getNeutrinoMode(lua_State *L);
 		static int setSinglePlay(lua_State *L);
+		static int setSkipRanges(lua_State *L);
 		static int VideoDelete(lua_State *L);
 #ifdef SCREENSHOT
 		static int Screenshot(lua_State *L);

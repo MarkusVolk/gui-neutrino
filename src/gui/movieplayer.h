@@ -199,6 +199,10 @@ class CMoviePlayerGui : public CMenuTarget
 	bool haveLuaInfoFunc;
 	lua_State* luaState;
 	bool blockedFromPlugin;
+	/* parts of the file to play over, start and end in ms, and the position
+	   the last look found, so that a part is skipped when playing runs into it */
+	std::vector<std::pair<int, int> > skip_ranges;
+	int skip_last;
 	int speed;
 	int startposition;
 	int position;
@@ -409,6 +413,7 @@ class CMoviePlayerGui : public CMenuTarget
 	void setFromInfoviewer(bool f) { fromInfoviewer = f; };
 	void setBlockedFromPlugin(bool b) { blockedFromPlugin = b; };
 	bool getBlockedFromPlugin() { return blockedFromPlugin; };
+	void setSkipRanges(const std::vector<std::pair<int, int> > &r) { skip_ranges = r; skip_last = -1; };
 	void setLuaInfoFunc(lua_State* L, bool func) { luaState = L; haveLuaInfoFunc = func; };
 	void getLivestreamInfo(std::string *i1, std::string *i2) { *i1=livestreamInfo1; *i2=livestreamInfo2; };
 	bool getLiveUrl(const std::string &url, const std::string &script, std::string &realUrl, std::string &_pretty_name, std::string &info1, std::string &info2, std::string &header, std::string &url2);
