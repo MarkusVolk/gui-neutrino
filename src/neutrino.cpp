@@ -4426,9 +4426,18 @@ int CNeutrinoApp::handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data)
 		}
 		if(data == scrambled_timer) {
 			scrambled_timer = 0;
-			if(g_settings.scrambled_message && videoDecoder->getBlank() && videoDecoder->getPlayState()) {
-				const char * text = g_Locale->getText(LOCALE_SCRAMBLED_CHANNEL);
-				ShowHint (LOCALE_MESSAGEBOX_INFO, text, g_Font[SNeutrinoSettings::FONT_TYPE_MENU]->getRenderWidth(text) + 10, 5);
+			/* getBlank() tells of a blanked output only on some boxes; a
+			   decoder without a picture gives no size */
+			int w = 0, h = 0, r = 0;
+			videoDecoder->getPictureInfo(w, h, r);
+			if ((videoDecoder->getBlank() || w <= 0 || h <= 0) && videoDecoder->getPlayState()) {
+				/* no picture: a timeshift would only keep what cannot be played */
+				if (mode == NeutrinoModes::mode_tv && !CMoviePlayerGui::getInstance().timeshift)
+					CRecordManager::getInstance()->StopAutoRecord();
+				if (g_settings.scrambled_message) {
+					const char * text = g_Locale->getText(LOCALE_SCRAMBLED_CHANNEL);
+					ShowHint (LOCALE_MESSAGEBOX_INFO, text, g_Font[SNeutrinoSettings::FONT_TYPE_MENU]->getRenderWidth(text) + 10, 5);
+				}
 			}
 			return messages_return::handled;
 		}
