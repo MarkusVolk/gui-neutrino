@@ -2001,6 +2001,10 @@ bool CMoviePlayerGui::StartWebtv(void)
 			clearWebtvFailureLocked();
 			printf("[webtv] restart counter reset after successful playback channel=%llx generation=%llu\n",
 				(unsigned long long)request_channel, (unsigned long long)request_generation);
+			/* the infobar was drawn at the zap, before the audio tracks were known */
+			unsigned char *chid = new unsigned char[sizeof(t_channel_id)];
+			*(t_channel_id *)chid = request_channel;
+			g_RCInput->postMsg(NeutrinoMessages::EVT_ZAP_GOTAPIDS, (neutrino_msg_data_t) chid, false);
 		}
 	}
 	mutex.unlock();
