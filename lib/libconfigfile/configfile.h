@@ -107,6 +107,8 @@ class CConfigFile
 
 		ConfigDataMap getConfigDataMap() { return configData; }
 		bool deleteKey(const std::string &key);
+		/* asks without storing the key, unlike the get functions */
+		bool hasKey(const std::string &key) const { return configData.find(key) != configData.end(); }
 };
 
 #endif /* __configfile_h__ */

@@ -33,7 +33,7 @@ option('public_httpddir', type : 'string', value : '', description : 'Public htt
 option('hosted_httpddir', type : 'string', value : '/mnt/hosted', description : 'Hosted httpd files')
 option('flagdir', type : 'string', value : '', description : 'Flag files, default localstatedir/etc')
 
-option('default-theme', type : 'string', value : '', description : 'Default theme of the GUI')
+option('default-theme', type : 'string', value : 'Tuxbox', description : 'Default theme of the GUI')
 option('default-oled-theme', type : 'string', value : '', description : 'Default OLED theme')
 option('weather-api-key', type : 'string', value : '', description : 'OpenWeather API key')
 option('weather-api-version', type : 'string', value : '', description : 'OpenWeather API version')

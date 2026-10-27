@@ -443,7 +443,10 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	parentallocked = !access(NEUTRINO_PARENTALLOCKED_FILE, R_OK);
 
 	// theme/color options
-	setSettingsText(g_settings.theme_name, configfile.getString("theme_name", !access(NEUTRINO_SETTINGS_FILE, F_OK) ? MIGRATE_THEME_NAME : ""));
+	/* Settings with colours of their own but no theme name come from before
+	   the themes and keep their colours as a migrated theme. Without colours,
+	   as in the start values an image brings, the default theme applies. */
+	setSettingsText(g_settings.theme_name, configfile.getString("theme_name", configfile.hasKey("menu_Head_red") ? MIGRATE_THEME_NAME : ""));
 	CThemes::getInstance()->getTheme(configfile);
 
 #ifdef ENABLE_GRAPHLCD

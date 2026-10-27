@@ -20,6 +20,7 @@ install_data(
 	'Olive-3.0.theme',
 	'Origin.theme',
 	'Red.theme',
+	'Tuxbox.theme',
 	'VirginMedia.theme',
 	install_dir : themesdir,
 )
