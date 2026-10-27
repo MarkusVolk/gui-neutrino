@@ -1526,7 +1526,7 @@ void CRecordManager::ArmTimeshift()
 
 /* the timeshift ends; the caller holds mutex. In the record path a
  * recording takes its tuner over, nothing else is to follow. */
-bool CRecordManager::StopTimeshiftLocked()
+bool CRecordManager::StopTimeshiftLocked(bool remove_event)
 {
 	g_RCInput->killTimer (shift_timer);
 
@@ -1535,7 +1535,7 @@ bool CRecordManager::StopTimeshiftLocked()
 		return false;
 
 	std::string file = inst->GetFileName();
-	StopInstance(inst);
+	StopInstance(inst, remove_event);
 	CMoviePlayerGui::getInstance().stopTimeshift();
 	/* the player deletes only a timeshift it played; one that was
 	 * recorded but never watched would stay until the next start */
@@ -1741,7 +1741,14 @@ bool CRecordManager::Stop(const CTimerd::RecordingStopInfo * recinfo)
 
 	CRecordInstance * inst = FindInstanceID(recinfo->eventID);
 	if(inst != NULL && recinfo->eventID == inst->GetRecordingId()) {
-		StopInstance(inst, false);
+		/* The timer of a timeshift ends after timeshift_hours: a fresh one
+		   follows and the unplayed file goes. One being played runs out,
+		   and the zap back to live TV starts the next. */
+		if (inst->Timeshift() && !CMoviePlayerGui::getInstance().timeshift) {
+			StopTimeshiftLocked(false);
+			restartTimeshift = true;
+		} else
+			StopInstance(inst, false);
 		ret = true;
 #ifdef ENABLE_GRAPHLCD
 		cGLCD::Update();
