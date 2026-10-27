@@ -188,7 +188,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		OpenThreads::Mutex mutex;
 		static OpenThreads::Mutex sm;
 
-		bool CutBackNeutrino(const t_channel_id channel_id, CFrontend * &frontend);
+		bool CutBackNeutrino(const t_channel_id channel_id, CFrontend * &frontend, bool timeshift);
 		void RestoreNeutrino(void);
 		void StartNextRecording();
 		void StopPostProcess();

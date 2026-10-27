@@ -1433,7 +1433,7 @@ bool CRecordManager::Record(const CTimerd::RecordingInfo * const eventinfo, cons
 		}
 	} else if(recmap.size() < RECORD_MAX_COUNT) {
 		CFrontend * frontend = NULL;
-		if(CutBackNeutrino(eventinfo->channel_id, frontend)) {
+		if(CutBackNeutrino(eventinfo->channel_id, frontend, timeshift)) {
 
 			inst = new CRecordInstance(eventinfo, newdir, timeshift, StreamVTxtPid, StreamPmtPid, StreamSubtitlePids);
 
@@ -1757,6 +1757,13 @@ int CRecordManager::handleMsg(const neutrino_msg_t msg, neutrino_msg_data_t data
 		g_RCInput->killTimer(shift_timer);
 	else if ((msg == NeutrinoMessages::EVT_ZAP_COMPLETE && !IS_WEBCHAN(*(t_channel_id *) data)) ||
 		 msg == NeutrinoMessages::EVT_WEBTV_ZAP_COMPLETE) {
+		/* A timeshift gives way to every zap, and the channel list ends
+		   it before. A zap from the web interface, the stream server or a
+		   timer does not: the timeshift ends here once its channel has
+		   left live TV, the tuner it wrote from is tuned elsewhere. */
+		if (msg == NeutrinoMessages::EVT_ZAP_COMPLETE && TimeshiftStatus()
+				&& !TimeshiftStatus(*(t_channel_id *) data))
+			StopAutoRecord();
 		g_RCInput->killTimer (shift_timer);
 		if (g_settings.timeshift_auto && CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_standby) {
 			int delay = g_settings.timeshift_auto;
@@ -2100,7 +2107,7 @@ bool CRecordManager::RunStopScript(void)
  * if zap ok
  * 	set record mode
  */
-bool CRecordManager::CutBackNeutrino(const t_channel_id channel_id, CFrontend * &frontend)
+bool CRecordManager::CutBackNeutrino(const t_channel_id channel_id, CFrontend * &frontend, bool timeshift)
 {
 	bool ret = true;
 	CZapitChannel * channel = CServiceManager::getInstance()->FindChannel(channel_id);
@@ -2196,8 +2203,10 @@ bool CRecordManager::CutBackNeutrino(const t_channel_id channel_id, CFrontend * 
 			g_Zapit->stopPlayBack();
 		if ((live_channel_id == channel_id) && g_Radiotext)
 			g_Radiotext->radiotext_stop();
-		/* in case channel_id == live_channel_id */
-		CStreamManager::getInstance()->StopStream(channel_id);
+		/* in case channel_id == live_channel_id; a timeshift leaves the
+		   streams alone, each reads its own demux */
+		if (!timeshift)
+			CStreamManager::getInstance()->StopStream(channel_id);
 	}
 	if(last_mode == NeutrinoModes::mode_standby) {
 		//CNeutrinoApp::getInstance()->handleMsg( NeutrinoMessages::CHANGEMODE , NeutrinoModes::mode_standby);
