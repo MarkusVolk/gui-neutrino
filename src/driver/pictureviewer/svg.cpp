@@ -100,11 +100,11 @@ static void svg_rasterize(NSVGrasterizer *rast, NSVGimage *image, float sx, floa
 	unsigned char *big = ss > 1 ? (unsigned char *) malloc((size_t)w * h * 4 * ss * ss) : NULL;
 	if (!big)
 	{
-		nsvgRasterizeFull(rast, image, 0, 0, sx, sy, dst, w, h, w * 4);
+		nsvgRasterizeXY(rast, image, 0, 0, sx, sy, dst, w, h, w * 4);
 		return;
 	}
 	int W = w * ss;
-	nsvgRasterizeFull(rast, image, 0, 0, sx * ss, sy * ss, big, W, h * ss, W * 4);
+	nsvgRasterizeXY(rast, image, 0, 0, sx * ss, sy * ss, big, W, h * ss, W * 4);
 	for (int y = 0; y < h; y++)
 	{
 		for (int x = 0; x < w; x++)
