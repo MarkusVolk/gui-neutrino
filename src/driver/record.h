@@ -178,6 +178,7 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool		StopSectionsd;
 		bool		sectionsdPaused;
 		bool		scriptStarted;
+		bool		restartTimeshift;
 		int		last_mode;
 		uint32_t	shift_timer;
 		uint32_t	check_timer;
@@ -193,6 +194,8 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		void StopPostProcess();
 		void StopInstance(CRecordInstance * inst, bool remove_event = true);
 		bool StopTimeshiftLocked();
+		void ArmTimeshift();
+		void EndTimeshiftOfLocked(t_channel_id channel_id);
 		bool RecordingRunningLocked();
 		int RecordCountLocked();
 		void ShowRecordIcon();
