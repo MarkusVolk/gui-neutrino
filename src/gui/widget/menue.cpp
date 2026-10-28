@@ -32,6 +32,7 @@
 #include <global.h>
 #include <neutrino.h>
 #include "menue.h"
+#include "remote_path.h"
 #include "remote_secret.h"
 
 #include <driver/fontrenderer.h>
@@ -236,7 +237,8 @@ void CMenuItem::paintItemCaption(const bool select_mode, const char * right_text
 	const char *left_text = getName();
 	std::string desc_text = getDescription();
 
-	if (select_mode)
+	/* the displays of the box follow the menu, but not a hidden walk */
+	if (select_mode && !remote_path::hidden())
 	{
 		if (right_text && *right_text) 
 		{
@@ -1044,7 +1046,9 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 		parent->hide();
 
 	COSDFader fader(g_settings.theme.menu_Content_alpha);
-	if(fade)
+	/* on some boxes fading sets the alpha of the whole OSD */
+	bool fading = fade && !remote_path::hidden();
+	if(fading)
 		fader.StartFadeIn();
 
 	if(from_wizard) {
@@ -1128,7 +1132,7 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 							msg = CRCInput::RC_timeout;
 							break;
 						}
-						if (fade && washidden)
+						if (fading && washidden)
 							fader.StartFadeIn();
 						checkHints();
 						paint();
@@ -1290,11 +1294,11 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 					int rv = item->exec( this );
 
 #ifdef ENABLE_GRAPHLCD
-					if (g_settings.glcd_enable && !cGLCD::getInstance()->GetCfgMode())
+					if (g_settings.glcd_enable && !cGLCD::getInstance()->GetCfgMode() && !remote_path::hidden())
 						cGLCD::lockChannel(g_Locale->getText(LOCALE_MAINMENU_HEAD), item->lcd_text, 0);
 #endif
 #ifdef ENABLE_LCD4LINUX
-					if (g_settings.lcd4l_support)
+					if (g_settings.lcd4l_support && !remote_path::hidden())
 						CLCD4l::getInstance()->CreateMenuFile(item->lcd_text, g_settings.lcd4l_convert);
 #endif
 
@@ -1312,7 +1316,7 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 								msg = CRCInput::RC_timeout;
 								break;
 							}
-							if (fade && washidden)
+							if (fading && washidden)
 								fader.StartFadeIn();
 							checkHints();
 							pos = selected;
@@ -1365,7 +1369,7 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 			msg = CRCInput::RC_timeout;
 		}
 		if(msg == CRCInput::RC_timeout && !inStandby()) {
-			if(fade && fader.StartFadeOut()) {
+			if(fading && fader.StartFadeOut()) {
 				timeoutEnd = CRCInput::calcTimeoutEnd(1);
 				msg = 0;
 				continue;
@@ -1655,7 +1659,8 @@ void CMenuWidget::paint()
 
 	calcSize();
 
-	CVFD::getInstance()->setMode(CVFD::MODE_MENU_UTF8 /*, nameString.c_str()*/);
+	if (!remote_path::hidden())
+		CVFD::getInstance()->setMode(CVFD::MODE_MENU_UTF8 /*, nameString.c_str()*/);
 
 
 	/* prepare footer:

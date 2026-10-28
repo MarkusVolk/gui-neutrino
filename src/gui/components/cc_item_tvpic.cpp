@@ -31,6 +31,7 @@
 #include <global.h>
 #include <neutrino.h>
 #include "cc_item_tvpic.h"
+#include <gui/widget/remote_path.h>
 
 #include <hardware/video.h>
 
@@ -96,7 +97,9 @@ void CComponentsPIP::paint(const bool &do_save_bg)
 	
 	int mode = CNeutrinoApp::getInstance()->getMode();
 	if(mode == NeutrinoModes::mode_tv || mode == NeutrinoModes::mode_webtv || mode == NeutrinoModes::mode_ts) {
-		videoDecoder->Pig(pig_x, pig_y, pig_w, pig_h, screen_w, screen_h);
+		/* the live picture would move for a walk the viewer does not see */
+		if (!remote_path::hidden())
+			videoDecoder->Pig(pig_x, pig_y, pig_w, pig_h, screen_w, screen_h);
 	}
 	else{ //paint an alternate image if no tv mode available
 		CComponentsPicture pic(pig_x, pig_y, pig_w, pig_h, pic_name, NULL, CC_SHADOW_OFF, col_frame, col_body_std, col_shadow, CFrameBuffer::TM_NONE);
@@ -111,6 +114,7 @@ void CComponentsPIP::paint(const bool &do_save_bg)
 
 void CComponentsPIP::hide()
 {
-	videoDecoder->Pig(-1, -1, -1, -1);
+	if (!remote_path::hidden())
+		videoDecoder->Pig(-1, -1, -1, -1);
 	CComponents::hide();
 }

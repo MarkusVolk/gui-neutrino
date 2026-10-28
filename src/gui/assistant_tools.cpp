@@ -1047,7 +1047,7 @@ static void menu_walk(const Json::Value &input, CAssistantTools::done_fn done)
 	bool leave = input["leave"].isBool() ? input["leave"].asBool() : set;
 	bool here = input["here"].isBool() && input["here"].asBool();
 	std::string error;
-	if (!remote_path::start(path, set, value, leave, here, done, error))
+	if (!remote_path::start(path, set, value, leave, here, false, done, error))
 		done(false, error);
 }
 

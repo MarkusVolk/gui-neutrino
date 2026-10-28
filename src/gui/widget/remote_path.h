@@ -36,13 +36,18 @@ namespace remote_path
 
 	/* walks path from the main menu, or with here from the menu that is
 	 * open; with set, the last element is the entry that takes value;
-	 * with leave, the menus close at the end. done runs in the main loop
-	 * once the walk ends; false with the reason in error when the walk
-	 * cannot start */
+	 * with leave, the menus close at the end. A hidden walk draws nothing
+	 * the viewer sees, always closes the menus and stops at the viewer's
+	 * first key. done runs in the main loop once the walk ends; false with
+	 * the reason in error when the walk cannot start */
 	bool start(const std::vector<std::string> &path, bool set, const std::string &value,
-		   bool leave, bool here, done_fn done, std::string &error);
+		   bool leave, bool here, bool hidden, done_fn done, std::string &error);
 	/* drops the walk without calling done */
 	void cancel();
+	/* a hidden walk runs; what only the TV shows of a menu stays off */
+	bool hidden();
+	/* a question for the viewer opens: a hidden walk becomes visible */
+	void reveal();
 }
 
 #endif

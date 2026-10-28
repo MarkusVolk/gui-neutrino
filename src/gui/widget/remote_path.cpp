@@ -26,6 +26,7 @@
 
 #include <global.h>
 #include <neutrino.h>
+#include <driver/framebuffer.h>
 #include <driver/rcinput.h>
 #include <gui/movieplayer.h>
 #include <gui/widget/menue.h>
@@ -65,6 +66,17 @@ namespace
 		bool reported;
 		/* dropped while busy, deleted once the setting returns */
 		bool cancelled;
+		/* drawn into the framebuffer's shadow, the viewer sees nothing */
+		bool hidden;
+		/* the viewer pressed a key; it is handed on after the walk */
+		bool viewer_pressed;
+		neutrino_msg_t viewer_key;
+		/* why a hidden walk stopped, told once the menus are closed */
+		std::string error;
+		/* the dialog it stopped at, only compared */
+		CRemoteUi *stopped_at;
+		/* questions a hidden walk answered with back */
+		std::string answered;
 		remote_path::done_fn done;
 	};
 
@@ -88,6 +100,48 @@ static void post_key(neutrino_msg_t key)
 	post_step();
 }
 
+/* the viewer's keys stop a hidden walk: the first press is kept for later,
+ * every key event is held back until the menus are closed */
+static bool hold_viewer_key(neutrino_msg_t key, neutrino_msg_data_t data)
+{
+	if (!current || !current->hidden)
+		return false;
+	if (data == 1 && !current->viewer_pressed)
+	{
+		current->viewer_pressed = true;
+		current->viewer_key = key;
+	}
+	return true;
+}
+
+/* the screen shows what the walk left, the viewer's keys work again */
+static void show()
+{
+	if (!current->hidden)
+		return;
+	current->hidden = false;
+	g_RCInput->setDeviceKeyFilter(NULL);
+	CFrameBuffer::getInstance()->shadowEnd();
+	if (current->viewer_pressed)
+		g_RCInput->postMsg(current->viewer_key, 0);
+}
+
+/* two parts of an answer, one blank line between them */
+static std::string joined(std::string first, const std::string &second)
+{
+	while (!first.empty() && first[first.size() - 1] == '\n')
+		first.erase(first.size() - 1);
+	if (second.empty())
+		return first;
+	return first.empty() ? second : first + "\n\n" + second;
+}
+
+static std::string where(CRemoteUi *ui)
+{
+	CMenuWidget *menu = (ui ? ui->remoteMenu() : NULL);
+	return menu ? menu->remoteDescribe(true) : ui->remoteDescribe();
+}
+
 /* runs inside the loop of a question that a setting asked while it was
  * set, and does nothing if none came */
 static void nested_step(unsigned int id)
@@ -97,6 +151,13 @@ static void nested_step(unsigned int id)
 	CRemoteUi *ui = CRemoteUi::top();
 	if (!ui || ui->remoteMenu() || CRemoteUi::viewerOnly())
 		return;
+	if (current->hidden)
+	{
+		current->answered = joined(current->answered, ui->remoteDescribe());
+		g_RCInput->postMsg(CRCInput::RC_home, 0, false);
+		main_call::post([id] { nested_step(id); });
+		return;
+	}
 	current->reported = true;
 	current->done(false, "the setting asks a question; answer it with tv_select or tv_input\n\n" + ui->remoteDescribe());
 }
@@ -104,23 +165,38 @@ static void nested_step(unsigned int id)
 static void finish(bool ok, const std::string &text)
 {
 	walk *w = current;
+	show();
 	current = NULL;
-	w->done(ok, text);
+	std::string answer = text;
+	if (!w->answered.empty())
+		answer = joined(answer, "The walk answered these questions with back:\n" + w->answered);
+	w->done(ok, answer);
 	delete w;
 }
 
-static std::string where(CRemoteUi *ui)
+/* a visible walk stops where it is; a hidden one first closes the menus */
+static void stop(const std::string &error, CRemoteUi *at = NULL)
 {
-	CMenuWidget *menu = (ui ? ui->remoteMenu() : NULL);
-	return menu ? menu->remoteDescribe(true) : ui->remoteDescribe();
+	if (!current->hidden)
+	{
+		finish(false, error);
+		return;
+	}
+	current->error = error;
+	current->stopped_at = at;
+	current->phase = LEAVING;
+	post_step();
 }
 
 static void arrived(CRemoteUi *ui)
 {
 	if (current->leave)
 	{
+		/* a hidden walk that only looked tells what it saw */
+		if (current->hidden && current->result.empty())
+			current->result = where(ui);
 		current->phase = LEAVING;
-		post_key(CRCInput::RC_home);
+		post_key(current->hidden ? CRCInput::RC_setup : CRCInput::RC_home);
 		return;
 	}
 	std::string text = current->result.empty() ? where(ui) : current->result + "\n\n" + where(ui);
@@ -146,6 +222,11 @@ static void step(unsigned int id)
 		finish(false, "a question for the viewer at the TV is open; remote clients can neither read nor answer it");
 		return;
 	}
+	if (current->hidden && current->viewer_pressed && current->phase != LEAVING)
+	{
+		stop("the viewer pressed a key; the walk stopped");
+		return;
+	}
 
 	switch (current->phase)
 	{
@@ -156,7 +237,7 @@ static void step(unsigned int id)
 				post_key(CRCInput::RC_setup);
 			}
 			else if (!menu)
-				finish(false, "a dialog is open; answer it first with tv_select or tv_input\n\n" + where(ui));
+				stop("a dialog is open; answer it first with tv_select or tv_input\n\n" + where(ui), ui);
 			else
 				post_key(CRCInput::RC_home);
 			return;
@@ -168,7 +249,7 @@ static void step(unsigned int id)
 				if (!ui && ++current->open_tries < OPEN_TRIES)
 					post_step();
 				else
-					finish(false, "the main menu did not open; look with tv_screen");
+					stop("the main menu did not open; look with tv_screen");
 				return;
 			}
 			current->phase = WALKING;
@@ -177,7 +258,8 @@ static void step(unsigned int id)
 		case WALKING:
 			if (!menu)
 			{
-				finish(false, "stopped at a dialog; answer it with tv_select or tv_input\n\n" + where(ui));
+				stop("stopped at a dialog; answer it with tv_select or tv_input"
+					+ std::string(current->hidden ? ", in a visible walk" : "") + "\n\n" + where(ui), ui);
 				return;
 			}
 			if (current->chosen_in == ui)
@@ -185,7 +267,7 @@ static void step(unsigned int id)
 				/* the chosen entry did its work without a dialog of its own,
 				 * or opened one a remote client cannot read */
 				if (current->next < current->path.size())
-					finish(false, "\"" + current->path[current->next - 1] + "\" opened no menu\n\n" + where(ui));
+					stop("\"" + current->path[current->next - 1] + "\" opened no menu\n\n" + where(ui));
 				else
 				{
 					current->result = "\"" + current->path[current->next - 1] + "\" was chosen; it opened "
@@ -217,7 +299,7 @@ static void step(unsigned int id)
 				}
 				if (!ok)
 				{
-					finish(false, result + "\n\n" + where(ui));
+					stop(result + "\n\n" + where(ui));
 					return;
 				}
 				current->next++;
@@ -230,14 +312,14 @@ static void step(unsigned int id)
 				int found = menu->remoteFind(current->path[current->next], error);
 				if (found >= 0 && menu->getItem(found)->isMenueOptionChooser())
 				{
-					finish(false, std::string("\"") + menu->getItem(found)->getName() + "\" is a setting, not a menu; "
+					stop(std::string("\"") + menu->getItem(found)->getName() + "\" is a setting, not a menu; "
 						"change it with set\n\n" + where(ui));
 					return;
 				}
 			}
 			if (!menu->remoteSelect(current->path[current->next], error))
 			{
-				finish(false, error + "\n\n" + where(ui));
+				stop(error + "\n\n" + where(ui));
 				return;
 			}
 			current->chosen_in = ui;
@@ -247,7 +329,26 @@ static void step(unsigned int id)
 
 		case LEAVING:
 			if (!ui)
-				finish(true, (current->result.empty() ? std::string("done") : current->result) + "; the menus are closed");
+			{
+				if (!current->error.empty())
+					finish(false, joined(current->error, "The menus are closed."));
+				else if (current->result.find('\n') != std::string::npos)
+					finish(true, joined(current->result, "The menus are closed."));
+				else
+					finish(true, (current->result.empty() ? std::string("done") : current->result) + "; the menus are closed");
+			}
+			else if (current->hidden)
+			{
+				/* the setup key closes every level at once, back answers a question */
+				if (menu)
+					post_key(CRCInput::RC_setup);
+				else
+				{
+					if (ui != current->stopped_at)
+						current->answered = joined(current->answered, ui->remoteDescribe());
+					post_key(CRCInput::RC_home);
+				}
+			}
 			else if (!menu)
 				finish(false, "a dialog opened while the menus closed; answer it with tv_select or tv_input\n\n" + where(ui));
 			else
@@ -257,7 +358,7 @@ static void step(unsigned int id)
 }
 
 bool remote_path::start(const std::vector<std::string> &path, bool set, const std::string &value,
-			bool leave, bool here, done_fn done, std::string &error)
+			bool leave, bool here, bool hidden, done_fn done, std::string &error)
 {
 	if (current)
 	{
@@ -289,6 +390,12 @@ bool remote_path::start(const std::vector<std::string> &path, bool set, const st
 		error = "no menu is open";
 		return false;
 	}
+	/* a hidden walk must not close what the viewer has open */
+	if (hidden && (here || CRemoteUi::top()))
+	{
+		error = here ? "here needs a visible walk" : "a menu or dialog is open on the TV; use a visible walk";
+		return false;
+	}
 
 	current = new walk;
 	current->id = ++last_id;
@@ -296,7 +403,7 @@ bool remote_path::start(const std::vector<std::string> &path, bool set, const st
 	current->next = 0;
 	current->set = set;
 	current->value = value;
-	current->leave = leave;
+	current->leave = leave || hidden;
 	current->phase = here ? WALKING : CLOSING;
 	current->chosen_in = NULL;
 	current->steps = 0;
@@ -304,18 +411,38 @@ bool remote_path::start(const std::vector<std::string> &path, bool set, const st
 	current->busy = false;
 	current->reported = false;
 	current->cancelled = false;
+	current->hidden = hidden && CFrameBuffer::getInstance()->shadowBegin();
+	current->viewer_pressed = false;
+	current->viewer_key = 0;
+	current->stopped_at = NULL;
 	current->done = done;
+	if (current->hidden)
+		g_RCInput->setDeviceKeyFilter(hold_viewer_key);
 	post_step();
 	return true;
 }
 
 void remote_path::cancel()
 {
-	if (current && current->busy)
+	if (!current)
+		return;
+	show();
+	if (current->busy)
 	{
 		current->cancelled = true;
 		return;
 	}
 	delete current;
 	current = NULL;
+}
+
+bool remote_path::hidden()
+{
+	return current && current->hidden;
+}
+
+void remote_path::reveal()
+{
+	if (current)
+		show();
 }

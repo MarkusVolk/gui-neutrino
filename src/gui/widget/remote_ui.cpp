@@ -18,6 +18,7 @@
 */
 
 #include "remote_ui.h"
+#include "remote_path.h"
 
 #include <algorithm>
 #include <vector>
@@ -74,6 +75,7 @@ CRemoteUi::Guard::~Guard()
 CRemoteUi::ViewerOnly::ViewerOnly()
 {
 	viewer_only++;
+	remote_path::reveal();
 }
 
 CRemoteUi::ViewerOnly::~ViewerOnly()
