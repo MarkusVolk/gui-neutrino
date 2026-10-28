@@ -1507,6 +1507,8 @@ int CHDDMenuHandler::checkDevice(std::string dev)
 		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd);
 		if (msg == CRCInput::RC_timeout || msg == CRCInput::RC_ok || CNeutrinoApp::getInstance()->backKey(msg))
 			loop = false;
+		else if (msg > CRCInput::RC_MaxRC)
+			CNeutrinoApp::getInstance()->handleMsg(msg, data);
 	}
 
 	progress->hide();

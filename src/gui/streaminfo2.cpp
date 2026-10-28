@@ -442,11 +442,12 @@ int CStreamInfo2::doSignalStrengthLoop()
 	bool repaint_bitrate = true;
 	ts_setup();
 	neutrino_msg_data_t data = 0;
-	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd_MS(10);
 
 	while (1)
 	{
-		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd);
+		/* a short pace; messages are read once, below, where all of them are handled */
+		usleep(10000);
+		msg = CRCInput::RC_timeout;
 
 		if (!mp)
 		{

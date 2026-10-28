@@ -247,7 +247,9 @@ int CPSISetup::exec (CMenuTarget * parent, const std::string &)
 			}
 			break;
 		default:
-			;
+			if (msg > CRCInput::RC_MaxRC && msg != CRCInput::RC_timeout)
+				CNeutrinoApp::getInstance()->handleMsg(msg, data);
+			break;
 		}
 	}
 

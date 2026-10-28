@@ -288,9 +288,11 @@ void CShellWindow::showResult()
 
 			if (!exit)
 			{
-				do
+				do {
 					g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd);
-				while (msg != CRCInput::RC_ok && !CNeutrinoApp::getInstance()->backKey(msg) && msg != CRCInput::RC_timeout);
+					if (msg > CRCInput::RC_MaxRC && msg != CRCInput::RC_timeout)
+						CNeutrinoApp::getInstance()->handleMsg(msg, data);
+				} while (msg != CRCInput::RC_ok && !CNeutrinoApp::getInstance()->backKey(msg) && msg != CRCInput::RC_timeout);
 			}
 			textBox->hide();
 		}

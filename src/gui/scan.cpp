@@ -531,6 +531,9 @@ neutrino_msg_t CScanTs::handleMsg(neutrino_msg_t msg, neutrino_msg_data_t data)
 			}
 			break;
 		default:
+			/* the data of the others is freed below */
+			if (msg > CRCInput::RC_MaxRC && msg < CRCInput::RC_WithData && msg != CRCInput::RC_timeout)
+				CNeutrinoApp::getInstance()->handleMsg(msg, data);
 			break;
 	}
 	if ((msg >= CRCInput::RC_WithData) && (msg < CRCInput::RC_WithData + 0x10000000))
