@@ -443,7 +443,14 @@ int CStreamInfo2::doSignalStrengthLoop()
 	bool repaint_bitrate = true;
 	ts_setup();
 	neutrino_msg_data_t data = 0;
-	CRemoteView remote_view("Technical information", nullptr);
+	CRemoteView remote_view("Technical information", [this] {
+		std::string text = techinfo_text;
+		if (!mp)
+			text += "Signal: " + to_string(signal.sig) + "%, SNR: " + to_string(signal.snr) + "%, BER: " + to_string(signal.ber) + "\n";
+		if (rate.short_average)
+			text += "Bitrate: " + to_string(rate.short_average / 1000) + " kbit/s\n";
+		return text;
+	});
 
 	while (1)
 	{
@@ -1275,6 +1282,10 @@ void CStreamInfo2::paint_techinfo(int xpos, int ypos)
 			}
 		}
 	}
+
+	techinfo_text.clear();
+	for (std::vector<row>::iterator it = v.begin(); it != v.end(); ++it)
+		techinfo_text += it->key + it->val + "\n";
 
 	spaceoffset = 0;
 	for (std::vector<row>::iterator it = v.begin(); it != v.end(); ++it)

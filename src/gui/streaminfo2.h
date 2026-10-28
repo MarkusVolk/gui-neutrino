@@ -92,6 +92,8 @@ class CStreamInfo2 : public CMenuTarget
 		} rate;
 
 		std::vector<std::map<std::string, std::string> > streamdata;
+		/* the lines of the technical information, as a remote client reads them */
+		std::string techinfo_text;
 
 		int doSignalStrengthLoop();
 
