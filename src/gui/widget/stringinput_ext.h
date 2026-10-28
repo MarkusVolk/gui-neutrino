@@ -34,6 +34,7 @@
 #define __stringinput_ext__
 
 #include "menue.h"
+#include "remote_ui.h"
 
 #include <system/localize.h>
 
@@ -42,7 +43,7 @@
 
 class CFrameBuffer;
 class CExtendedInput_Item;
-class CExtendedInput : public CMenuTarget
+class CExtendedInput : public CMenuTarget, public CRemoteUi
 {
 	protected:
 		void Init(void);
@@ -92,6 +93,9 @@ class CExtendedInput : public CMenuTarget
 		void addInputField( CExtendedInput_Item* );
 
 		void enableSaveScreen(bool enable);
+
+		std::string remoteDescribe();
+		bool remoteInput(const std::string &text, std::string &error);
 };
 
 
@@ -110,6 +114,8 @@ class CExtendedInput_Item
 		virtual void init(int &/*x*/, int &/*y*/){};
 		virtual void paint(int /*x*/, int /*y*/, bool /*focusGained*/){};
 		virtual bool isSelectable(){return true;};
+		/* whether a remote client may put this character here */
+		virtual bool accepts(char /*c*/){return true;};
 
 		virtual void keyPressed( int /*key*/ ){};
 		virtual ~CExtendedInput_Item() {};
@@ -157,6 +163,7 @@ class CExtendedInput_Item_Char : public CExtendedInput_Item
 
 		virtual void keyPressed( int key );
 		virtual bool isSelectable(){return selectable;};
+		virtual bool accepts(char c){return isAllowedChar(c);};
 };
 
 //----------------------------------------------------------------------------------------------------
@@ -227,6 +234,9 @@ class CIntInput : public CExtendedInput
 		 */
 		CIntInput(const neutrino_locale_t Name, int *Value, const unsigned int Size, const neutrino_locale_t Hint_1 = NONEXISTANT_LOCALE, const neutrino_locale_t Hint_2 = NONEXISTANT_LOCALE, CChangeObserver* Observ = NULL);
 		void updateValue() { onBeforeExec(); }
+
+		std::string remoteDescribe();
+		bool remoteInput(const std::string &text, std::string &error);
 };
 
 #endif

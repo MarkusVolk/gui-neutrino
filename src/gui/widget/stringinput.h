@@ -27,6 +27,7 @@
 #define __stringinput__
 
 #include "menue.h"
+#include "remote_ui.h"
 
 #include <system/localize.h>
 
@@ -61,7 +62,7 @@ class CStringInputOpen
 		CStringInputOpen &operator=(const CStringInputOpen &);
 };
 
-class CStringInput : public CMenuTarget
+class CStringInput : public CMenuTarget, public CRemoteUi
 {
 	protected:
 		CFrameBuffer	*frameBuffer;
@@ -111,6 +112,8 @@ class CStringInput : public CMenuTarget
 		virtual void keyMinusPressed();
 
 		virtual int handleOthers(const neutrino_msg_t msg, const neutrino_msg_data_t data);
+		/* what a remote client may not read back, such as a PIN */
+		virtual bool remoteMasked() { return false; }
 
 	public:
 		CStringInput(const neutrino_locale_t Name, std::string* Value, int Size, const neutrino_locale_t Hint_1 = NONEXISTANT_LOCALE, const neutrino_locale_t Hint_2 = NONEXISTANT_LOCALE, const char * const Valid_Chars= (const char *) "0123456789. ", CChangeObserver* Observ = NULL, const char * const Icon = NULL);
@@ -122,6 +125,9 @@ class CStringInput : public CMenuTarget
 		void setMinMax(const int min_value, const int max_value);
 
 		void forceSaveScreen(bool enable);
+
+		std::string remoteDescribe();
+		bool remoteInput(const std::string &text, std::string &error);
 };
 
 class CStringInputSMS : public CStringInput
@@ -153,6 +159,7 @@ class CPINInput : public CStringInput
 {
 	protected:
 		virtual void paintChar(int pos);
+		bool remoteMasked() { return true; }
 	public:
 		CPINInput(const neutrino_locale_t Name, std::string *Value, int Size, const neutrino_locale_t Hint_1 = NONEXISTANT_LOCALE, const neutrino_locale_t Hint_2 = NONEXISTANT_LOCALE, const char * const Valid_Chars= (const char *)"0123456789", CChangeObserver* Observ = NULL)
 		 : CStringInput(Name, Value, Size, Hint_1, Hint_2, Valid_Chars, Observ, (char *) NEUTRINO_ICON_LOCK) {};

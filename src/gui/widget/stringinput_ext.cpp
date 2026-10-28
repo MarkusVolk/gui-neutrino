@@ -179,6 +179,39 @@ void CExtendedInput::enableSaveScreen(bool enable)
 	}
 }
 
+std::string CExtendedInput::remoteDescribe()
+{
+	std::string out = "Input: " + std::string(name == NONEXISTANT_LOCALE ? nameString : g_Locale->getText(name)) + "\n";
+	out += "Current value: " + *valueString + "\n";
+	out += "A new value keeps this form, " + to_string(valueString->size()) + " characters\n";
+	if (hint_1 != NONEXISTANT_LOCALE)
+		out += std::string("Hint: ") + g_Locale->getText(hint_1) + "\n";
+	if (hint_2 != NONEXISTANT_LOCALE)
+		out += std::string("Hint: ") + g_Locale->getText(hint_2) + "\n";
+	return out;
+}
+
+/* the fields point into the value, so it changes in place, one character
+ * per field, and is confirmed as with OK */
+bool CExtendedInput::remoteInput(const std::string &text, std::string &error)
+{
+	if (text.size() != inputFields.size() || text.size() != valueString->size()) {
+		error = "the value has the form \"" + *valueString + "\", " + to_string(valueString->size()) + " characters";
+		return false;
+	}
+	for (size_t i = 0; i < text.size(); i++) {
+		bool fixed = !inputFields[i]->isSelectable();
+		if ((fixed && text[i] != valueString->at(i)) || (!fixed && !inputFields[i]->accepts(text[i]))) {
+			error = "character " + to_string(i + 1) + " cannot be \"" + text.substr(i, 1) + "\"; the form is \"" + *valueString + "\"";
+			return false;
+		}
+	}
+	for (size_t i = 0; i < text.size(); i++)
+		setCharLocked(&valueString->at(i), text[i]);
+	g_RCInput->postMsg(CRCInput::RC_ok, 0);
+	return true;
+}
+
 int CExtendedInput::exec( CMenuTarget* parent, const std::string & )
 {
 	CStringInputOpen counted;
@@ -197,6 +230,8 @@ int CExtendedInput::exec( CMenuTarget* parent, const std::string & )
 	if (savescreen)
 		saveScreen();
 	paint();
+
+	CRemoteUi::Guard remote_guard(this);
 
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(g_settings.timing[SNeutrinoSettings::TIMING_MENU]);
 
@@ -747,6 +782,36 @@ void CIntInput::onBeforeExec()
 void CIntInput::onAfterExec()
 {
 	*myValue = atoi(*valueString);
+}
+
+std::string CIntInput::remoteDescribe()
+{
+	std::string out = std::string("Input: ") + g_Locale->getText(name) + "\n";
+	out += "Current value: " + to_string(atoi(*valueString)) + "\n";
+	out += "A whole number of up to " + to_string(m_size) + " digits\n";
+	if (hint_1 != NONEXISTANT_LOCALE)
+		out += std::string("Hint: ") + g_Locale->getText(hint_1) + "\n";
+	if (hint_2 != NONEXISTANT_LOCALE)
+		out += std::string("Hint: ") + g_Locale->getText(hint_2) + "\n";
+	return out;
+}
+
+/* the number goes into the fields right-aligned, as onBeforeExec puts it */
+bool CIntInput::remoteInput(const std::string &text, std::string &error)
+{
+	char *end = NULL;
+	long number = strtol(text.c_str(), &end, 10);
+	if (text.empty() || *end || number < 0) {
+		error = "the input takes a whole number";
+		return false;
+	}
+	char tmp[MAX_CINTINPUT_SIZE + 8];
+	snprintf(tmp, sizeof(tmp), "%*ld", m_size, number);
+	if (strlen(tmp) > m_size || valueString->size() < m_size) {
+		error = "the number has more than " + to_string(m_size) + " digits";
+		return false;
+	}
+	return CExtendedInput::remoteInput(tmp + valueString->substr(m_size), error);
 }
 
 //-----------------------------#################################-------------------------------------------------------

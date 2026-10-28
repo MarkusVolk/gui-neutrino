@@ -458,6 +458,8 @@ int CStringInput::exec( CMenuTarget* parent, const std::string & )
 
 	paint();
 
+	CRemoteUi::Guard remote_guard(this);
+
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(g_settings.timing[SNeutrinoSettings::TIMING_MENU]);
 
 	bool loop=true;
@@ -603,6 +605,43 @@ int CStringInput::exec( CMenuTarget* parent, const std::string & )
 	cGLCD::unlockChannel();
 #endif
 	return res;
+}
+
+std::string CStringInput::remoteDescribe()
+{
+	std::string out = std::string(remoteMasked() ? "PIN input: " : "Input: ")
+		+ (name == NONEXISTANT_LOCALE ? head : g_Locale->getText(name)) + "\n";
+	if (!remoteMasked()) {
+		std::string current = *valueString;
+		out += "Current value: " + trim(current) + "\n";
+	}
+	out += "Up to " + to_string(size) + " characters";
+	if (validchars)
+		out += std::string(" of \"") + validchars + "\"";
+	out += "\n";
+	if (hint_1 != NONEXISTANT_LOCALE)
+		out += std::string("Hint: ") + g_Locale->getText(hint_1) + "\n";
+	if (hint_2 != NONEXISTANT_LOCALE)
+		out += std::string("Hint: ") + g_Locale->getText(hint_2) + "\n";
+	return out;
+}
+
+/* the text replaces what is there and is confirmed, as with OK */
+bool CStringInput::remoteInput(const std::string &text, std::string &error)
+{
+	if ((int) text.size() > size) {
+		error = "the input takes up to " + to_string(size) + " characters";
+		return false;
+	}
+	if (validchars)
+		for (size_t i = 0; i < text.size(); i++)
+			if (!strchr(validchars, text[i])) {
+				error = std::string("the input takes only \"") + validchars + "\"";
+				return false;
+			}
+	setSettingsText(*valueString, text + std::string(size - text.size(), ' '));
+	g_RCInput->postMsg(CRCInput::RC_ok, 0);
+	return true;
 }
 
 int CStringInput::handleOthers(const neutrino_msg_t /*msg*/, const neutrino_msg_data_t /*data*/)
@@ -860,6 +899,8 @@ int CPINInput::exec( CMenuTarget* parent, const std::string & )
 		setSettingsText(*valueString, *valueString + std::string(size - valueString->length(), ' '));
 
 	paint();
+
+	CRemoteUi::Guard remote_guard(this);
 
 	bool loop = true;
 
