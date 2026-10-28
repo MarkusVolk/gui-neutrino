@@ -73,6 +73,8 @@ class CLuaInstance
 		static int NewWindow(lua_State *L);
 		static int GCWindow(lua_State *L);
 		static int GetInput(lua_State *L);
+		static int RemoteView(lua_State *L);
+		static int RemoteClear(lua_State *L);
 		static int Blit(lua_State *L);
 		static int GetLanguage(lua_State *L);
 		static int PaintBox(lua_State *L);

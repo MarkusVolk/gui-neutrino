@@ -22,6 +22,9 @@
 #define _LUAINSTANCEHELPERS_H
 
 #include <map>
+#include <memory>
+
+#include <gui/widget/remote_ui.h>
 
 #if LUA_COMPAT_5_2
 
@@ -118,6 +121,9 @@ struct CLuaData
 	CRCInput *rcinput;
 	fontmap_t fontmap;
 	screenmap_t screenmap;
+	/* what the script tells remote clients it shows; the view is dropped first */
+	std::unique_ptr<CRemoteUi::ViewerOnly> remote_viewer;
+	std::unique_ptr<CRemoteView> remote_view;
 };
 
 bool _luaL_checkbool(lua_State *L, int numArg);

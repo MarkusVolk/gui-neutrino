@@ -792,6 +792,8 @@ void LuaInstRegisterFunctions(lua_State *L, bool fromThreads/*=false*/)
 	const luaL_Reg methods[] =
 	{
 		{ "GetInput",               CLuaInstance::GetInput },
+		{ "remoteView",             CLuaInstance::RemoteView },
+		{ "remoteClear",            CLuaInstance::RemoteClear },
 		{ "Blit",                   CLuaInstance::Blit },
 		{ "GetLanguage",            CLuaInstance::GetLanguage },
 		{ "PaintBox",               CLuaInstance::PaintBox },
@@ -961,11 +963,42 @@ int CLuaInstance::GCWindow(lua_State *L)
 
 	if (w)
 	{
+		w->remote_view.reset();
+		w->remote_viewer.reset();
 		if (w->fbwin)
 			delete w->fbwin;
 		w->rcinput = NULL;
 		delete w;
 	}
+	return 0;
+}
+
+/* n:remoteView(title, text[, viewer_only]): what a screen of the script shows,
+ * for remote clients; viewer_only for a code or a question that is the
+ * viewer's alone. It stays until n:remoteClear() or the end of the script. */
+int CLuaInstance::RemoteView(lua_State *L)
+{
+	CLuaData *W = CheckData(L, 1);
+	if (!W)
+		return 0;
+	std::string title = luaL_checkstring(L, 2);
+	std::string text = lua_isstring(L, 3) ? lua_tostring(L, 3) : "";
+	bool viewer_only = lua_gettop(L) > 3 && _luaL_checkbool(L, 4);
+	W->remote_view.reset();
+	W->remote_viewer.reset();
+	if (viewer_only)
+		W->remote_viewer.reset(new CRemoteUi::ViewerOnly);
+	W->remote_view.reset(new CRemoteView(title, [text] { return text; }, viewer_only));
+	return 0;
+}
+
+int CLuaInstance::RemoteClear(lua_State *L)
+{
+	CLuaData *W = CheckData(L, 1);
+	if (!W)
+		return 0;
+	W->remote_view.reset();
+	W->remote_viewer.reset();
 	return 0;
 }
 

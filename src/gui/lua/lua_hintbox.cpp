@@ -32,6 +32,7 @@
 
 #include "luainstance.h"
 #include "lua_hintbox.h"
+#include <gui/widget/remote_ui.h>
 
 CLuaInstHintbox* CLuaInstHintbox::getInstance()
 {
@@ -131,6 +132,7 @@ int CLuaInstHintbox::HintboxExec(lua_State *L)
 		timeout = (int) lua_tonumber(L, -1);
 	CLuaInstance::scriptUiOpen();
 	D->b->paint();
+	CRemoteView remote_view(D->caption ? D->caption : "", [D] { return D->b->getText(); });
 
 	// copied from gui/widget/hintbox.cpp
 	neutrino_msg_t msg;

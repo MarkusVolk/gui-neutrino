@@ -96,6 +96,7 @@ class CHintBox : public CComponentsWindow
 		int getMaxWidth(const std::string& Text, const std::string& Title, Font *font, const int& minWidth);
 
 	public:
+		const std::string &getText() const { return hb_text; }
 		/**CHintBox Constructor
 		* @param[in]	Caption
 		* 	@li 	expects type neutrino_locale_t with locale entry from /system/locals.h
