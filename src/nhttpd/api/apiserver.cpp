@@ -21,6 +21,9 @@
 	  does not keep, is 404 no-such-bouquet like a number past the end.
 	  Paged with limit or cursor, the channels of a web bouquet come in
 	  channel-number order; unpaged, those with a running event come first
+	- the assistant's tools: GET /api/v1/tools lists them with their JSON
+	  schema, POST /api/v1/tools/<name> runs one with its arguments as the
+	  body; a tool that only reads needs read, the others write
 
 	Without authentication in nhttpd.conf the web interface is open to the
 	home network, and so is this API: a caller with a private address gets
@@ -109,6 +112,7 @@
 #include <neutrinoapi.h>
 #ifdef ENABLE_ASSISTANT
 #include <mcpoauth.h>
+#include <gui/assistant_tools.h>
 #endif
 
 /* helpers.h, which the movie player brings in, makes to_string a macro
@@ -2241,6 +2245,77 @@ void ep_mcp_clients_delete(Call &c)
 	mcp_oauth::revokeAll();
 	send_empty(c.out, 204);
 }
+
+#define TOOL_TIMEOUT	20000
+
+/* the tools that only read; the others operate the box */
+const char *const read_tools[] = { "tv_status", "tv_channels", "tv_epg", "tv_epg_search", "tv_timers",
+	"tv_plugins", "tv_screen", NULL };
+
+Level tool_level(const std::string &name)
+{
+	for (const char *const *p = read_tools; *p; p++)
+		if (name == *p)
+			return L_READ;
+	return L_WRITE;
+}
+
+void ep_tools(Call &c)
+{
+	std::vector<llm_tool> tools;
+	CAssistantTools::list(tools, true);
+	Json::Value out(Json::arrayValue);
+	for (const llm_tool &t : tools) {
+		Json::Value v(Json::objectValue);
+		v["name"] = t.name;
+		v["description"] = t.description;
+		v["schema"] = t.schema;
+		v["level"] = level_name(tool_level(t.name));
+		out.append(v);
+	}
+	send_json(c.out, 200, out);
+}
+
+/* the body is the tool's arguments, which the tool itself checks */
+void ep_tool_run(Call &c)
+{
+	const std::string &name = c.args[0];
+	std::vector<llm_tool> tools;
+	CAssistantTools::list(tools, true);
+	bool known = false;
+	for (const llm_tool &t : tools)
+		known |= t.name == name;
+	if (!known) {
+		problem(c.out, 404, "no-such-tool", "no tool " + name);
+		return;
+	}
+	if (c.level < tool_level(name)) {
+		problem(c.out, 403, "not-permitted", "this tool is not open to this caller");
+		return;
+	}
+	Json::Value input(Json::objectValue);
+	const std::string &text = c.in.body;
+	if (text.find_first_not_of(" \t\r\n") != std::string::npos) {
+		Json::CharReaderBuilder b;
+		b["rejectDupKeys"] = true;
+		std::unique_ptr<Json::CharReader> reader(b.newCharReader());
+		std::string errs;
+		if (!reader->parse(text.data(), text.data() + text.size(), &input, &errs) || !input.isObject()) {
+			problem(c.out, 400, "bad-body", "the body is one object with the arguments of the tool");
+			return;
+		}
+	}
+	bool ok = false;
+	std::string answer;
+	if (!CAssistantTools::run(name, input, TOOL_TIMEOUT, ok, answer)) {
+		problem(c.out, 504, "no-answer", answer);
+		return;
+	}
+	Json::Value out(Json::objectValue);
+	out["ok"] = ok;
+	out["text"] = answer;
+	send_json(c.out, 200, out);
+}
 #endif
 
 /* the certificate of the box's own CA, for a phone to trust */
@@ -3225,6 +3300,8 @@ const Route routes[] = {
 	{ "POST",	"/api/v1/mcp",			L_SYSTEM,	ep_mcp_set },
 	{ "DELETE",	"/api/v1/mcp/clients",		L_SYSTEM,	ep_mcp_clients_delete },
 	{ "DELETE",	"/api/v1/mcp/clients/{}",	L_SYSTEM,	ep_mcp_client_delete },
+	{ "GET",	"/api/v1/tools",		L_READ,		ep_tools },
+	{ "POST",	"/api/v1/tools/{}",		L_READ,		ep_tool_run },
 #endif
 	{ "POST",	"/api/v1/ext/{}/run",		L_WRITE,	ep_ext_run },
 };
