@@ -48,6 +48,7 @@
 #include "bouquetlist.h"
 #include "widget/stringinput.h"
 #include "widget/keyboard_input.h"
+#include "widget/remote_list.h"
 
 #include <driver/display.h>
 #include <driver/screen_max.h>
@@ -394,6 +395,20 @@ int CEventList::exec(const t_channel_id channel_id, const std::string& channelna
 	int timeout = g_settings.timing[SNeutrinoSettings::TIMING_EPG];
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(timeout);
 
+	CRemoteList::Access remote_access;
+	remote_access.title = [&channelname] { return std::string(g_Locale->getText(LOCALE_EVENTLIST_NAME)) + " " + channelname; };
+	remote_access.count = [this] { return evtlist.size(); };
+	remote_access.text = [this](size_t i) {
+		char when[32];
+		time_t start = evtlist[i].startTime;
+		strftime(when, sizeof(when), "%a %d.%m. %H:%M", localtime(&start));
+		return std::string(when) + " " + evtlist[i].description;
+	};
+	remote_access.selected = [this] { return (size_t) selected; };
+	remote_access.select = [this, channel_id](size_t i) { if (i != selected) moveCursor(i, channel_id); };
+	CRemoteList remote_list(remote_access, "shows the details of the event",
+		"red: record timer, yellow: switch timer, green: search, blue: sort, left and right: other channels");
+
 	bool loop = true;
 	while (loop)
 	{
@@ -420,22 +435,7 @@ int CEventList::exec(const t_channel_id channel_id, const std::string& channelna
 		if (msg == CRCInput::RC_up || (int) msg == g_settings.key_pageup || 
 			msg == CRCInput::RC_down || (int) msg == g_settings.key_pagedown)
 		{
-			int prev_selected = selected;
-			int new_sel = UpDownKey(evtlist, msg, listmaxshow, selected);
-			if (new_sel >= 0) {
-				selected = new_sel;
-				paintDescription(selected);
-			}
-			paintItem(prev_selected - liststart, channel_id);
-			unsigned int oldliststart = liststart;
-			liststart = (selected/listmaxshow)*listmaxshow;
-
-			if(oldliststart!=liststart)
-				paint(channel_id);
-			else
-				paintItem(selected - liststart, channel_id);
-
-			paintFoot(channel_id);
+			moveCursor(UpDownKey(evtlist, msg, listmaxshow, selected), channel_id);
 		}
 		//sort
 		else if (!showfollow && (msg == (neutrino_msg_t)g_settings.key_channelList_sort))
@@ -735,6 +735,26 @@ CTimerd::CTimerEventTypes CEventList::isScheduled(t_channel_id channel_id, CChan
 		}
 	}
 	return (CTimerd::CTimerEventTypes) 0;
+}
+
+/* new_sel below 0 keeps the cursor; the rows around it are painted again */
+void CEventList::moveCursor(int new_sel, t_channel_id channel_id)
+{
+	int prev_selected = selected;
+	if (new_sel >= 0) {
+		selected = new_sel;
+		paintDescription(selected);
+	}
+	paintItem(prev_selected - liststart, channel_id);
+	unsigned int oldliststart = liststart;
+	liststart = (selected/listmaxshow)*listmaxshow;
+
+	if(oldliststart!=liststart)
+		paint(channel_id);
+	else
+		paintItem(selected - liststart, channel_id);
+
+	paintFoot(channel_id);
 }
 
 void CEventList::paintItem(unsigned int pos, t_channel_id channel_idI)

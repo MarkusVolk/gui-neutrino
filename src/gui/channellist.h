@@ -158,6 +158,7 @@ private:
 	void paintItem2DetailsLine (int pos);
 	void paintAdditionals(int index);
 	void paintItem(int pos,const bool firstpaint = false);
+	void moveCursor(int newpos);
 	bool updateSelection(int newpos);
 	void paintBody();
 	void paintHead();

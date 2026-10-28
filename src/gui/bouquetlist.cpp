@@ -39,6 +39,7 @@
 #include <gui/widget/buttons.h>
 #include <gui/widget/icons.h>
 #include <gui/widget/msgbox.h>
+#include <gui/widget/remote_list.h>
 #include <gui/infoclock.h>
 #include <driver/display.h>
 #include <driver/fontrenderer.h>
@@ -500,6 +501,15 @@ int CBouquetList::show(bool bShowChannelList)
 
 	int timeout = g_settings.timing[SNeutrinoSettings::TIMING_CHANLIST];
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(timeout);
+
+	CRemoteList::Access remote_access;
+	remote_access.title = [] { return std::string(g_Locale->getText(LOCALE_BOUQUETLIST_HEAD)); };
+	remote_access.count = [this] { return Bouquets.size(); };
+	remote_access.text = [this](size_t i) { return std::string(Bouquets[i]->channelList->getName()); };
+	remote_access.selected = [this] { return (size_t) selected; };
+	remote_access.select = [this](size_t i) { updateSelection(i); };
+	CRemoteList remote_list(remote_access, "opens the channel list of the bouquet",
+		"red: favourites, green: providers, yellow: satellites, blue: all channels");
 
 	bool loop = true;
 	while (loop)

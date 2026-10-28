@@ -75,6 +75,7 @@ static bool simulate_fe_enabled()
 #include "widget/hintbox.h"
 #else
 #include "widget/msgbox.h"
+#include "widget/remote_list.h"
 #endif
 #include <system/helpers.h>
 #include <system/settings.h>
@@ -585,28 +586,35 @@ void CChannelList::calcSize()
 	infozone_height = height - theight - pig_height - footerHeight;
 }
 
+/* the cursor to newpos and painted there; nothing is zapped or moved */
+void CChannelList::moveCursor(int newpos)
+{
+	int prev_selected = selected;
+	unsigned int oldliststart = liststart;
+	selected = newpos;
+	liststart = (selected/listmaxshow)*listmaxshow;
+	if (oldliststart != liststart) {
+		paintBody();
+		updateVfd();
+	} else {
+		paintItem(prev_selected - liststart);
+		paintItem(selected - liststart);
+		showChannelLogo();
+	}
+}
+
 bool CChannelList::updateSelection(int newpos)
 {
 	bool actzap = false;
 	if((int) selected == newpos)
 		return actzap;
 
-	int prev_selected = selected;
-	selected = newpos;
 	if (move_state == beMoving) {
+		int prev_selected = selected;
+		selected = newpos;
 		internalMoveChannel(prev_selected, selected);
 	} else {
-		unsigned int oldliststart = liststart;
-
-		liststart = (selected/listmaxshow)*listmaxshow;
-		if (oldliststart != liststart) {
-			paintBody();
-			updateVfd();
-		} else {
-			paintItem(prev_selected - liststart);
-			paintItem(selected - liststart);
-			showChannelLogo();
-		}
+		moveCursor(newpos);
 
 		if(!edit_state && (new_zap_mode == 2 /* active */) && SameTP()) {
 			actzap = true;
@@ -677,6 +685,21 @@ int CChannelList::show()
 
 	bool loop=true;
 	bool dont_hide = false;
+	CRemoteList::Access remote_access;
+	remote_access.title = [this] { return std::string(getName()); };
+	remote_access.count = [this] { return (size_t) chanlist->size(); };
+	remote_access.text = [this](size_t i) {
+		CZapitChannel *chan = (*chanlist)[i];
+		std::string text = to_string(getKey(i)) + " " + chan->getName();
+		if (!chan->currentEvent.description.empty())
+			text += " - " + chan->currentEvent.description;
+		return text;
+	};
+	remote_access.selected = [this] { return (size_t) selected; };
+	remote_access.select = [this](size_t i) { if (i != selected) moveCursor(i); };
+	CRemoteList remote_list(remote_access, "switches to the channel and closes the list",
+		"red: programme guide of the channel, info: programme details, yellow: bouquet list, "
+		"blue: now/next/prime time, record: records the channel");
 	while (loop) {
 		/* Something covering the infozone made a paint of it get skipped. Being
 		 * back in the loop usually means whatever put it there is gone, but not

@@ -108,6 +108,7 @@ class CEventList : public CListHelpers
 	const char *	unit_short_minute;
 
 	void paintItem(unsigned pos, t_channel_id channel_id = 0);
+	void moveCursor(int new_sel, t_channel_id channel_id);
 	void paintDescription(int index);
 	void paint(t_channel_id channel_id = 0);
 	void paintHead(t_channel_id _channel_id, std::string _channelname, std::string _channelname_prev = "", std::string _channelname_next = "");
