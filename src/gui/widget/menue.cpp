@@ -998,7 +998,7 @@ bool CMenuWidget::remoteSelect(const std::string &what, std::string &error)
 	if (found < 0)
 		return false;
 	remote_select = found;
-	g_RCInput->postMsg(CRCInput::RC_ok, 0);
+	g_RCInput->postMsg(CRCInput::RC_ok, CRemoteUi::PICK);
 	return true;
 }
 
@@ -1088,7 +1088,7 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 		/* the OK a remote client sent after it chose an entry: the entry
 		 * becomes the selected one first, as with a direct key */
 		if (msg == CRCInput::RC_ok && remote_select >= 0) {
-			if (remote_select < (int)items.size() && items[remote_select]->isSelectable()) {
+			if (data == CRemoteUi::PICK && remote_select < (int)items.size() && items[remote_select]->isSelectable()) {
 				if (selected >= 0 && selected < (int)items.size())
 					items[selected]->paint(false);
 				selected = remote_select;

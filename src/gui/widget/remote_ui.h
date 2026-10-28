@@ -34,6 +34,9 @@ class CMenuWidget;
 class CRemoteUi
 {
 	public:
+		/* the data of the OK a remote client's choice posts, so that only
+		 * this OK carries the choice and not the viewer's next one */
+		enum { PICK = 0x7069636b };
 		virtual ~CRemoteUi() {}
 		/* what the viewer sees, as text */
 		virtual std::string remoteDescribe() = 0;
