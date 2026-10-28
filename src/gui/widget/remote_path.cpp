@@ -35,6 +35,8 @@
 
 #define MAX_STEPS	64
 #define OPEN_TRIES	5
+/* seconds after which a walk whose steps stopped coming counts as lost */
+#define LOST_AFTER	30
 
 namespace
 {
@@ -59,6 +61,7 @@ namespace
 		CRemoteUi *chosen_in;
 		std::string result;
 		int steps;
+		time_t last_step;
 		int open_tries;
 		/* a value is being set; its notifier may ask something */
 		bool busy;
@@ -207,6 +210,7 @@ static void step(unsigned int id)
 {
 	if (!current || current->id != id)
 		return;
+	current->last_step = time(NULL);
 	if (++current->steps > MAX_STEPS)
 	{
 		finish(false, "the menus did not settle; look with tv_screen");
@@ -360,6 +364,9 @@ static void step(unsigned int id)
 bool remote_path::start(const std::vector<std::string> &path, bool set, const std::string &value,
 			bool leave, bool here, bool hidden, done_fn done, std::string &error)
 {
+	/* a window that drops the main loop's messages may have lost its steps */
+	if (current && !current->busy && time(NULL) - current->last_step > LOST_AFTER)
+		cancel();
 	if (current)
 	{
 		error = "a walk through the menus runs already";
@@ -407,6 +414,7 @@ bool remote_path::start(const std::vector<std::string> &path, bool set, const st
 	current->phase = here ? WALKING : CLOSING;
 	current->chosen_in = NULL;
 	current->steps = 0;
+	current->last_step = time(NULL);
 	current->open_tries = 0;
 	current->busy = false;
 	current->reported = false;
