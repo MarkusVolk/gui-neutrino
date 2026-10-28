@@ -22,7 +22,17 @@
 #include <algorithm>
 #include <vector>
 
-static std::vector<CRemoteUi *> open_dialogs;
+namespace
+{
+	struct open_dialog
+	{
+		CRemoteUi *ui;
+		bool viewer_only;
+	};
+}
+
+static std::vector<open_dialog> open_dialogs;
+static int viewer_only = 0;
 
 bool CRemoteUi::remoteSelect(const std::string &, std::string &error)
 {
@@ -38,17 +48,35 @@ bool CRemoteUi::remoteInput(const std::string &, std::string &error)
 
 CRemoteUi *CRemoteUi::top()
 {
-	return open_dialogs.empty() ? NULL : open_dialogs.back();
+	return open_dialogs.empty() ? NULL : open_dialogs.back().ui;
+}
+
+bool CRemoteUi::viewerOnly()
+{
+	return !open_dialogs.empty() && open_dialogs.back().viewer_only;
 }
 
 CRemoteUi::Guard::Guard(CRemoteUi *u) : ui(u)
 {
-	open_dialogs.push_back(ui);
+	open_dialog d = { ui, viewer_only > 0 };
+	open_dialogs.push_back(d);
 }
 
 CRemoteUi::Guard::~Guard()
 {
-	std::vector<CRemoteUi *>::iterator it = std::find(open_dialogs.begin(), open_dialogs.end(), ui);
-	if (it != open_dialogs.end())
-		open_dialogs.erase(it);
+	for (std::vector<open_dialog>::iterator it = open_dialogs.begin(); it != open_dialogs.end(); ++it)
+		if (it->ui == ui) {
+			open_dialogs.erase(it);
+			break;
+		}
+}
+
+CRemoteUi::ViewerOnly::ViewerOnly()
+{
+	viewer_only++;
+}
+
+CRemoteUi::ViewerOnly::~ViewerOnly()
+{
+	viewer_only--;
 }

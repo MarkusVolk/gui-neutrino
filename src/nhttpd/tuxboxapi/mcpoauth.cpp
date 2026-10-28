@@ -616,6 +616,7 @@ static std::string with_params(const std::string &uri, const std::string &params
 static void ask_on_tv(const std::string &id, const std::string &name, const std::string &where)
 {
 	std::string text = name + " (" + where + ")\n\n" + g_Locale->getText(LOCALE_ASSISTANT_CONSENT);
+	CRemoteUi::ViewerOnly viewer;
 	int res = ShowMsg(LOCALE_ASSISTANT_SETUP_BOX_SERVER, text.c_str(), CMsgBox::mbrNo,
 			  CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_INFO, 700, CONSENT_TIMEOUT, true);
 	std::lock_guard<std::mutex> l(lock);

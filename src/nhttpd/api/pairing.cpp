@@ -213,6 +213,7 @@ void ask_on_tv(const std::string &id, const std::string &name, const std::string
 {
 	std::string text = std::string(g_Locale->getText(LOCALE_NETWORKMENU_HTTPD_PAIR_ASK)) + "\n\n"
 		+ name + " (" + client + ")\n\n" + g_Locale->getText(LOCALE_NETWORKMENU_HTTPD_PAIR_ASK_CODE) + "  " + digits;
+	CRemoteUi::ViewerOnly viewer;
 	int res = ShowMsg(LOCALE_NETWORKMENU_HTTPD_PAIR, text.c_str(), CMsgBox::mbrNo,
 			  CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_INFO, 700, ASK_TIMEOUT, true);
 	std::lock_guard<std::mutex> l(lock);

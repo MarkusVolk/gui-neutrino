@@ -42,6 +42,8 @@ class CRemoteUi
 
 		/* the dialog on top, NULL when none is open */
 		static CRemoteUi *top();
+		/* the dialog on top is a question for the viewer at the TV only */
+		static bool viewerOnly();
 
 		/* registers a dialog for as long as it lives in a scope */
 		class Guard
@@ -51,6 +53,15 @@ class CRemoteUi
 			public:
 				Guard(CRemoteUi *u);
 				~Guard();
+		};
+
+		/* the dialogs opened while one lives, such as a consent, are
+		 * answered by the viewer, never by a remote client */
+		class ViewerOnly
+		{
+			public:
+				ViewerOnly();
+				~ViewerOnly();
 		};
 };
 

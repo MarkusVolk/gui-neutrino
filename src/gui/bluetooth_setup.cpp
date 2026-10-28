@@ -344,6 +344,7 @@ bool CBluetoothSetup::confirmCode(const std::string &code)
 {
 	hideHint();
 	std::string question = std::string(g_Locale->getText(LOCALE_BLUETOOTH_CONFIRM_CODE)) + "\n" + display_name(code);
+	CRemoteUi::ViewerOnly viewer;
 	return ShowMsg(LOCALE_NETWORKMENU_BLUETOOTH, question, CMsgBox::mbrNo, CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_QUESTION) == CMsgBox::mbrYes;
 }
 
