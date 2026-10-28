@@ -541,6 +541,12 @@ const char *CMenuItem::getName(void)
 	return nameString.c_str();
 }
 
+bool CMenuItem::remoteSet(const std::string &, std::string &error)
+{
+	error = std::string("the entry \"") + getName() + "\" has no value to set; open it instead";
+	return false;
+}
+
 void CMenuItem::setDescription(const std::string& text)
 {
 	descString = text;
@@ -864,9 +870,36 @@ static std::string lower_text(std::string s)
 	return s;
 }
 
+/* the same name first, else the one name that contains the text */
+static int remote_match(const std::vector<std::string> &names, const std::string &what, std::string &error)
+{
+	std::string want = lower_text(what);
+	int partial = -1, partials = 0;
+	for (unsigned int i = 0; i < names.size(); i++) {
+		std::string name = lower_text(names[i]);
+		if (name.empty())
+			continue;
+		if (name == want)
+			return i;
+		if (!want.empty() && name.find(want) != std::string::npos) {
+			partial = i;
+			partials++;
+		}
+	}
+	if (partials == 1)
+		return partial;
+	if (partials > 1)
+		error = "more than one value contains \"" + what + "\"";
+	else
+		error = "no value \"" + what + "\"";
+	return -1;
+}
+
+#define REMOTE_MAX_OPTIONS	40
+
 /* the menu as a list a remote client reads: number, name, value, and
  * the hint of the selected entry */
-std::string CMenuWidget::remoteDescribe()
+std::string CMenuWidget::remoteDescribe(bool with_options)
 {
 	std::string out = std::string("Menu: ") + getName() + "\n";
 	if (!subhead_text.empty())
@@ -885,6 +918,17 @@ std::string CMenuWidget::remoteDescribe()
 		std::string value = item->getValueText();
 		if (!value.empty())
 			out += " = " + value;
+		if (with_options) {
+			std::vector<std::string> options = item->remoteOptions();
+			if (!options.empty()) {
+				out += " [";
+				for (unsigned int o = 0; o < options.size() && o < REMOTE_MAX_OPTIONS; o++)
+					out += (o ? " | " : "") + options[o];
+				if (options.size() > REMOTE_MAX_OPTIONS)
+					out += " | ... " + to_string(options.size() - REMOTE_MAX_OPTIONS) + " more";
+				out += "]";
+			}
+		}
 		if (!item->isSelectable())
 			out += " (not selectable)";
 		out += "\n";
@@ -900,9 +944,9 @@ std::string CMenuWidget::remoteDescribe()
 	return out;
 }
 
-/* chooses an entry by its number in remoteDescribe() or by its name:
+/* an entry by its number in remoteDescribe() or by its name:
  * the same name first, else the one name that contains the text */
-bool CMenuWidget::remoteSelect(const std::string &what, std::string &error)
+int CMenuWidget::remoteFind(const std::string &what, std::string &error)
 {
 	int found = -1;
 	char *end = NULL;
@@ -928,19 +972,41 @@ bool CMenuWidget::remoteSelect(const std::string &what, std::string &error)
 			found = partial;
 		if (found < 0 && partials > 1) {
 			error = "more than one entry contains \"" + what + "\"; give its number";
-			return false;
+			return -1;
 		}
 	}
 	if (found < 0) {
 		error = "no entry \"" + what + "\" in this menu";
-		return false;
+		return -1;
 	}
 	if (!items[found]->isSelectable()) {
 		error = std::string("the entry \"") + items[found]->getName() + "\" cannot be chosen";
-		return false;
+		return -1;
 	}
+	return found;
+}
+
+bool CMenuWidget::remoteSelect(const std::string &what, std::string &error)
+{
+	int found = remoteFind(what, error);
+	if (found < 0)
+		return false;
 	remote_select = found;
 	g_RCInput->postMsg(CRCInput::RC_ok, 0);
+	return true;
+}
+
+/* the menu is open and painted, as this runs from its loop */
+bool CMenuWidget::remoteSet(const std::string &entry, const std::string &value, std::string &result)
+{
+	int found = remoteFind(entry, result);
+	if (found < 0)
+		return false;
+	CMenuItem *item = items[found];
+	if (!item->remoteSet(value, result))
+		return false;
+	paint();
+	result = std::string(item->getName() ? item->getName() : "") + " = " + item->getValueText();
 	return true;
 }
 
@@ -2109,12 +2175,7 @@ int CMenuOptionNumberChooser::exec(CMenuTarget*)
 			(*optionValue)++;
 	}
 
-	bool wantsRepaint = false;
-	if(observ && !luaAction.empty()) {
-		// optionValue is int*
-		wantsRepaint = observ->changeNotify(luaState, luaAction, luaId, (void *) to_string(*optionValue).c_str());
-	} else if(observ)
-		wantsRepaint = observ->changeNotify(name, optionValue);
+	bool wantsRepaint = notifyChange();
 
 	// give the observer a chance to modify the value
 	paint(true);
@@ -2125,10 +2186,20 @@ int CMenuOptionNumberChooser::exec(CMenuTarget*)
 	return res;
 }
 
-int CMenuOptionNumberChooser::paint(bool selected)
+bool CMenuOptionNumberChooser::notifyChange()
 {
-	const char * l_option;
-	char option_value[41];
+	if(observ && !luaAction.empty()) {
+		// optionValue is int*
+		return observ->changeNotify(luaState, luaAction, luaId, (void *) to_string(*optionValue).c_str());
+	} else if(observ)
+		return observ->changeNotify(name, optionValue);
+	return false;
+}
+
+std::string CMenuOptionNumberChooser::valueText()
+{
+	char option_value[41] = "";
+	std::string l_option;
 
 	for (size_t i = 0; i < localized.size(); i++)
 	{
@@ -2138,7 +2209,7 @@ int CMenuOptionNumberChooser::paint(bool selected)
 				std::string s = numberFormatFunction(*optionValue + display_offset);
 				strncpy(option_value, s.c_str(), sizeof(option_value)-1);
 			} else
-				sprintf(option_value, numberFormat.c_str(), *optionValue + display_offset);
+				snprintf(option_value, sizeof(option_value), numberFormat.c_str(), *optionValue + display_offset);
 			l_option = option_value;
 		}
 		else
@@ -2147,6 +2218,54 @@ int CMenuOptionNumberChooser::paint(bool selected)
 			break;
 		}
 	}
+	return l_option;
+}
+
+/* the range as the viewer reads it, and the values that have a name */
+std::vector<std::string> CMenuOptionNumberChooser::remoteOptions()
+{
+	std::vector<std::string> out;
+	out.push_back(to_string(lower_bound + display_offset) + ".." + to_string(upper_bound + display_offset));
+	for (size_t i = 0; i < localized.size(); i++)
+		if (localized[i].value_name != NONEXISTANT_LOCALE)
+			out.push_back(g_Locale->getText(localized[i].value_name));
+	return out;
+}
+
+bool CMenuOptionNumberChooser::remoteSet(const std::string &value, std::string &error)
+{
+	int set;
+	char *end = NULL;
+	long number = strtol(value.c_str(), &end, 10);
+	if (!value.empty() && end != value.c_str()) {
+		set = number - display_offset;
+		if (set < lower_bound || set > upper_bound) {
+			error = "the value lies outside " + to_string(lower_bound + display_offset) + ".." + to_string(upper_bound + display_offset);
+			return false;
+		}
+	} else {
+		std::vector<std::string> names;
+		std::vector<int> values;
+		for (size_t i = 0; i < localized.size(); i++)
+			if (localized[i].value_name != NONEXISTANT_LOCALE) {
+				names.push_back(g_Locale->getText(localized[i].value_name));
+				values.push_back(localized[i].value);
+			}
+		int found = remote_match(names, value, error);
+		if (found < 0)
+			return false;
+		set = values[found];
+	}
+	*optionValue = set;
+	notifyChange();
+	OnAfterChangeOption();
+	return true;
+}
+
+int CMenuOptionNumberChooser::paint(bool selected)
+{
+	std::string option_text = valueText();
+	const char * l_option = option_text.c_str();
 
 	//manage toggle button
 	if (localized.size() == 2)
@@ -2426,16 +2545,49 @@ int CMenuOptionChooser::exec(CMenuTarget*)
 	}
 	paint(true);
 	OnAfterChangeOption();
-	if(observ && !luaAction.empty()) {
-		if (optionValname)
-			wantsRepaint = observ->changeNotify(luaState, luaAction, luaId, optionValname);
-	} else if(observ)
-		wantsRepaint = observ->changeNotify(name, optionValue);
+	wantsRepaint = notifyChange(optionValname);
 
 	if (wantsRepaint)
 		ret = menu_return::RETURN_REPAINT;
 
 	return ret;
+}
+
+bool CMenuOptionChooser::notifyChange(char *valname)
+{
+	if(observ && !luaAction.empty()) {
+		if (valname)
+			return observ->changeNotify(luaState, luaAction, luaId, valname);
+	} else if(observ)
+		return observ->changeNotify(name, optionValue);
+	return false;
+}
+
+std::string CMenuOptionChooser::getValueText()
+{
+	for (unsigned int count = 0; count < number_of_options; count++)
+		if (options[count].key == *optionValue)
+			return getValName(options[count].value, options[count].valname);
+	return "";
+}
+
+std::vector<std::string> CMenuOptionChooser::remoteOptions()
+{
+	std::vector<std::string> out;
+	for (unsigned int count = 0; count < number_of_options; count++)
+		out.push_back(getValName(options[count].value, options[count].valname));
+	return out;
+}
+
+bool CMenuOptionChooser::remoteSet(const std::string &value, std::string &error)
+{
+	int found = remote_match(remoteOptions(), value, error);
+	if (found < 0)
+		return false;
+	*optionValue = options[found].key;
+	OnAfterChangeOption();
+	notifyChange((char *) options[found].valname);
+	return true;
 }
 
 int CMenuOptionChooser::paint( bool selected)
@@ -2608,16 +2760,36 @@ int CMenuOptionStringChooser::exec(CMenuTarget* parent)
 
 		paint(true);
 	}
-	if(observ && !luaAction.empty())
-		wantsRepaint = observ->changeNotify(luaState, luaAction, luaId, (void *)(optionValuePtr ? optionValuePtr->c_str() : ""));
-	else if(observ) {
-		wantsRepaint = observ->changeNotify(name, (void *)(optionValuePtr ? optionValuePtr->c_str() : ""));
-	}
+	wantsRepaint = notifyChange();
 	OnAfterChangeOption();
 	if (wantsRepaint)
 		ret = menu_return::RETURN_REPAINT;
 
 	return ret;
+}
+
+bool CMenuOptionStringChooser::notifyChange()
+{
+	if(observ && !luaAction.empty())
+		return observ->changeNotify(luaState, luaAction, luaId, (void *)(optionValuePtr ? optionValuePtr->c_str() : ""));
+	else if(observ)
+		return observ->changeNotify(name, (void *)(optionValuePtr ? optionValuePtr->c_str() : ""));
+	return false;
+}
+
+bool CMenuOptionStringChooser::remoteSet(const std::string &value, std::string &error)
+{
+	if (!optionValuePtr) {
+		error = "this entry holds no value";
+		return false;
+	}
+	int found = remote_match(options, value, error);
+	if (found < 0)
+		return false;
+	setSettingsText(*optionValuePtr, options[found]);
+	notifyChange();
+	OnAfterChangeOption();
+	return true;
 }
 
 int CMenuOptionStringChooser::paint( bool selected )

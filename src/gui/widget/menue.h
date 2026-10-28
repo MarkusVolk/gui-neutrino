@@ -154,6 +154,10 @@ class CMenuItem : public  CComponentsSignals
 		std::string	painted_value;
 		virtual std::string getValueText() { return painted_value; }
 		virtual bool isSeparator() const { return false; }
+		/* the values a remote client may set, empty when it sets none */
+		virtual std::vector<std::string> remoteOptions() { return std::vector<std::string>(); }
+		/* sets the value the way the viewer would choose it */
+		virtual bool remoteSet(const std::string &value, std::string &error);
 
 		CMenuItem(bool Active = true, neutrino_msg_t DirectKey = RC_NOKEY, const char * const IconName= NULL, const char * const IconName_Info_right = NULL, bool IsStatic = false);
 
@@ -354,6 +358,9 @@ private:
 	std::string		numberFormat;
 	std::string		(*numberFormatFunction)(int num);
 
+	std::string		valueText();
+	bool			notifyChange();
+
 	void			init(	const neutrino_locale_t& lName,
 					const std::string &sName,
 					int* const Option_Value,
@@ -382,6 +389,9 @@ private:
 	int exec(CMenuTarget* parent);
 	int isMenueOptionChooser(void) const{return 1;}
 	int getWidth(void);
+	std::string getValueText() { return valueText(); }
+	std::vector<std::string> remoteOptions();
+	bool remoteSet(const std::string &value, std::string &error);
 	void setNumberFormat(const std::string &format) { numberFormat = format; }
 	void setNumberFormat(std::string (*fun)(int)) { numberFormatFunction = fun; }
 	void setNumericInput(bool _numeric_input) { numeric_input = _numeric_input; }
@@ -445,6 +455,7 @@ class CMenuOptionChooser : public CAbstractMenuOptionChooser
 		bool                    optionsSort;
 
 		void clearChooserOptions();
+		bool notifyChange(char *valname);
 		void init(      const std::string &OptionName,
 				const neutrino_locale_t Name,
 				int * const OptionValue,
@@ -495,6 +506,9 @@ class CMenuOptionChooser : public CAbstractMenuOptionChooser
 
 		int exec(CMenuTarget* parent);
 		int isMenueOptionChooser(void) const{return 1;}
+		std::string getValueText();
+		std::vector<std::string> remoteOptions();
+		bool remoteSet(const std::string &value, std::string &error);
 };
 
 class CMenuOptionStringChooser : public CMenuItem
@@ -511,6 +525,7 @@ class CMenuOptionStringChooser : public CMenuItem
 				CChangeObserver * const Observ,
 				bool Pulldown );
 		bool 		hold_last_item;
+		bool notifyChange();
 	public:
 		CMenuOptionStringChooser(const neutrino_locale_t Name, std::string* OptionValue, bool Active = false,
 					 CChangeObserver* Observ = NULL, const neutrino_msg_t DirectKey = RC_NOKEY,
@@ -534,6 +549,9 @@ class CMenuOptionStringChooser : public CMenuItem
 		std::string getOptionValue() { return *optionValuePtr; }
 		sigc::signal<void> OnAfterChangeOption;
 		void rememberLastItem(bool remember = true) {hold_last_item = remember;}
+		std::string getValueText() { return optionValuePtr ? *optionValuePtr : ""; }
+		std::vector<std::string> remoteOptions() { return options; }
+		bool remoteSet(const std::string &value, std::string &error);
 };
 
 class CMenuGlobal
@@ -662,8 +680,14 @@ class CMenuWidget : public CMenuTarget, public CComponentsSignals, public CRemot
 		void setSelectedByName(const neutrino_locale_t &Locale);
 		void setSelectedByName(const std::string &Name);
 		int getSelected()const { return selected; };
-		std::string remoteDescribe();
+		std::string remoteDescribe() { return remoteDescribe(false); }
+		/* with the values the choosers may take */
+		std::string remoteDescribe(bool with_options);
+		/* the index of an entry by its number in remoteDescribe() or its name, -1 when none */
+		int remoteFind(const std::string &what, std::string &error);
 		bool remoteSelect(const std::string &what, std::string &error);
+		/* sets the value of an entry without opening it */
+		bool remoteSet(const std::string &entry, const std::string &value, std::string &result);
 		int getSelectedByName(const neutrino_locale_t &Locale);
 		int getSelectedByName(const std::string &Name);
 		void move(int xoff, int yoff);
