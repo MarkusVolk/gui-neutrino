@@ -158,6 +158,9 @@ CFrameBuffer::CFrameBuffer()
 	backupBackground = NULL;
 	backgroundFilename = "";
 	locked = false;
+	shadow_real = NULL;
+	shadow_buf = NULL;
+	shadow_size = 0;
 	fd  = -1;
 	// 	tty = 0;
 	/*
@@ -400,6 +403,43 @@ fb_pixel_t * CFrameBuffer::getBackBufferPointer() const
 	return getFrameBufferPointer();
 }
 
+/* The shadow is kept after shadowEnd(): a painter in another thread may
+ * still hold the pointer it fetched just before. */
+bool CFrameBuffer::shadowBegin()
+{
+	if (shadowed() || !lbb)
+		return false;
+	size_t size = (size_t) stride * yRes;
+	if (size > shadow_size) {
+		fb_pixel_t *buf = (fb_pixel_t *) malloc(size);
+		if (!buf)
+			return false;
+		free(shadow_buf);
+		shadow_buf = buf;
+		shadow_size = size;
+	}
+	memcpy(shadow_buf, lbb, size);
+	shadow_real = lbb;
+	lbb = shadow_buf;
+	return true;
+}
+
+/* only the rows that changed reach the screen, so it goes from the picture
+ * before straight to the one after */
+void CFrameBuffer::shadowEnd()
+{
+	if (!shadowed())
+		return;
+	lbb = shadow_real;
+	shadow_real = NULL;
+	uint8_t *from = (uint8_t *) shadow_buf;
+	uint8_t *to = (uint8_t *) lbb;
+	for (unsigned int y = 0; y < yRes; y++, from += stride, to += stride)
+		if (memcmp(to, from, stride))
+			memcpy(to, from, stride);
+	shadowShown();
+}
+
 bool CFrameBuffer::getActive() const
 {
 	return (active || (virtual_fb != NULL));
@@ -419,6 +459,8 @@ int CFrameBuffer::setMode(unsigned int /*nxRes*/, unsigned int /*nyRes*/, unsign
 {
 	if (!available&&!active)
 		return -1;
+	if (shadowed())
+		shadowEnd();
 
 	xRes = screeninfo.xres;
 	yRes = screeninfo.yres;

@@ -167,6 +167,8 @@ void CFbAccelGLFB::_blit()
 /* the size of the OSD; the display's mode is the video system's business */
 int CFbAccelGLFB::setMode(unsigned int nxRes, unsigned int nyRes, unsigned int)
 {
+	if (shadowed())
+		shadowEnd();
 	if (glfb && nxRes > 0 && nyRes > 0 && (nxRes != screeninfo.xres || nyRes != screeninfo.yres))
 	{
 		if (!glfb->setOSDResolution(nxRes, nyRes))

@@ -125,6 +125,12 @@ class CFrameBuffer : public sigc::trackable
 		int             fd/*, tty*/;
 		fb_pixel_t *    lfb;
 		fb_pixel_t *    lbb;
+		/* the visible buffer while lbb points to the shadow */
+		fb_pixel_t *    shadow_real;
+		fb_pixel_t *    shadow_buf;
+		size_t          shadow_size;
+		/* the shadow's changes reached the visible buffer */
+		virtual void shadowShown() {}
 		int		available;
 		fb_pixel_t *    background;
 		fb_pixel_t *    backupBackground;
@@ -291,6 +297,11 @@ class CFrameBuffer : public sigc::trackable
 		bool Lock(void);
 		void Unlock(void);
 		bool Locked(void) { return locked; };
+		/* the OSD is drawn into a copy the viewer does not see, until
+		 * shadowEnd() shows what differs from the screen */
+		bool shadowBegin();
+		void shadowEnd();
+		bool shadowed() const { return shadow_real != NULL; }
 		virtual void waitForIdle(const char* func=NULL);
 		void* convertRGB2FB(unsigned char *rgbbuff, unsigned long x, unsigned long y, int transp = 0xFF);
 		void* convertRGBA2FB(unsigned char *rgbbuff, unsigned long x, unsigned long y);

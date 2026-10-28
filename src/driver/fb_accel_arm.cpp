@@ -319,6 +319,8 @@ int CFbAccelARM::setMode(unsigned int nxRes, unsigned int nyRes, unsigned int nb
 {
 	if (!available&&!active)
 		return -1;
+	if (shadowed())
+		shadowEnd();
 
 	unsigned int nxRes_ = nxRes;
 	unsigned int nyRes_ = nyRes;

@@ -174,6 +174,7 @@ class CFbAccelGLFB
 		OpenThreads::Condition blit_cond;
 		OpenThreads::Mutex blit_mutex;
 		fb_pixel_t *backbuffer;
+		void shadowShown() { blit(); }
 	public:
 		CFbAccelGLFB();
 		~CFbAccelGLFB();

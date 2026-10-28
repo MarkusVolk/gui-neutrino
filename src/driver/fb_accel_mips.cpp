@@ -320,6 +320,8 @@ int CFbAccelMIPS::setMode(unsigned int nxRes, unsigned int nyRes, unsigned int n
 {
 	if (!available&&!active)
 		return -1;
+	if (shadowed())
+		shadowEnd();
 
 	unsigned int nxRes_ = nxRes;
 	unsigned int nyRes_ = nyRes;
