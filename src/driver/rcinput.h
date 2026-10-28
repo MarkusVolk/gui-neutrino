@@ -36,6 +36,7 @@
 #include <linux/input.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -288,6 +289,14 @@ class CRCInput
 		void getMsg_ms(neutrino_msg_t *msg, neutrino_msg_data_t *data, int Timeout, bool bAllowRepeatLR = false);      // get message, timeout in msecs
 		void getMsg_us(neutrino_msg_t *msg, neutrino_msg_data_t *data, uint64_t Timeout, bool bAllowRepeatLR = false); // get message, timeout in µsecs
 		bool postMsg(const neutrino_msg_t msg, const neutrino_msg_data_t data, const bool Priority = true);            // push message back into buffer, false if the queue would not take it
+		/* sees every key event of the input devices - the remote control and
+		 * the web keys, not posted messages - before it is handed out; true
+		 * swallows it. data is 1 for a press, 2 for a repeat, 0 for a release */
+		typedef std::function<bool(neutrino_msg_t key, neutrino_msg_data_t data)> device_key_filter_t;
+		void setDeviceKeyFilter(device_key_filter_t filter) { device_key_filter = filter; }
+	private:
+		device_key_filter_t device_key_filter;
+	public:
 		void clearRCMsg();
 
 		int messageLoop(bool anyKeyCancels = false, int timeout = -1);
