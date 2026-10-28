@@ -23,15 +23,22 @@
 
 #include <system/llm_client.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
 class CAssistantTools
 {
 	public:
-		static void list(std::vector<llm_tool> &tools);
+		/* remote: with the tools only a client in the network can use, as they answer later */
+		static void list(std::vector<llm_tool> &tools, bool remote = false);
 		/* runs in the thread of the user interface; false when the tool failed, result says why */
 		static bool call(const std::string &name, const Json::Value &input, std::string &result);
+		/* like call, but done may run later in the main loop, once the tool is through */
+		typedef std::function<void(bool ok, const std::string &result)> done_fn;
+		static void start(const std::string &name, const Json::Value &input, done_fn done);
+		/* drops a tool that did not get through in time */
+		static void cancel();
 		/* the local time and the channel, for the model to know what "tonight" and "here" mean */
 		static std::string context();
 		/* a channel of the mode the box is in has exactly this name or number */

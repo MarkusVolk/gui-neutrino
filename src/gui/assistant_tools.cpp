@@ -31,6 +31,7 @@
 #include <eitd/sectionsd.h>
 #include <gui/channellist.h>
 #include <gui/movieplayer.h>
+#include <gui/widget/remote_path.h>
 #include <gui/widget/remote_ui.h>
 #include <gui/plugins.h>
 #include <system/helpers.h>
@@ -162,6 +163,25 @@ static const struct
 		"\"required\":[\"text\"]}"
 	},
 	{
+		"tv_menu",
+		"Walk the menus of the box by the names of their entries, from the main menu down: path "
+		"[\"Settings\", \"Video\"] opens that menu and answers with its entries, their values and the "
+		"values each chooser takes. With set, the last element of path is an entry that gets this value, "
+		"as if chosen on the remote; the menus then close, which saves the settings (leave false keeps "
+		"them open). Use the names tv_screen shows, or the numbers of the entries. The walk stops at a "
+		"PIN, a question or a text input; answer those with tv_select or tv_input, then go on with here.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"path\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},"
+		"\"description\":\"entries to choose one after the other, starting in the main menu; "
+		"empty with here for the open menu itself\"},"
+		"\"set\":{\"type\":\"string\",\"description\":\"the value for the last entry of path\"},"
+		"\"leave\":{\"type\":\"boolean\",\"description\":\"close the menus at the end; "
+		"the default is true with set, else false\"},"
+		"\"here\":{\"type\":\"boolean\",\"description\":\"start in the menu that is open "
+		"instead of the main menu\"}},"
+		"\"required\":[\"path\"]}"
+	},
+	{
 		"tv_key",
 		"Press a key of the remote control, for what a menu does not offer: ok, exit, menu, up, down, left, "
 		"right, red, green, yellow, blue, info, epg, 0 to 9, play, pause, stop, forward, rewind, record, "
@@ -173,10 +193,18 @@ static const struct
 	}
 };
 
-void CAssistantTools::list(std::vector<llm_tool> &tools)
+/* tools that answer later, which the assistant on the screen cannot wait for */
+static bool remote_only(const char *name)
+{
+	return !strcmp(name, "tv_menu");
+}
+
+void CAssistantTools::list(std::vector<llm_tool> &tools, bool remote)
 {
 	for (size_t i = 0; i < sizeof(tool_table) / sizeof(tool_table[0]); i++)
 	{
+		if (!remote && remote_only(tool_table[i].name))
+			continue;
 		llm_tool tool;
 		tool.name = tool_table[i].name;
 		tool.description = tool_table[i].description;
@@ -996,8 +1024,48 @@ bool CAssistantTools::call(const std::string &name, const Json::Value &input, st
 		return input_text(input, result);
 	if (name == "tv_key")
 		return press_key(input, result);
+	if (remote_only(name.c_str()))
+	{
+		result = "this tool is for clients in the network";
+		return false;
+	}
 	result = "unknown tool";
 	return false;
+}
+
+static void menu_walk(const Json::Value &input, CAssistantTools::done_fn done)
+{
+	std::vector<std::string> path;
+	const Json::Value &elements = input["path"];
+	if (elements.isArray())
+		for (Json::ArrayIndex i = 0; i < elements.size(); i++)
+			path.push_back(elements[i].asString());
+	else if (elements.isString())
+		path.push_back(elements.asString());
+	bool set = input["set"].isString() || input["set"].isNumeric();
+	std::string value = set ? input["set"].asString() : "";
+	bool leave = input["leave"].isBool() ? input["leave"].asBool() : set;
+	bool here = input["here"].isBool() && input["here"].asBool();
+	std::string error;
+	if (!remote_path::start(path, set, value, leave, here, done, error))
+		done(false, error);
+}
+
+void CAssistantTools::start(const std::string &name, const Json::Value &input, done_fn done)
+{
+	if (name == "tv_menu")
+	{
+		menu_walk(input, done);
+		return;
+	}
+	std::string result;
+	bool ok = call(name, input, result);
+	done(ok, result);
+}
+
+void CAssistantTools::cancel()
+{
+	remote_path::cancel();
 }
 
 std::string CAssistantTools::context()
