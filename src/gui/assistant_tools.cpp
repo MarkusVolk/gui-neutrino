@@ -891,6 +891,18 @@ static bool plugin_start(const Json::Value &input, std::string &result)
 //-----------------------------------------------------------------------------
 #define VIEWER_ONLY	"a question for the viewer at the TV is open; remote clients can neither read nor answer it"
 
+/* what is on top takes nothing from a remote client */
+static bool remote_refused(std::string &result)
+{
+	if (CRemoteUi::viewerOnly())
+		result = VIEWER_ONLY;
+	else if (CRemoteUi::readOnly())
+		result = "this window is for the viewer; a remote client can only read it";
+	else
+		return false;
+	return true;
+}
+
 static bool screen(std::string &result)
 {
 	CRemoteUi *ui = CRemoteUi::top();
@@ -921,11 +933,8 @@ static bool select_entry(const Json::Value &input, std::string &result)
 		result = "no menu or message box is open";
 		return false;
 	}
-	if (CRemoteUi::viewerOnly())
-	{
-		result = VIEWER_ONLY;
+	if (remote_refused(result))
 		return false;
-	}
 	if (!ui->remoteSelect(input["choice"].asString(), result))
 		return false;
 	result = "done; look with tv_screen";
@@ -940,11 +949,8 @@ static bool input_text(const Json::Value &input, std::string &result)
 		result = "no text input is open";
 		return false;
 	}
-	if (CRemoteUi::viewerOnly())
-	{
-		result = VIEWER_ONLY;
+	if (remote_refused(result))
 		return false;
-	}
 	if (!ui->remoteInput(input["text"].asString(), result))
 		return false;
 	result = "typed and confirmed; look with tv_screen";
@@ -969,11 +975,8 @@ static bool press_key(const Json::Value &input, std::string &result)
 		{ "text", CRCInput::RC_text }, { "audio", CRCInput::RC_audio }, { "help", CRCInput::RC_help },
 		{ "favorites", CRCInput::RC_favorites },
 	};
-	if (CRemoteUi::viewerOnly())
-	{
-		result = VIEWER_ONLY;
+	if (remote_refused(result))
 		return false;
-	}
 	std::string want = lower(input["key"].asString());
 	int times = input["times"].isIntegral() ? input["times"].asInt() : 1;
 	if (times < 1 || times > 20)

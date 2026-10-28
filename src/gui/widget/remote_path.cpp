@@ -260,6 +260,13 @@ static void step(unsigned int id)
 			/* fall through */
 
 		case WALKING:
+			/* the last element opened a window: that is where the walk was going */
+			if (!menu && ui && ui->remoteWindow() && current->chosen_in && current->next == current->path.size())
+			{
+				current->chosen_in = NULL;
+				arrived(ui);
+				return;
+			}
 			if (!menu)
 			{
 				stop("stopped at a dialog; answer it with tv_select or tv_input"
@@ -341,6 +348,8 @@ static void step(unsigned int id)
 				else
 					finish(true, (current->result.empty() ? std::string("done") : current->result) + "; the menus are closed");
 			}
+			else if (ui->remoteReadOnly())
+				finish(false, "a window for the viewer is open; it stays\n\n" + where(ui));
 			else if (current->hidden)
 			{
 				/* the setup key closes every level at once, back answers a question */
@@ -348,7 +357,7 @@ static void step(unsigned int id)
 					post_key(CRCInput::RC_setup);
 				else
 				{
-					if (ui != current->stopped_at)
+					if (ui != current->stopped_at && !ui->remoteWindow())
 						current->answered = joined(current->answered, ui->remoteDescribe());
 					post_key(CRCInput::RC_home);
 				}

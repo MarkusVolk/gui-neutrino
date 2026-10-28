@@ -873,31 +873,6 @@ static std::string lower_text(std::string s)
 	return s;
 }
 
-/* the same name first, else the one name that contains the text */
-static int remote_match(const std::vector<std::string> &names, const std::string &what, std::string &error)
-{
-	std::string want = lower_text(what);
-	int partial = -1, partials = 0;
-	for (unsigned int i = 0; i < names.size(); i++) {
-		std::string name = lower_text(names[i]);
-		if (name.empty())
-			continue;
-		if (name == want)
-			return i;
-		if (!want.empty() && name.find(want) != std::string::npos) {
-			partial = i;
-			partials++;
-		}
-	}
-	if (partials == 1)
-		return partial;
-	if (partials > 1)
-		error = "more than one value contains \"" + what + "\"";
-	else
-		error = "no value \"" + what + "\"";
-	return -1;
-}
-
 #define REMOTE_MAX_OPTIONS	40
 
 /* the menu as a list a remote client reads: number, name, value, and
@@ -2262,7 +2237,7 @@ bool CMenuOptionNumberChooser::remoteSet(const std::string &value, std::string &
 				names.push_back(g_Locale->getText(localized[i].value_name));
 				values.push_back(localized[i].value);
 			}
-		int found = remote_match(names, value, error);
+		int found = CRemoteUi::match(names, value, "value", error);
 		if (found < 0)
 			return false;
 		set = values[found];
@@ -2592,7 +2567,7 @@ std::vector<std::string> CMenuOptionChooser::remoteOptions()
 
 bool CMenuOptionChooser::remoteSet(const std::string &value, std::string &error)
 {
-	int found = remote_match(remoteOptions(), value, error);
+	int found = CRemoteUi::match(remoteOptions(), value, "value", error);
 	if (found < 0)
 		return false;
 	*optionValue = options[found].key;
@@ -2794,7 +2769,7 @@ bool CMenuOptionStringChooser::remoteSet(const std::string &value, std::string &
 		error = "this entry holds no value";
 		return false;
 	}
-	int found = remote_match(options, value, error);
+	int found = CRemoteUi::match(options, value, "value", error);
 	if (found < 0)
 		return false;
 	setSettingsText(*optionValuePtr, options[found]);

@@ -27,7 +27,9 @@
 #ifndef __remote_ui_h__
 #define __remote_ui_h__
 
+#include <functional>
 #include <string>
+#include <vector>
 
 class CMenuWidget;
 
@@ -46,11 +48,21 @@ class CRemoteUi
 		virtual bool remoteInput(const std::string &text, std::string &error);
 		/* the dialog as a menu, NULL when it is none */
 		virtual CMenuWidget *remoteMenu() { return NULL; }
+		/* a window that shows something rather than asks something */
+		virtual bool remoteWindow() { return false; }
+		/* a remote client may read it, but only the viewer works it */
+		virtual bool remoteReadOnly() { return false; }
 
 		/* the dialog on top, NULL when none is open */
 		static CRemoteUi *top();
 		/* the dialog on top is a question for the viewer at the TV only */
 		static bool viewerOnly();
+		/* the dialog on top takes no keys or answers of a remote client */
+		static bool readOnly();
+		/* the index of what in names: the same name first, else the one name
+		 * that contains it; -1 with the reason in error, noun names the kind */
+		static int match(const std::vector<std::string> &names, const std::string &what,
+				 const char *noun, std::string &error);
 
 		/* registers a dialog for as long as it lives in a scope */
 		class Guard
@@ -70,6 +82,26 @@ class CRemoteUi
 				ViewerOnly();
 				~ViewerOnly();
 		};
+};
+
+/* A window that is not a menu, for as long as it lives in a scope: its
+ * title, what it shows and, unless it is read-only, ok and back as the
+ * answers of a remote client. */
+class CRemoteView : public CRemoteUi
+{
+	public:
+		typedef std::function<std::string()> text_fn;
+		CRemoteView(const std::string &title, text_fn text, bool read_only = false);
+		std::string remoteDescribe();
+		bool remoteSelect(const std::string &what, std::string &error);
+		bool remoteWindow() { return true; }
+		bool remoteReadOnly() { return read_only; }
+
+	private:
+		std::string title;
+		text_fn text;
+		bool read_only;
+		Guard guard;
 };
 
 #endif
