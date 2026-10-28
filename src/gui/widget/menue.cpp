@@ -3023,6 +3023,8 @@ bool CPINProtection::check()
 		cPIN = "";
 		CPINInput* PINInput = new CPINInput(title, &cPIN, 4, hint);
 		PINInput->exec( getParent(), "");
+		if (PINInput->remoteEntered())
+			CPINInput::remoteResult(cPIN == *validPIN);
 		delete PINInput; PINInput = NULL;
 		hint = LOCALE_PINPROTECTION_WRONGCODE;
 	} while ((cPIN != *validPIN) && !cPIN.empty());
@@ -3043,8 +3045,11 @@ bool CZapProtection::check()
 		CPLPINInput* PINInput = new CPLPINInput(title, &cPIN, 4, hint, fsk);
 
 		res = PINInput->exec(getParent(), "");
+		bool remote = PINInput->remoteEntered();
 		delete PINInput; PINInput = NULL;
 		cPIN[4] = 0;
+		if (remote)
+			CPINInput::remoteResult(cPIN == *validPIN);
 //		strcpy(systemstr, CONFIGDIR "/pinentered.sh ");
 //		strcat(systemstr, cPIN.c_str());
 //		system(systemstr);

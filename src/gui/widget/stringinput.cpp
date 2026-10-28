@@ -47,6 +47,7 @@
 #include <neutrinoMessages.h>
 
 #include <atomic>
+#include <time.h>
 #include <neutrino.h>
 
 /* One character of the edited string, written under the lock that the readers
@@ -645,6 +646,36 @@ bool CStringInput::remoteInput(const std::string &text, std::string &error)
 	setSettingsText(*valueString, text + std::string(size - text.size(), ' '));
 	g_RCInput->postMsg(CRCInput::RC_ok, 0);
 	return true;
+}
+
+#define REMOTE_PIN_TRIES	3
+#define REMOTE_PIN_WAIT		600
+
+static int remote_pin_wrong = 0;
+static time_t remote_pin_until = 0;
+
+bool CPINInput::remoteInput(const std::string &text, std::string &error)
+{
+	if (remote_pin_until > time(NULL)) {
+		error = "too many wrong PINs; try again later or use the remote control";
+		return false;
+	}
+	if (!CStringInput::remoteInput(text, error))
+		return false;
+	remote_entered = true;
+	return true;
+}
+
+void CPINInput::remoteResult(bool right)
+{
+	if (right) {
+		remote_pin_wrong = 0;
+		return;
+	}
+	if (++remote_pin_wrong >= REMOTE_PIN_TRIES) {
+		remote_pin_wrong = 0;
+		remote_pin_until = time(NULL) + REMOTE_PIN_WAIT;
+	}
 }
 
 int CStringInput::handleOthers(const neutrino_msg_t /*msg*/, const neutrino_msg_data_t /*data*/)

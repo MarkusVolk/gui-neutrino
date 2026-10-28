@@ -160,13 +160,20 @@ class CPINInput : public CStringInput
 	protected:
 		virtual void paintChar(int pos);
 		bool remoteMasked() { return true; }
+		bool remote_entered;
 	public:
 		CPINInput(const neutrino_locale_t Name, std::string *Value, int Size, const neutrino_locale_t Hint_1 = NONEXISTANT_LOCALE, const neutrino_locale_t Hint_2 = NONEXISTANT_LOCALE, const char * const Valid_Chars= (const char *)"0123456789", CChangeObserver* Observ = NULL)
-		 : CStringInput(Name, Value, Size, Hint_1, Hint_2, Valid_Chars, Observ, (char *) NEUTRINO_ICON_LOCK) {};
+		 : CStringInput(Name, Value, Size, Hint_1, Hint_2, Valid_Chars, Observ, (char *) NEUTRINO_ICON_LOCK), remote_entered(false) {};
 		CPINInput(const std::string &Name, std::string *Value, int Size, const neutrino_locale_t Hint_1 = NONEXISTANT_LOCALE, const neutrino_locale_t Hint_2 = NONEXISTANT_LOCALE, const char * const Valid_Chars= (const char *)"0123456789", CChangeObserver* Observ = NULL)
-		 : CStringInput(Name, Value, Size, Hint_1, Hint_2, Valid_Chars, Observ, (char *) NEUTRINO_ICON_LOCK) {};
+		 : CStringInput(Name, Value, Size, Hint_1, Hint_2, Valid_Chars, Observ, (char *) NEUTRINO_ICON_LOCK), remote_entered(false) {};
 
 		 int exec( CMenuTarget* parent, const std::string & actionKey );
+
+		/* a remote client may guess a few times only, then it waits */
+		bool remoteInput(const std::string &text, std::string &error);
+		bool remoteEntered() const { return remote_entered; }
+		/* the check that asked tells whether a PIN of a remote client was right */
+		static void remoteResult(bool right);
 };
 
 // For CI
