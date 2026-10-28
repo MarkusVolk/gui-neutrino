@@ -50,6 +50,7 @@
 #define POLICY_DIR DATADIR "/neutrino/policy/"
 #ifdef ENABLE_LUA
 #include <gui/lua/lua_api_version.h>
+#include <gui/widget/remote_ui.h>
 #endif
 #include <nhttpd/yconfig.h>
 #include <system/supportinfo.h>
@@ -128,6 +129,12 @@ int CImageInfo::exec(CMenuTarget* parent, const std::string &)
 	bool fadeout = false;
 	neutrino_msg_t postmsg = 0;
 	neutrino_msg_t msg;
+	CRemoteView remote_view("Image information", [this] {
+		std::string text;
+		for (size_t i = 0; i < v_info.size(); i++)
+			text += v_info[i].caption + " " + v_info[i].info_text + "\n";
+		return text;
+	});
 	while (1)
 	{
 		neutrino_msg_data_t data;

@@ -37,6 +37,7 @@
 #include <gui/color.h>
 #include <gui/widget/msgbox.h>
 #include <gui/widget/icons.h>
+#include <gui/widget/remote_ui.h>
 
 static const char *const icon_names[VALUES] =
 {
@@ -181,6 +182,7 @@ int CColorChooser::exec(CMenuTarget *parent, const std::string &)
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(g_settings.timing[SNeutrinoSettings::TIMING_MENU]);
 
 	bool loop = true;
+	CRemoteView remote_view("Colour", nullptr);
 	while (loop)
 	{
 		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd, true);

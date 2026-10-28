@@ -58,6 +58,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <gui/widget/remote_ui.h>
 
 extern CBouquetList *bouquetList;
 
@@ -912,6 +913,7 @@ int EpgPlus::exec(CChannelList *pchannelList, int selectedChannelIndex, CBouquet
 	int res = menu_return::RETURN_REPAINT;
 
 	COSDFader fader(g_settings.theme.menu_Content_alpha);
+	CRemoteView remote_view("EPG grid", nullptr);
 	do
 	{
 		this->refreshFooterButtons = false;

@@ -39,6 +39,7 @@
 #include <system/debug.h>
 #include <system/settings.h>
 #include <gui/widget/hourglass.h>
+#include <gui/widget/remote_ui.h>
 
 #define MSG_FONT g_Font[SNeutrinoSettings::FONT_TYPE_MESSAGE_TEXT]
 
@@ -262,6 +263,8 @@ int CHintBox::exec()
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(timeout);
 
 	initTimeOutBar(enable_timeout_bar && timeout > 0);
+
+	CRemoteView remote_view(ccw_caption, [this] { return hb_text; });
 
 	while ( ! ( res & ( messages_return::cancel_info | messages_return::cancel_all ) ) )
 	{

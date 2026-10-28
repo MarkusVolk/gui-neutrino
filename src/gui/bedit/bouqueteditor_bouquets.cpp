@@ -40,6 +40,7 @@
 
 #include "bouqueteditor_bouquets.h"
 #include "bouqueteditor_channels.h"
+#include <gui/widget/remote_ui.h>
 
 extern CBouquetManager *g_bouquetManager;
 
@@ -226,6 +227,7 @@ int CBEBouquetWidget::exec(CMenuTarget* parent, const std::string & /*actionKey*
 
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(*timeout_ptr);
 
+	CRemoteView remote_view("Bouquet editor", nullptr);
 	while (loop)
 	{
 		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd);

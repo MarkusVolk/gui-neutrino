@@ -77,6 +77,7 @@
 
 #include <zapit/zapit.h>
 #include <hardware/video.h>
+#include <gui/widget/remote_ui.h>
 extern cVideo * videoDecoder;
 
 
@@ -289,6 +290,7 @@ int CPictureViewerGui::show()
 	CAudioMute::getInstance()->enableMuteIcon(false);
 	CInfoClock::getInstance()->enableInfoClock(false);
 
+	CRemoteView remote_view("Picture viewer", nullptr);
 	while (loop)
 	{
 		if (update)

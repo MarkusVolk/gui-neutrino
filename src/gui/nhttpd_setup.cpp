@@ -38,6 +38,7 @@
 #include <gui/widget/menue_options.h>
 #include <gui/widget/msgbox.h>
 #include <gui/widget/stringinput_ext.h>
+#include <gui/widget/remote_ui.h>
 
 #include <global.h>
 #include <neutrino.h>
@@ -385,6 +386,9 @@ int CNhttpdPair::exec(CMenuTarget* parent, const std::string &)
 	uint64_t end = CRCInput::calcTimeoutEnd(300);
 	neutrino_msg_t msg;
 	neutrino_msg_data_t data;
+	/* the code on the screen is for the viewer's phone alone */
+	CRemoteUi::ViewerOnly viewer;
+	CRemoteView remote_view("Pair a phone", nullptr);
 	for (;;) {
 		/* a short wait, so that a phone that used the code ends it soon */
 		uint64_t step = std::min<uint64_t>(end, CRCInput::calcTimeoutEnd_MS(500));

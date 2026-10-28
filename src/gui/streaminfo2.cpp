@@ -63,6 +63,7 @@ extern "C" {
 #include <string>
 #include <system/helpers.h>
 #include <system/set_threadname.h>
+#include <gui/widget/remote_ui.h>
 
 extern cVideo *videoDecoder;
 extern cAudio *audioDecoder;
@@ -442,6 +443,7 @@ int CStreamInfo2::doSignalStrengthLoop()
 	bool repaint_bitrate = true;
 	ts_setup();
 	neutrino_msg_data_t data = 0;
+	CRemoteView remote_view("Technical information", nullptr);
 
 	while (1)
 	{

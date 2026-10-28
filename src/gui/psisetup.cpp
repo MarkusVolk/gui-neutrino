@@ -49,6 +49,7 @@
 #include <neutrino.h>
 
 #include <hardware/video.h>
+#include <gui/widget/remote_ui.h>
 
 extern cVideo * videoDecoder;
 
@@ -173,6 +174,7 @@ int CPSISetup::exec (CMenuTarget * parent, const std::string &)
 
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(g_settings.timing[SNeutrinoSettings::TIMING_MENU] ? g_settings.timing[SNeutrinoSettings::TIMING_MENU] : 0xffff);
 	bool loop = true;
+	CRemoteView remote_view("Picture settings", nullptr);
 	while (loop)
 	{
 		if(needsBlit) {

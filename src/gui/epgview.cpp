@@ -35,6 +35,7 @@
 #include <gui/widget/buttons.h>
 #include <gui/widget/hintbox.h>
 #include <gui/widget/icons.h>
+#include <gui/widget/remote_ui.h>
 #include <gui/widget/msgbox.h>
 #include <gui/widget/mountchooser.h>
 
@@ -954,6 +955,16 @@ int CEpgData::show(const t_channel_id channel_id, uint64_t a_id, time_t* a_start
 
 		int timeout = g_settings.timing[SNeutrinoSettings::TIMING_EPG];
 		uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(timeout);
+
+		CRemoteView remote_view("Programme details", [this] {
+			std::string text = epgData.title + "\n" + epg_date + " " + epg_start + " - " + epg_end + "\n";
+			if (!epgData.info1.empty())
+				text += epgData.info1 + "\n";
+			if (!epgData.info2.empty())
+				text += epgData.info2.substr(0, 2000) + "\n";
+			return text + "Keys: red records it, yellow sets a switch timer, left and right go to the "
+				"previous or next event, blue lists more screenings, ok closes";
+		});
 
 		while (loop)
 		{

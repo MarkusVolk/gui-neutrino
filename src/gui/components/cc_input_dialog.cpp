@@ -28,6 +28,7 @@
 #include <xkbcommon/xkbcommon-keysyms.h>
 #endif
 #include <gui/widget/menue.h>
+#include <gui/widget/remote_secret.h>
 #include <gui/widget/msgbox.h>
 #include <gui/widget/stringinput.h>
 
@@ -663,6 +664,43 @@ void CCTextInputDialog::setFieldFocus(const bool &focused)
 	cid_field->paint(false);
 }
 
+std::string CCTextInputDialog::remoteDescribe()
+{
+	std::string out = "Text input: " + ccw_caption + "\n";
+	const std::string &text = cid_buffer.getText();
+	bool hidden = cid_password_mode || remote_secret::title(NONEXISTANT_LOCALE, ccw_caption);
+	out += "Current text: " + (hidden ? remote_secret::hidden(text) : text) + "\n";
+	if (cid_max_chars)
+		out += "Up to " + std::to_string(cid_max_chars) + " characters\n";
+	if (!cid_hint_text.empty())
+		out += "Hint: " + cid_hint_text + "\n";
+	return out;
+}
+
+/* checked the way save() checks, so the reason goes back to the client;
+ * then saved as with the red key */
+bool CCTextInputDialog::remoteInput(const std::string &text, std::string &error)
+{
+	cid_buffer.setText(text);
+	if (cid_buffer.getText() != text) {
+		error = "the input does not take this text (too long or characters it filters)";
+		return false;
+	}
+	if (!cid_buffer.isAcceptable()) {
+		error = "the input does not take an empty text";
+		return false;
+	}
+	if (!cid_validator.empty()) {
+		std::string reason;
+		if (!cid_validator(text, reason)) {
+			error = reason.empty() ? "the input refused the text" : reason;
+			return false;
+		}
+	}
+	g_RCInput->postMsg(CRCInput::RC_red, 0);
+	return true;
+}
+
 bool CCTextInputDialog::save()
 {
 	if (!cid_buffer.isAcceptable())
@@ -825,6 +863,8 @@ int CCTextInputDialog::exec(CMenuTarget *parent, const std::string & /*actionKey
 	syncDialogState();
 	cid_field->ensureCursorVisible();
 	paint();
+
+	CRemoteUi::Guard remote_guard(this);
 
 	CVFD::getInstance()->showMenuText(1,
 		getVfdText().c_str(),

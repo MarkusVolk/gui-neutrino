@@ -41,6 +41,7 @@
 
 #include "bouqueteditor_channels.h"
 #include "bouqueteditor_chanselect.h"
+#include <gui/widget/remote_ui.h>
 
 extern CBouquetManager *g_bouquetManager;
 
@@ -249,6 +250,7 @@ int CBEChannelWidget::exec(CMenuTarget* parent, const std::string & /*actionKey*
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(*timeout_ptr);
 
 	bool loop = true;
+	CRemoteView remote_view("Bouquet editor: channels", nullptr);
 	while (loop)
 	{
 		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd);

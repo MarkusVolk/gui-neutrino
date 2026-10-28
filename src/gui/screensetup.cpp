@@ -47,6 +47,7 @@
 
 #include <global.h>
 #include <neutrino.h>
+#include <gui/widget/remote_ui.h>
 
 //int x_box = 15 * 5;
 
@@ -97,6 +98,7 @@ int CScreenSetup::exec(CMenuTarget *parent, const std::string &)
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(g_settings.timing[SNeutrinoSettings::TIMING_MENU]);
 
 	bool loop = true;
+	CRemoteView remote_view("Screen position", nullptr);
 	while (loop)
 	{
 		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd, true);

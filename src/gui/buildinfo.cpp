@@ -33,6 +33,7 @@
 #include <system/helpers.h>
 
 #include <local_build_config.h>
+#include <gui/widget/remote_ui.h>
 
 using namespace std;
 
@@ -77,6 +78,12 @@ int CBuildInfo::exec(CMenuTarget *parent, const string & /*actionKey*/)
 		paint();
 
 	neutrino_msg_t msg;
+	CRemoteView remote_view("Build information", [this] {
+		std::string text;
+		for (size_t i = 0; i < v_info.size(); i++)
+			text += std::string(g_Locale->getText(v_info[i].caption)) + ": " + v_info[i].info_text + "\n";
+		return text;
+	});
 	while (1)
 	{
 		neutrino_msg_data_t data;

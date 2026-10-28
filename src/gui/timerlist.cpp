@@ -88,6 +88,7 @@
 extern CBouquetManager *g_bouquetManager;
 
 #include <string.h>
+#include <gui/widget/remote_ui.h>
 
 class CTimerListNewNotifier : public CChangeObserver
 {
@@ -939,6 +940,7 @@ int CTimerList::show()
 	COSDFader fader(g_settings.theme.menu_Content_alpha);
 	fader.StartFadeIn();
 
+	CRemoteView remote_view("Timer list", [] { return std::string("The timers are read and changed with tv_timers, tv_timer_add and tv_timer_remove."); });
 	while (loop)
 	{
 		if (update)

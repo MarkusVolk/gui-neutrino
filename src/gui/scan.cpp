@@ -60,6 +60,7 @@
 
 #ifdef ENABLE_LCD4LINUX
 #include "driver/lcd4l.h"
+#include <gui/widget/remote_ui.h>
 #endif
 
 extern cVideo * videoDecoder;
@@ -330,6 +331,7 @@ int CScanTs::exec(CMenuTarget* /*parent*/, const std::string & actionKey)
 
 	/* poll for messages */
 	istheend = !success;
+	CRemoteView remote_view("Channel scan", nullptr, true);
 	while (!istheend) {
 		paintRadar();
 

@@ -36,6 +36,7 @@
 #include <zapit/zapit.h>
 
 #include "bouqueteditor_chanselect.h"
+#include <gui/widget/remote_ui.h>
 
 extern CBouquetManager *g_bouquetManager;
 
@@ -249,6 +250,7 @@ int CBEChannelSelectWidget::exec(CMenuTarget* parent, const std::string & /*acti
 
 	channelChanged = false;
 	bool loop = true;
+	CRemoteView remote_view("Bouquet editor: add channels", nullptr);
 	while (loop)
 	{
 		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd);

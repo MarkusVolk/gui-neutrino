@@ -55,6 +55,7 @@
 #include <system/helpers.h>
 #include <zapit/zapit.h>
 #include <hardware/video.h>
+#include <gui/widget/remote_ui.h>
 
 extern cVideo *videoDecoder;
 extern CPictureViewer *g_PicViewer;
@@ -541,6 +542,7 @@ void CUpnpBrowserGui::selectDevice()
 
 	CAudioMute::getInstance()->enableMuteIcon(false);
 
+	CRemoteView remote_view("UPnP browser: servers", nullptr);
 	while (loop)
 	{
 		if (refresh)
@@ -797,6 +799,7 @@ bool CUpnpBrowserGui::selectItem(std::string id)
 	if (!getItems(id, liststart, entries, total))
 		return endall;
 
+	CRemoteView remote_view("UPnP browser", nullptr);
 	while (loop && entries != NULL)
 	{
 		updateTimes();

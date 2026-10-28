@@ -83,6 +83,7 @@ extern CPictureViewer * g_PicViewer;
 
 #include <zapit/zapit.h>
 #include <hardware/video.h>
+#include <gui/widget/remote_ui.h>
 extern cVideo * videoDecoder;
 
 #define AUDIOPLAYERGUI_SMSKEY_TIMEOUT 1000
@@ -385,6 +386,7 @@ int CAudioPlayerGui::show()
 		}
 	}
 
+	CRemoteView remote_view("Audio player", nullptr);
 	while (loop)
 	{
 		if (msg <= CRCInput::RC_MaxRC)

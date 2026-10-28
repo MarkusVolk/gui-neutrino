@@ -18,6 +18,7 @@
 #include "cc_item_text.h"
 
 #include <gui/widget/menue_target.h>
+#include <gui/widget/remote_ui.h>
 
 #include <sigc++/signal.h>
 
@@ -90,7 +91,7 @@ class CCInputDialogBase : public CMenuTarget, public CComponentsWindow
 		static int getDialogHintHeight(Font *font);
 };
 
-class CCTextInputDialog : public CCInputDialogBase
+class CCTextInputDialog : public CCInputDialogBase, public CRemoteUi
 {
 	private:
 		std::string *cid_value;
@@ -139,6 +140,9 @@ class CCTextInputDialog : public CCInputDialogBase
 			CChangeObserver *observ = NULL,
 			const std::string &icon = NEUTRINO_ICON_EDIT);
 		virtual ~CCTextInputDialog() {};
+
+		std::string remoteDescribe();
+		bool remoteInput(const std::string &text, std::string &error);
 
 		void setHintText(const std::string &hint);
 		void setPlaceholder(const std::string &text);
