@@ -34,6 +34,8 @@
 #include <gui/widget/remote_path.h>
 #include <gui/widget/remote_ui.h>
 #include <gui/plugins.h>
+#include <gui/rc_lock.h>
+#include <gui/widget/progresswindow.h>
 #include <system/helpers.h>
 #include <system/main_call.h>
 #include <timerdclient/timerdclient.h>
@@ -916,7 +918,9 @@ static bool screen(std::string &result)
 		result = ui->remoteDescribe();
 		return true;
 	}
-	if (CNeutrinoApp::getInstance()->getMode() == NeutrinoModes::mode_standby)
+	if (CRCLock::getInstance()->isLocked())
+		result = "The remote control of the box is locked; the viewer unlocks it.\n";
+	else if (CNeutrinoApp::getInstance()->getMode() == NeutrinoModes::mode_standby)
 		result = "The box is in standby.\n";
 	else if (CMoviePlayerGui::getInstance().Playing())
 		result = "A video plays, no menu is open; keys: play, pause, stop, forward, rewind, info.\n";
@@ -1101,6 +1105,9 @@ bool CAssistantTools::run(const std::string &name, const Json::Value &input, int
 	if (!main_call::run([done, name, input] { start(name, input, done); }, timeout_ms))
 	{
 		text = "the box did not get to the tool in time";
+		std::string busy = CProgressWindow::busy();
+		if (!busy.empty())
+			text += "; it is busy with " + busy;
 		return false;
 	}
 	std::unique_lock<std::mutex> l(out->lock);

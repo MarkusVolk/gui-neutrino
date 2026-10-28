@@ -34,6 +34,11 @@
 
 #include <driver/fontrenderer.h>
 #include <driver/display.h>
+
+#include <mutex>
+
+static std::mutex busy_lock;
+static std::string busy_text;
 using namespace sigc;
 using namespace std;
 
@@ -146,6 +151,17 @@ void CProgressWindow::initStatus(const unsigned int prog, const unsigned int max
 		cur_statusText = statusText;
 	}
 	pBar->paint(false);
+
+	std::lock_guard<std::mutex> l(busy_lock);
+	busy_text = ccw_caption + (cur_statusText.empty() ? "" : ": " + cur_statusText);
+	if (max)
+		busy_text += " (" + std::to_string(prog * 100 / max) + "%)";
+}
+
+std::string CProgressWindow::busy()
+{
+	std::lock_guard<std::mutex> l(busy_lock);
+	return busy_text;
 }
 
 void CProgressWindow::showStatus(const unsigned int prog, const unsigned int max, const string &statusText)
@@ -211,6 +227,8 @@ unsigned int CProgressWindow::getGlobalStatus(void)
 void CProgressWindow::hide()
 {
 	CComponentsWindow::hide();
+	std::lock_guard<std::mutex> l(busy_lock);
+	busy_text.clear();
 }
 
 int CProgressWindow::exec(CMenuTarget* parent, const string & /*actionKey*/)

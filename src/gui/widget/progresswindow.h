@@ -140,6 +140,9 @@ class CProgressWindow : public CComponentsWindow, public CMenuTarget
 		* @return	unsigned int
 		*/
 		unsigned int getGlobalStatus(void);
+		/* what a progress window on the screen says, for a thread that finds
+		 * the main loop busy with it; empty while none is shown */
+		static std::string busy();
 
 		/**
 		* Sets current progress value and shows a single progress bar inside window as default, but allows
