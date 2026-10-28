@@ -169,7 +169,9 @@ static const struct
 		"values each chooser takes. With set, the last element of path is an entry that gets this value, "
 		"as if chosen on the remote; the menus then close, which saves the settings (leave false keeps "
 		"them open). Use the names tv_screen shows, or the numbers of the entries. The walk stops at a "
-		"PIN, a question or a text input; answer those with tv_select or tv_input, then go on with here.",
+		"PIN, a question or a text input; answer those with tv_select or tv_input, then go on with here. "
+		"A walk with set is hidden unless visible is true: the viewer sees nothing, the menus close at "
+		"the end, and a key the viewer presses stops it.",
 		"{\"type\":\"object\",\"properties\":{"
 		"\"path\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},"
 		"\"description\":\"entries to choose one after the other, starting in the main menu; "
@@ -178,7 +180,9 @@ static const struct
 		"\"leave\":{\"type\":\"boolean\",\"description\":\"close the menus at the end; "
 		"the default is true with set, else false\"},"
 		"\"here\":{\"type\":\"boolean\",\"description\":\"start in the menu that is open "
-		"instead of the main menu\"}},"
+		"instead of the main menu\"},"
+		"\"visible\":{\"type\":\"boolean\",\"description\":\"show the walk on the TV; the default "
+		"is false with set, else true\"}},"
 		"\"required\":[\"path\"]}"
 	},
 	{
@@ -1046,8 +1050,9 @@ static void menu_walk(const Json::Value &input, CAssistantTools::done_fn done)
 	std::string value = set ? input["set"].asString() : "";
 	bool leave = input["leave"].isBool() ? input["leave"].asBool() : set;
 	bool here = input["here"].isBool() && input["here"].asBool();
+	bool visible = input["visible"].isBool() ? input["visible"].asBool() : !set || here;
 	std::string error;
-	if (!remote_path::start(path, set, value, leave, here, false, done, error))
+	if (!remote_path::start(path, set, value, leave, here, !visible, done, error))
 		done(false, error);
 }
 
