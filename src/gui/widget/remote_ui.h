@@ -29,6 +29,8 @@
 
 #include <string>
 
+class CMenuWidget;
+
 class CRemoteUi
 {
 	public:
@@ -39,6 +41,8 @@ class CRemoteUi
 		virtual bool remoteSelect(const std::string &what, std::string &error);
 		/* types a text and confirms it */
 		virtual bool remoteInput(const std::string &text, std::string &error);
+		/* the dialog as a menu, NULL when it is none */
+		virtual CMenuWidget *remoteMenu() { return NULL; }
 
 		/* the dialog on top, NULL when none is open */
 		static CRemoteUi *top();

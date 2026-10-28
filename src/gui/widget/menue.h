@@ -681,6 +681,7 @@ class CMenuWidget : public CMenuTarget, public CComponentsSignals, public CRemot
 		void setSelectedByName(const neutrino_locale_t &Locale);
 		void setSelectedByName(const std::string &Name);
 		int getSelected()const { return selected; };
+		CMenuWidget *remoteMenu() { return this; }
 		std::string remoteDescribe() { return remoteDescribe(false); }
 		/* with the values the choosers may take */
 		std::string remoteDescribe(bool with_options);
