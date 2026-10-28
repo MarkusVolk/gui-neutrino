@@ -15,6 +15,7 @@ libneutrino_system_sources = [
 	'netshares.cpp',
 	'ping.cpp',
 	'proc_tools.cpp',
+	'recordings.cpp',
 	'secrets.cpp',
 	'settings.cpp',
 	'stacktrace.cpp',
