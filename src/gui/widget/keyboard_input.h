@@ -95,7 +95,6 @@ class CKeyboardInput : public CMenuTarget,  public sigc::trackable, public CRemo
 		CChangeObserver * observ;
 		bool force_saveScreen;
 		bool masked;
-		bool remote_hidden;
 		fb_pixel_t *pixBuf;
 
 		std::string maskedString();
@@ -139,8 +138,6 @@ class CKeyboardInput : public CMenuTarget,  public sigc::trackable, public CRemo
 		void forceSaveScreen(bool enable);
 		/* for secrets: every character shows as '*', also on the displays of the box */
 		void setMasked(bool enable) { masked = enable; }
-		/* the text stays on the screen, but a remote client cannot read it back */
-		void setRemoteHidden(bool hide = true) { remote_hidden = hide; }
 		sigc::signal<void> OnAfterSave;
 };
 

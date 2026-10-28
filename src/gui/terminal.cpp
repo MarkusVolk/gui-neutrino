@@ -55,6 +55,7 @@
 #include <gui/infoviewer.h>
 #include <gui/terminal.h>
 #include <gui/widget/keyboard_input.h>
+#include <gui/widget/remote_ui.h>
 
 
 extern std::string font_file_monospace;
@@ -362,8 +363,8 @@ void CTerminal::typeText()
 	std::string text;
 	keyboard.close();
 	CKeyboardInput input(std::string("Terminal"), &text, 255, NULL, NULL, std::string("OK sends the text to the program"), std::string(""));
-	/* the program may be asking for a password, of sudo or ssh */
-	input.setRemoteHidden();
+	/* a shell, maybe asking for a password: only the viewer types here */
+	CRemoteUi::ViewerOnly viewer;
 	input.exec(NULL, "");
 	keyboard.open();
 	g_RCInput->clearRCMsg();
@@ -759,6 +760,7 @@ int CTerminal::exec()
 	 * web interface, is a tap */
 	int64_t exitDown = 0, exitLast = 0;
 	neutrino_msg_t exitKey = CRCInput::RC_home;
+	CRemoteView remote_view("Terminal", [] { return std::string("A shell that only the viewer types into."); }, true);
 	while (running)
 	{
 		if (!readOutput())
