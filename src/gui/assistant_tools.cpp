@@ -39,9 +39,16 @@
 #include <system/helpers.h>
 #include <system/main_call.h>
 #include <system/recordings.h>
+#include <driver/framebuffer.h>
+#include <driver/pictureviewer/pictureviewer.h>
+#include <hardware/video.h>
 #include <timerdclient/timerdclient.h>
 #include <zapit/getservices.h>
 #include <zapit/zapit.h>
+
+#include <dirent.h>
+#include <limits.h>
+#include <sys/stat.h>
 
 #include <algorithm>
 #include <chrono>
@@ -54,6 +61,8 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
+
+extern CPictureViewer *g_PicViewer;
 
 #define MAX_CHANNELS	100
 #define MAX_EVENTS	40
@@ -169,6 +178,24 @@ static const struct
 		"\"recording\":{\"type\":\"string\",\"description\":\"number, title or id from tv_recordings\"},"
 		"\"title\":{\"type\":\"string\"}},"
 		"\"required\":[\"recording\",\"title\"]}"
+	},
+	{
+		"tv_media",
+		"List a media folder of the box: movies, music, pictures or recordings, or a folder below it "
+		"with path. Shows the folders and the video, audio and picture files in it.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"folder\":{\"type\":\"string\",\"enum\":[\"movies\",\"music\",\"pictures\",\"recordings\"]},"
+		"\"path\":{\"type\":\"string\",\"description\":\"a folder below it, as tv_media names it\"}},"
+		"\"required\":[\"folder\"]}"
+	},
+	{
+		"tv_media_play",
+		"Play a video or audio file of a media folder, or show a picture full screen until a key is pressed. "
+		"Not while something plays already.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"folder\":{\"type\":\"string\",\"enum\":[\"movies\",\"music\",\"pictures\",\"recordings\"]},"
+		"\"path\":{\"type\":\"string\",\"description\":\"the file below the folder, as tv_media names it\"}},"
+		"\"required\":[\"folder\",\"path\"]}"
 	},
 	{
 		"tv_screen",
@@ -956,6 +983,181 @@ static bool recording_rename(const Json::Value &input, std::string &result)
 	return true;
 }
 
+//-----------------------------------------------------------------------------
+// media folders: only below the folders of the settings
+//-----------------------------------------------------------------------------
+enum media_kind { MEDIA_NONE, MEDIA_VIDEO, MEDIA_AUDIO, MEDIA_PICTURE };
+
+static media_kind kind_of(const std::string &name)
+{
+	static const char *video[] = { "ts", "mkv", "mp4", "m4v", "avi", "mpg", "mpeg", "m2ts", "mov", "webm", "flv", "wmv", "vob" };
+	static const char *audio[] = { "mp3", "flac", "ogg", "oga", "opus", "m4a", "aac", "wav", "wma" };
+	static const char *picture[] = { "jpg", "jpeg", "png", "gif", "bmp", "webp" };
+	size_t dot = name.rfind('.');
+	if (dot == std::string::npos)
+		return MEDIA_NONE;
+	std::string ext = CAssistantTools::lower(name.substr(dot + 1));
+	for (size_t i = 0; i < sizeof(video) / sizeof(video[0]); i++)
+		if (ext == video[i])
+			return MEDIA_VIDEO;
+	for (size_t i = 0; i < sizeof(audio) / sizeof(audio[0]); i++)
+		if (ext == audio[i])
+			return MEDIA_AUDIO;
+	for (size_t i = 0; i < sizeof(picture) / sizeof(picture[0]); i++)
+		if (ext == picture[i])
+			return MEDIA_PICTURE;
+	return MEDIA_NONE;
+}
+
+/* path, made real, is the folder itself or below it */
+static bool inside(const std::string &root, const std::string &path, std::string &real_path)
+{
+	char real[PATH_MAX];
+	if (!realpath(path.c_str(), real))
+		return false;
+	real_path = real;
+	return real_path == root || real_path.compare(0, root.size() + 1, root + "/") == 0;
+}
+
+/* the real path of folder/path, which must stay below the folder's own real path */
+static bool media_path(const Json::Value &input, std::string &full, std::string &result, std::string *base = NULL)
+{
+	std::string folder = input["folder"].asString();
+	std::string root;
+	if (folder == "movies")
+		root = g_settings.network_nfs_moviedir;
+	else if (folder == "music")
+		root = g_settings.network_nfs_audioplayerdir;
+	else if (folder == "pictures")
+		root = g_settings.network_nfs_picturedir;
+	else if (folder == "recordings")
+		root = g_settings.network_nfs_recordingdir;
+	else
+	{
+		result = "the folder is movies, music, pictures or recordings";
+		return false;
+	}
+	char real_root[PATH_MAX];
+	if (root.empty() || !realpath(root.c_str(), real_root))
+	{
+		result = "the " + folder + " folder " + root + " is not there";
+		return false;
+	}
+	std::string want = std::string(real_root) + "/" + input["path"].asString();
+	if (access(want.c_str(), F_OK) != 0)
+	{
+		result = "no " + input["path"].asString() + " in the " + folder + " folder";
+		return false;
+	}
+	if (!inside(real_root, want, full))
+	{
+		result = "that is outside the " + folder + " folder";
+		return false;
+	}
+	if (base)
+		*base = real_root;
+	return true;
+}
+
+static bool media_list(const Json::Value &input, std::string &result)
+{
+	std::string full, base, real;
+	if (!media_path(input, full, result, &base))
+		return false;
+	DIR *dir = opendir(full.c_str());
+	if (!dir)
+	{
+		result = "that is not a folder";
+		return false;
+	}
+	std::vector<std::string> folders, files;
+	while (struct dirent *e = readdir(dir))
+	{
+		std::string name = e->d_name;
+		if (name.empty() || name[0] == '.')
+			continue;
+		struct stat st;
+		if (stat((full + "/" + name).c_str(), &st) != 0 || !inside(base, full + "/" + name, real))
+			continue;
+		if (S_ISDIR(st.st_mode))
+			folders.push_back(name + "/");
+		else if (S_ISREG(st.st_mode) && kind_of(name) != MEDIA_NONE)
+			files.push_back(name);
+	}
+	closedir(dir);
+	std::sort(folders.begin(), folders.end());
+	std::sort(files.begin(), files.end());
+	std::string path = input["path"].asString();
+	result = input["folder"].asString() + (path.empty() ? "" : "/" + path) + ":\n";
+	if (folders.empty() && files.empty())
+		result += "(no folders and no media files)\n";
+	for (size_t i = 0; i < folders.size(); i++)
+		result += folders[i] + "\n";
+	for (size_t i = 0; i < files.size(); i++)
+		result += files[i] + "\n";
+	return true;
+}
+
+/* full screen on the OSD, until a key or the menu timeout */
+static void show_picture(const std::string &file, const std::string &name)
+{
+	g_PicViewer->SetScaling((CPictureViewer::ScalingMode)g_settings.picviewer_scaling);
+	g_PicViewer->SetVisible(g_settings.screen_StartX, g_settings.screen_EndX, g_settings.screen_StartY, g_settings.screen_EndY);
+	g_PicViewer->SetAspectRatio(g_settings.video_Format == DISPLAY_AR_16_9 ? 16.0 / 9 : 4.0 / 3);
+	g_PicViewer->ShowImage(file, false);
+	g_PicViewer->Cleanup();
+
+	CRemoteView remote_view("Picture", [name] { return name; });
+	neutrino_msg_t msg;
+	neutrino_msg_data_t data;
+	uint64_t end = CRCInput::calcTimeoutEnd(g_settings.timing[SNeutrinoSettings::TIMING_MENU]);
+	for (;;)
+	{
+		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &end);
+		if (msg <= CRCInput::RC_MaxRC || msg == CRCInput::RC_timeout)
+			break;
+		if (CNeutrinoApp::getInstance()->handleMsg(msg, data) & messages_return::cancel_all)
+			break;
+	}
+	CFrameBuffer::getInstance()->Clear();
+}
+
+static bool media_play(const Json::Value &input, std::string &result)
+{
+	std::string full;
+	if (!media_path(input, full, result))
+		return false;
+	std::string name = full.substr(full.rfind('/') + 1);
+	media_kind kind = kind_of(name);
+	if (kind == MEDIA_NONE)
+	{
+		result = name + " is no video, audio or picture file";
+		return false;
+	}
+	if (CMoviePlayerGui::getInstance().Playing())
+	{
+		result = "the box plays something already";
+		return false;
+	}
+	/* both wait in the main loop, the player until the file ends */
+	bool posted;
+	if (kind == MEDIA_PICTURE)
+		posted = main_call::post([full, name] { show_picture(full, name); });
+	else
+		posted = main_call::post([full, name] {
+			std::string t = name, f = full;
+			CMoviePlayerGui::getInstance().SetFile(t, f);
+			CMoviePlayerGui::getInstance().exec(NULL, "http");
+		});
+	if (!posted)
+	{
+		result = "the box did not take it";
+		return false;
+	}
+	result = (kind == MEDIA_PICTURE ? "shows " : "plays ") + name;
+	return true;
+}
+
 static bool plugins(std::string &result)
 {
 	CPlugins::PluginGuard guard(g_Plugins);
@@ -1173,6 +1375,10 @@ bool CAssistantTools::call(const std::string &name, const Json::Value &input, st
 		return recording_play(input, result);
 	if (name == "tv_recording_rename")
 		return recording_rename(input, result);
+	if (name == "tv_media")
+		return media_list(input, result);
+	if (name == "tv_media_play")
+		return media_play(input, result);
 	if (name == "tv_screen")
 		return screen(result);
 	if (name == "tv_select")

@@ -2253,7 +2253,7 @@ void ep_mcp_clients_delete(Call &c)
  * the others operate the box */
 const struct { const char *name; Level level; } tool_levels[] = {
 	{ "tv_status", L_READ }, { "tv_channels", L_READ }, { "tv_epg", L_READ }, { "tv_epg_search", L_READ },
-	{ "tv_timers", L_READ }, { "tv_plugins", L_READ }, { "tv_screen", L_READ }, { "tv_recordings", L_READ },
+	{ "tv_timers", L_READ }, { "tv_plugins", L_READ }, { "tv_screen", L_READ }, { "tv_recordings", L_READ }, { "tv_media", L_READ },
 	{ "tv_recording_rename", L_SYSTEM },
 };
 
