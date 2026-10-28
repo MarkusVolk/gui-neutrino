@@ -33,6 +33,7 @@
 #include <system/main_call.h>
 
 #define MAX_STEPS	64
+#define OPEN_TRIES	5
 
 namespace
 {
@@ -57,6 +58,13 @@ namespace
 		CRemoteUi *chosen_in;
 		std::string result;
 		int steps;
+		int open_tries;
+		/* a value is being set; its notifier may ask something */
+		bool busy;
+		/* the client got its answer while the walk was busy */
+		bool reported;
+		/* dropped while busy, deleted once the setting returns */
+		bool cancelled;
 		remote_path::done_fn done;
 	};
 
@@ -78,6 +86,19 @@ static void post_key(neutrino_msg_t key)
 {
 	g_RCInput->postMsg(key, 0, false);
 	post_step();
+}
+
+/* runs inside the loop of a question that a setting asked while it was
+ * set, and does nothing if none came */
+static void nested_step(unsigned int id)
+{
+	if (!current || current->id != id || !current->busy || current->reported)
+		return;
+	CRemoteUi *ui = CRemoteUi::top();
+	if (!ui || ui->remoteMenu() || CRemoteUi::viewerOnly())
+		return;
+	current->reported = true;
+	current->done(false, "the setting asks a question; answer it with tv_select or tv_input\n\n" + ui->remoteDescribe());
 }
 
 static void finish(bool ok, const std::string &text)
@@ -143,7 +164,11 @@ static void step(unsigned int id)
 		case OPENING:
 			if (!menu || std::string(menu->getName()) != g_Locale->getText(LOCALE_MAINMENU_HEAD))
 			{
-				finish(false, "the main menu did not open; look with tv_screen");
+				/* the infobar puts the key back behind this step */
+				if (!ui && ++current->open_tries < OPEN_TRIES)
+					post_step();
+				else
+					finish(false, "the main menu did not open; look with tv_screen");
 				return;
 			}
 			current->phase = WALKING;
@@ -178,7 +203,19 @@ static void step(unsigned int id)
 			if (current->set && current->next + 1 == current->path.size())
 			{
 				std::string result;
-				if (!menu->remoteSet(current->path[current->next], current->value, result))
+				walk *w = current;
+				w->busy = true;
+				main_call::post([id] { nested_step(id); });
+				bool ok = menu->remoteSet(w->path[w->next], w->value, result);
+				w->busy = false;
+				if (w->reported || w->cancelled)
+				{
+					if (current == w)
+						current = NULL;
+					delete w;
+					return;
+				}
+				if (!ok)
 				{
 					finish(false, result + "\n\n" + where(ui));
 					return;
@@ -263,6 +300,10 @@ bool remote_path::start(const std::vector<std::string> &path, bool set, const st
 	current->phase = here ? WALKING : CLOSING;
 	current->chosen_in = NULL;
 	current->steps = 0;
+	current->open_tries = 0;
+	current->busy = false;
+	current->reported = false;
+	current->cancelled = false;
 	current->done = done;
 	post_step();
 	return true;
@@ -270,6 +311,11 @@ bool remote_path::start(const std::vector<std::string> &path, bool set, const st
 
 void remote_path::cancel()
 {
+	if (current && current->busy)
+	{
+		current->cancelled = true;
+		return;
+	}
 	delete current;
 	current = NULL;
 }
