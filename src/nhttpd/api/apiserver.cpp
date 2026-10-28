@@ -2249,15 +2249,19 @@ void ep_mcp_clients_delete(Call &c)
 
 #define TOOL_TIMEOUT	20000
 
-/* the tools that only read; the others operate the box */
-const char *const read_tools[] = { "tv_status", "tv_channels", "tv_epg", "tv_epg_search", "tv_timers",
-	"tv_plugins", "tv_screen", NULL };
+/* the tools that only read, and those that need what their web route needs;
+ * the others operate the box */
+const struct { const char *name; Level level; } tool_levels[] = {
+	{ "tv_status", L_READ }, { "tv_channels", L_READ }, { "tv_epg", L_READ }, { "tv_epg_search", L_READ },
+	{ "tv_timers", L_READ }, { "tv_plugins", L_READ }, { "tv_screen", L_READ }, { "tv_recordings", L_READ },
+	{ "tv_recording_rename", L_SYSTEM },
+};
 
 Level tool_level(const std::string &name)
 {
-	for (const char *const *p = read_tools; *p; p++)
-		if (name == *p)
-			return L_READ;
+	for (size_t i = 0; i < sizeof(tool_levels) / sizeof(tool_levels[0]); i++)
+		if (name == tool_levels[i].name)
+			return tool_levels[i].level;
 	return L_WRITE;
 }
 

@@ -38,6 +38,7 @@
 #include <gui/widget/progresswindow.h>
 #include <system/helpers.h>
 #include <system/main_call.h>
+#include <system/recordings.h>
 #include <timerdclient/timerdclient.h>
 #include <zapit/getservices.h>
 #include <zapit/zapit.h>
@@ -146,6 +147,28 @@ static const struct
 		"{\"type\":\"object\",\"properties\":{"
 		"\"name\":{\"type\":\"string\",\"description\":\"name of the plugin\"}},"
 		"\"required\":[\"name\"]}"
+	},
+	{
+		"tv_recordings",
+		"The recordings of the box, newest first: title, channel, date, length and size. With recording "
+		"(its number in this list, a part of its title or its id) the details of that one.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"recording\":{\"type\":\"string\",\"description\":\"number, title or id of a recording\"}}}"
+	},
+	{
+		"tv_recording_play",
+		"Play a recording, as OK in the list of recordings does. Not while something plays already.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"recording\":{\"type\":\"string\",\"description\":\"number, title or id from tv_recordings\"}},"
+		"\"required\":[\"recording\"]}"
+	},
+	{
+		"tv_recording_rename",
+		"Give a recording a new title; its files are renamed to it. Not while it is being recorded.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"recording\":{\"type\":\"string\",\"description\":\"number, title or id from tv_recordings\"},"
+		"\"title\":{\"type\":\"string\"}},"
+		"\"required\":[\"recording\",\"title\"]}"
 	},
 	{
 		"tv_screen",
@@ -821,6 +844,118 @@ static bool plugin_usable(int number)
 	return !g_Plugins->isHidden(number) && !(g_Plugins->getType(number) & CPlugins::P_TYPE_DISABLED);
 }
 
+//-----------------------------------------------------------------------------
+// recordings
+//-----------------------------------------------------------------------------
+static void all_recordings(std::vector<recordings::entry> &list)
+{
+	std::vector<std::string> files;
+	recordings::files(files);
+	for (size_t i = 0; i < files.size(); i++)
+		list.push_back(recordings::describe(files[i]));
+	std::sort(list.begin(), list.end(), [](const recordings::entry &a, const recordings::entry &b) { return a.time > b.time; });
+}
+
+/* by its number in the list, then by its title, then by its id */
+static bool find_recording(const std::string &what, recordings::entry &found, std::string &result)
+{
+	std::vector<recordings::entry> list;
+	all_recordings(list);
+	char *end = NULL;
+	long number = strtol(what.c_str(), &end, 10);
+	if (!what.empty() && end && !*end) {
+		if (number < 1 || (size_t) number > list.size()) {
+			result = "there are " + to_string(list.size()) + " recordings";
+			return false;
+		}
+		found = list[number - 1];
+		return true;
+	}
+	for (size_t i = 0; i < list.size(); i++)
+		if (list[i].id == what) {
+			found = list[i];
+			return true;
+		}
+	std::vector<std::string> titles;
+	for (size_t i = 0; i < list.size(); i++)
+		titles.push_back(list[i].title);
+	int i = CRemoteUi::match(titles, what, "recording", result);
+	if (i < 0)
+		return false;
+	found = list[i];
+	return true;
+}
+
+static std::string recording_line(const recordings::entry &e)
+{
+	std::string line = e.title;
+	if (!e.channel.empty())
+		line += " - " + e.channel;
+	line += " - " + local_time(e.time, "%a %d.%m.%Y %H:%M");
+	if (e.length)
+		line += " - " + to_string(e.length) + " min";
+	char size[32];
+	snprintf(size, sizeof(size), " - %.1f GB", e.size / 1e9);
+	line += size;
+	if (e.busy)
+		line += " (being recorded)";
+	return line;
+}
+
+static bool recordings_list(const Json::Value &input, std::string &result)
+{
+	std::string what = input["recording"].asString();
+	if (!what.empty())
+	{
+		recordings::entry e;
+		if (!find_recording(what, e, result))
+			return false;
+		result = recording_line(e) + "\n";
+		if (!e.info.empty())
+			result += e.info + "\n";
+		result += "file: " + e.file + "\ncover: " + (e.cover ? "yes" : "no") + "\nid: " + e.id + "\n";
+		return true;
+	}
+	std::vector<recordings::entry> list;
+	all_recordings(list);
+	if (list.empty())
+		result = "There are no recordings in " + recordings::dir() + ".\n";
+	for (size_t i = 0; i < list.size(); i++)
+		result += to_string(i + 1) + ". " + recording_line(list[i]) + "\n";
+	return true;
+}
+
+static bool recording_play(const Json::Value &input, std::string &result)
+{
+	recordings::entry e;
+	if (!find_recording(input["recording"].asString(), e, result))
+		return false;
+	recordings::failure why;
+	if (!recordings::play(e.file, why))
+	{
+		result = why.detail;
+		return false;
+	}
+	result = "plays " + e.title;
+	return true;
+}
+
+static bool recording_rename(const Json::Value &input, std::string &result)
+{
+	recordings::entry e;
+	if (!find_recording(input["recording"].asString(), e, result))
+		return false;
+	std::string rel = e.file;
+	recordings::failure why;
+	if (!recordings::rename(rel, input["title"].asString(), why))
+	{
+		result = why.detail;
+		return false;
+	}
+	result = "renamed: " + recording_line(recordings::describe(rel));
+	return true;
+}
+
 static bool plugins(std::string &result)
 {
 	CPlugins::PluginGuard guard(g_Plugins);
@@ -1032,6 +1167,12 @@ bool CAssistantTools::call(const std::string &name, const Json::Value &input, st
 		return plugins(result);
 	if (name == "tv_plugin_start")
 		return plugin_start(input, result);
+	if (name == "tv_recordings")
+		return recordings_list(input, result);
+	if (name == "tv_recording_play")
+		return recording_play(input, result);
+	if (name == "tv_recording_rename")
+		return recording_rename(input, result);
 	if (name == "tv_screen")
 		return screen(result);
 	if (name == "tv_select")
