@@ -35,12 +35,17 @@
 #include <gui/widget/remote_ui.h>
 #include <gui/plugins.h>
 #include <system/helpers.h>
+#include <system/main_call.h>
 #include <timerdclient/timerdclient.h>
 #include <zapit/getservices.h>
 #include <zapit/zapit.h>
 
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1068,9 +1073,50 @@ void CAssistantTools::start(const std::string &name, const Json::Value &input, d
 	done(ok, result);
 }
 
-void CAssistantTools::cancel()
+bool CAssistantTools::run(const std::string &name, const Json::Value &input, int timeout_ms,
+			  bool &ok, std::string &text)
 {
-	remote_path::cancel();
+	/* the main loop may run the tool after the caller gave up waiting */
+	struct outcome
+	{
+		std::mutex lock;
+		std::condition_variable cond;
+		bool done = false;
+		bool ok = false;
+		std::string text;
+	};
+	std::shared_ptr<outcome> out = std::make_shared<outcome>();
+	done_fn done = [out](bool result_ok, const std::string &result)
+	{
+		std::lock_guard<std::mutex> l(out->lock);
+		out->ok = result_ok;
+		out->text = result;
+		out->done = true;
+		out->cond.notify_all();
+	};
+	std::chrono::steady_clock::time_point until = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+	if (!main_call::run([done, name, input] { start(name, input, done); }, timeout_ms))
+	{
+		text = "the box did not get to the tool in time";
+		return false;
+	}
+	std::unique_lock<std::mutex> l(out->lock);
+	if (!out->cond.wait_until(l, until, [&] { return out->done; }))
+	{
+		/* one walk runs at a time, so an unfinished one is this one */
+		main_call::post([out] {
+			std::unique_lock<std::mutex> l2(out->lock);
+			bool finished = out->done;
+			l2.unlock();
+			if (!finished)
+				remote_path::cancel();
+		});
+		text = "the menus did not answer in time; look with tv_screen";
+		return false;
+	}
+	ok = out->ok;
+	text = out->text;
+	return true;
 }
 
 std::string CAssistantTools::context()

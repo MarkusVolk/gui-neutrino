@@ -35,12 +35,7 @@
 #include <global.h>
 #include <gui/assistant_tools.h>
 #include <system/llm_client.h>
-#include <system/main_call.h>
 
-#include <chrono>
-#include <condition_variable>
-#include <memory>
-#include <mutex>
 #include <set>
 #include <string.h>
 
@@ -198,55 +193,21 @@ Json::Value CMcpAPI::toolsCall(const Json::Value &params, int &code, std::string
 	}
 	Json::Value input = params["arguments"].isObject() ? params["arguments"] : Json::Value(Json::objectValue);
 
-	/* the main loop may run the tool after this request gave up waiting */
-	struct outcome
-	{
-		std::mutex lock;
-		std::condition_variable cond;
-		bool done = false;
-		bool ok = false;
-		std::string text;
-	};
-	std::shared_ptr<outcome> out = std::make_shared<outcome>();
-	CAssistantTools::done_fn done = [out](bool ok, const std::string &text)
-	{
-		std::lock_guard<std::mutex> l(out->lock);
-		out->ok = ok;
-		out->text = text;
-		out->done = true;
-		out->cond.notify_all();
-	};
-	std::chrono::steady_clock::time_point until = std::chrono::steady_clock::now() + std::chrono::milliseconds(MCP_TOOL_TIMEOUT);
-	if (!main_call::run([done, name, input] { CAssistantTools::start(name, input, done); }, MCP_TOOL_TIMEOUT))
+	bool ok = false;
+	std::string answer;
+	if (!CAssistantTools::run(name, input, MCP_TOOL_TIMEOUT, ok, answer))
 	{
 		code = RPC_INTERNAL_ERROR;
-		message = "the box did not get to the tool in time";
+		message = answer;
 		return Json::Value();
-	}
-	{
-		std::unique_lock<std::mutex> l(out->lock);
-		if (!out->cond.wait_until(l, until, [&] { return out->done; }))
-		{
-			/* one walk runs at a time, so an unfinished one is this one */
-			main_call::post([out] {
-				std::unique_lock<std::mutex> l(out->lock);
-				bool done = out->done;
-				l.unlock();
-				if (!done)
-					CAssistantTools::cancel();
-			});
-			code = RPC_INTERNAL_ERROR;
-			message = "the menus did not answer in time; look with tv_screen";
-			return Json::Value();
-		}
 	}
 
 	Json::Value text(Json::objectValue);
 	text["type"] = "text";
-	text["text"] = out->text;
+	text["text"] = answer;
 	Json::Value result(Json::objectValue);
 	result["content"].append(text);
-	result["isError"] = !out->ok;
+	result["isError"] = !ok;
 	return result;
 }
 

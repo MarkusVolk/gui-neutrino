@@ -37,8 +37,10 @@ class CAssistantTools
 		/* like call, but done may run later in the main loop, once the tool is through */
 		typedef std::function<void(bool ok, const std::string &result)> done_fn;
 		static void start(const std::string &name, const Json::Value &input, done_fn done);
-		/* drops a tool that did not get through in time */
-		static void cancel();
+		/* for a thread of the web server: runs the tool in the main loop and waits for it;
+		 * false when the box did not answer within timeout_ms, text says what was left */
+		static bool run(const std::string &name, const Json::Value &input, int timeout_ms,
+				bool &ok, std::string &text);
 		/* the local time and the channel, for the model to know what "tonight" and "here" mean */
 		static std::string context();
 		/* a channel of the mode the box is in has exactly this name or number */
