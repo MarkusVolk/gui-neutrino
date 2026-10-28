@@ -177,6 +177,8 @@ inline  int     getSelectedLineRel(void)	{return(m_nSelectedLine - m_nLinesPerPa
 inline  int     getTitleHeight(void)		{return(m_cFrameTitleRel.iHeight);};
 inline  int     getHeaderListHeight(void)	{return(m_cFrameHeaderListRel.iHeight);};
 inline  int     getLines(void)				{return(m_nNrOfLines);};
+		/* the texts of a line's columns, as a remote client reads them */
+		std::string getLineText(int line);
 inline  int     getPages(void)				{return(m_nNrOfPages);};
 inline  void    showSelection(bool show)	{m_showSelection = show;refreshLine(m_nSelectedLine);};
 inline	void	movePosition(int x, int y){m_cFrame.iX = x; m_cFrame.iY = y;};

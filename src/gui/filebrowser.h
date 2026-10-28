@@ -183,6 +183,7 @@ class CFileBrowser
 		SMSKeyInput m_SMSKeyInput;
 
 		void paintItem(unsigned pos);
+		void moveCursor(unsigned int newsel);
 		void paint();
 		void paintHead();
 		int  paintFoot(bool show = true);

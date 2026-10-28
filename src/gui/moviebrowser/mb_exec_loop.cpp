@@ -45,6 +45,7 @@
 #include <driver/display.h>
 #include <gui/infoviewer.h>
 #include <gui/nfs.h>
+#include <gui/widget/remote_list.h>
 #include <neutrino.h>
 
 #include <sys/mount.h>
@@ -103,6 +104,28 @@ int CMovieBrowser::exec(const char* path)
 	bool result;
 	int timeout = g_settings.timing[SNeutrinoSettings::TIMING_FILEBROWSER];
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(timeout);
+
+	/* the pane in focus is the list a remote client reads */
+	auto pane = [this]() -> CListFrame * {
+		switch (m_windowFocus) {
+			case MB_FOCUS_LAST_PLAY:	return m_pcLastPlay;
+			case MB_FOCUS_LAST_RECORD:	return m_pcLastRecord;
+			case MB_FOCUS_FILTER:		return m_pcFilter;
+			default:			return m_pcBrowser;
+		}
+	};
+	CRemoteList::Access remote_access;
+	remote_access.title = [] { return std::string(g_Locale->getText(LOCALE_MOVIEBROWSER_HEAD)); };
+	remote_access.count = [pane] { return pane() ? (size_t) pane()->getLines() : 0; };
+	remote_access.text = [pane](size_t i) { return pane()->getLineText(i); };
+	remote_access.selected = [pane] { return pane() ? (size_t) pane()->getSelectedLine() : 0; };
+	remote_access.select = [this, pane](size_t i) {
+		pane()->setSelectedLine(i);
+		updateMovieSelection();
+	};
+	CRemoteList remote_list(remote_access, "plays the recording; in the filter pane it applies the filter",
+		"red: sort, green: filter, yellow: next pane, blue: reload, info: details, play: mark, "
+		"mute: delete (the viewer confirms it at the TV)");
 	while (loop)
 	{
 		g_RCInput->getMsgAbsoluteTimeout(&msg, &data, &timeoutEnd);

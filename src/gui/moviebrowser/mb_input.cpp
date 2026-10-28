@@ -53,6 +53,7 @@
 #include <gui/widget/icons.h>
 #include <gui/widget/menue.h>
 #include <gui/widget/msgbox.h>
+#include <gui/widget/remote_ui.h>
 #include <neutrino.h>
 #include <system/helpers.h>
 #include <timerdclient/timerdclient.h>
@@ -117,7 +118,12 @@ bool CMovieBrowser::onButtonPressMainFrame(neutrino_msg_t msg)
 			if (!cover_file.empty())
 			{
 				//delete Cover
-				if (ShowMsg(LOCALE_MESSAGEBOX_INFO, LOCALE_MOVIEBROWSER_DELETE_SCREENSHOT, CMsgBox::mbrNo, CMsgBox:: mbYes | CMsgBox::mbNo) == CMsgBox::mbrYes)
+				bool confirmed;
+				{
+					CRemoteUi::ViewerOnly viewer;
+					confirmed = ShowMsg(LOCALE_MESSAGEBOX_INFO, LOCALE_MOVIEBROWSER_DELETE_SCREENSHOT, CMsgBox::mbrNo, CMsgBox:: mbYes | CMsgBox::mbNo) == CMsgBox::mbrYes;
+				}
+				if (confirmed)
 				{
 					unlink(cover_file.c_str());
 					refresh();

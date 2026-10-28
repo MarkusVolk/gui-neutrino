@@ -46,6 +46,7 @@
 #include <driver/record.h>
 #include <gui/widget/hintbox.h>
 #include <gui/widget/msgbox.h>
+#include <gui/widget/remote_ui.h>
 #include <system/helpers.h>
 #include <timerdclient/timerdclient.h>
 
@@ -107,7 +108,14 @@ bool CMovieBrowser::onDeleteFile(MI_MOVIE_INFO *movieinfo, bool skipAsk)
 	int msgBoxWidth = 450;
 
 	std::string msg = formatDeleteMsg(movieinfo, msgFont, msgBoxWidth);
-	if ((skipAsk || !movieinfo->delAsk) || (ShowMsg(LOCALE_FILEBROWSER_DELETE, msg, CMsgBox::mbrYes, CMsgBox::mbYes|CMsgBox::mbNo, NULL, msgBoxWidth)==CMsgBox::mbrYes))
+	bool confirmed = skipAsk || !movieinfo->delAsk;
+	if (!confirmed)
+	{
+		/* a remote client may choose a recording, but deleting it is the viewer's word */
+		CRemoteUi::ViewerOnly viewer;
+		confirmed = ShowMsg(LOCALE_FILEBROWSER_DELETE, msg, CMsgBox::mbrYes, CMsgBox::mbYes|CMsgBox::mbNo, NULL, msgBoxWidth) == CMsgBox::mbrYes;
+	}
+	if (confirmed)
 	{
 		CHintBox hintBox(LOCALE_MESSAGEBOX_INFO, g_Locale->getText(LOCALE_MOVIEBROWSER_DELETE_INFO));
 		hintBox.paint();
@@ -219,7 +227,10 @@ bool CMovieBrowser::onDelete(bool cursor_only)
 	if (!dellist.empty()) {
 		bool skipAsk = false;
 		if (dellist_cnt > 1)
+		{
+			CRemoteUi::ViewerOnly viewer;
 			skipAsk = (ShowMsg(LOCALE_FILEBROWSER_DELETE, LOCALE_MOVIEBROWSER_DELETE_ALL, CMsgBox::mbrNo, CMsgBox:: mbYes | CMsgBox::mbNo) == CMsgBox::mbrYes);
+		}
 		for (dellist_it = dellist.begin(); dellist_it != dellist.end(); ++dellist_it)
 			result |= onDeleteFile((MI_MOVIE_INFO *)&(*dellist_it), skipAsk);
 		dellist.clear();

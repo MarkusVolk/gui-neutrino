@@ -656,6 +656,20 @@ bool CListFrame::setTitle(char* title)
 	return(true);
 }
 
+std::string CListFrame::getLineText(int line)
+{
+	std::string text;
+	if (!m_pLines)
+		return text;
+	for (int row = 0; row < m_pLines->rows && row < LF_MAX_ROWS; row++) {
+		const std::vector<std::string> &cells = m_pLines->lineArray[row].v_text;
+		if (line < 0 || line >= (int) cells.size() || cells[line].empty())
+			continue;
+		text += (text.empty() ? "" : " | ") + cells[line];
+	}
+	return text;
+}
+
 bool CListFrame::setSelectedLine(int selection)
 {
 	//TRACE("[CListFrame]->setSelectedLine %d \r\n",selection);

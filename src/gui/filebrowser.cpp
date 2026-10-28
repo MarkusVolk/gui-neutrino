@@ -33,6 +33,7 @@
 #include <gui/widget/icons.h>
 #include <gui/widget/iconfont.h>
 #include <gui/widget/msgbox.h>
+#include <gui/widget/remote_list.h>
 #include <gui/widget/hourglass.h>
 
 #include <algorithm>
@@ -651,6 +652,16 @@ bool CFileBrowser::exec(const char * const dirname)
 
 	unsigned int oldselected = selected;
 
+	CRemoteList::Access remote_access;
+	remote_access.title = [this] { return Path; };
+	remote_access.count = [this] { return filelist.size(); };
+	remote_access.text = [this](size_t i) { return filelist[i].getFileName() + (filelist[i].isDir() ? "/" : ""); };
+	remote_access.selected = [this] { return (size_t) selected; };
+	remote_access.select = [this](size_t i) { if (i != selected) moveCursor(i); };
+	CRemoteList remote_list(remote_access, "enters the folder or chooses the file; in a folder chooser it chooses the folder",
+		"right: into the folder, left: one folder up, yellow: mark, red: sort, blue: filter, "
+		"mute: delete (the viewer confirms it at the TV)");
+
 	int timeout = g_settings.timing[SNeutrinoSettings::TIMING_FILEBROWSER];
 	uint64_t timeoutEnd = CRCInput::calcTimeoutEnd(timeout);
 
@@ -760,40 +771,9 @@ bool CFileBrowser::exec(const char * const dirname)
 			}
 		}
 		if (msg_repeatok == CRCInput::RC_up)
-		{
-			unsigned int prevselected=selected;
-			unsigned int prevliststart = liststart;
-			if (selected)
-				selected --;
-			else
-				selected = filelist.size() - 1;
-			liststart = (selected/listmaxshow)*listmaxshow;
-			if(prevliststart != liststart)
-			{
-				paint();
-			}
-			else
-			{
-				paintItem(prevselected - prevliststart);
-				paintItem(selected - liststart);
-			}
-		}
+			moveCursor(selected ? selected - 1 : filelist.size() - 1);
 		else if (msg_repeatok == CRCInput::RC_down)
-		{
-			unsigned int prevselected=selected;
-			unsigned int prevliststart = liststart;
-			selected = (selected + 1) % filelist.size();
-			liststart = (selected/listmaxshow)*listmaxshow;
-			if(prevliststart != liststart)
-			{
-				paint();
-			}
-			else
-			{
-				paintItem(prevselected - prevliststart);
-				paintItem(selected - liststart);
-			}
-		}
+			moveCursor((selected + 1) % filelist.size());
 		else if (msg == CRCInput::RC_right)
 		{
 			if (filelist[selected].isDir())
@@ -844,7 +824,13 @@ bool CFileBrowser::exec(const char * const dirname)
 					_msg << filelist[selected].getFileName();
 
 				_msg << " " << g_Locale->getText(LOCALE_FILEBROWSER_DODELETE2);
-				if (ShowMsg(LOCALE_FILEBROWSER_DELETE, _msg.str(), CMsgBox::mbrYes, CMsgBox::mbNoYes)==CMsgBox::mbrYes)
+				bool confirmed;
+				{
+					/* a remote client may choose a file, but deleting it is the viewer's word */
+					CRemoteUi::ViewerOnly viewer;
+					confirmed = ShowMsg(LOCALE_FILEBROWSER_DELETE, _msg.str(), CMsgBox::mbrYes, CMsgBox::mbNoYes) == CMsgBox::mbrYes;
+				}
+				if (confirmed)
 				{
 					std::string n = filelist[selected].Name;
 					recursiveDelete(n.c_str());
@@ -1026,40 +1012,9 @@ bool CFileBrowser::playlist_manager(CFileList &playlist, unsigned int playing, b
 			continue;
 
 		if (msg_repeatok == CRCInput::RC_up)
-		{
-			unsigned int prevselected=selected;
-			unsigned int prevliststart = liststart;
-			if (selected)
-				selected --;
-			else
-				selected = filelist.size() - 1;
-			liststart = (selected/listmaxshow)*listmaxshow;
-			if(prevliststart != liststart)
-			{
-				paint();
-			}
-			else
-			{
-				paintItem(prevselected - prevliststart);
-				paintItem(selected - liststart);
-			}
-		}
+			moveCursor(selected ? selected - 1 : filelist.size() - 1);
 		else if (msg_repeatok == CRCInput::RC_down)
-		{
-			unsigned int prevselected=selected;
-			unsigned int prevliststart = liststart;
-			selected = (selected + 1) % filelist.size();
-			liststart = (selected/listmaxshow)*listmaxshow;
-			if(prevliststart != liststart)
-			{
-				paint();
-			}
-			else
-			{
-				paintItem(prevselected - prevliststart);
-				paintItem(selected - liststart);
-			}
-		}
+			moveCursor((selected + 1) % filelist.size());
 		else if (msg == (neutrino_msg_t) g_settings.key_pagedown)
 		{
 			unsigned int last = filelist.size() - 1;
@@ -1205,6 +1160,21 @@ void CFileBrowser::addRecursiveDir(CFileList * re_filelist, std::string rpath, b
 void CFileBrowser::hide()
 {
 	frameBuffer->paintBackgroundBoxRel(x, y, width + OFFSET_SHADOW, height + OFFSET_SHADOW);
+}
+
+void CFileBrowser::moveCursor(unsigned int newsel)
+{
+	unsigned int prevselected = selected;
+	unsigned int prevliststart = liststart;
+	selected = newsel;
+	liststart = (selected/listmaxshow)*listmaxshow;
+	if (prevliststart != liststart)
+		paint();
+	else
+	{
+		paintItem(prevselected - prevliststart);
+		paintItem(selected - liststart);
+	}
 }
 
 void CFileBrowser::paintItem(unsigned int pos)
