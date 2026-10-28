@@ -32,6 +32,7 @@
 #include <global.h>
 #include <neutrino.h>
 #include "menue.h"
+#include "remote_secret.h"
 
 #include <driver/fontrenderer.h>
 #include <driver/screen_max.h>
@@ -916,9 +917,12 @@ std::string CMenuWidget::remoteDescribe(bool with_options)
 			continue;
 		out += std::string((int)i == selected ? "> " : "  ") + to_string(i + 1) + ". " + name;
 		std::string value = item->getValueText();
-		if (!value.empty())
+		bool secret = remote_secret::title(item->getNameLocale(), name);
+		if (secret)
+			out += " = " + remote_secret::hidden(value);
+		else if (!value.empty())
 			out += " = " + value;
-		if (with_options) {
+		if (with_options && !secret) {
 			std::vector<std::string> options = item->remoteOptions();
 			if (!options.empty()) {
 				out += " [";
@@ -1006,7 +1010,9 @@ bool CMenuWidget::remoteSet(const std::string &entry, const std::string &value, 
 	if (!item->remoteSet(value, result))
 		return false;
 	paint();
-	result = std::string(item->getName() ? item->getName() : "") + " = " + item->getValueText();
+	std::string name = item->getName() ? item->getName() : "";
+	std::string now = item->getValueText();
+	result = name + " = " + (remote_secret::title(item->getNameLocale(), name) ? remote_secret::hidden(now) : now);
 	return true;
 }
 

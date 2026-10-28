@@ -26,6 +26,7 @@
 
 #include <global.h>
 #include <neutrino.h>
+#include <gui/widget/remote_secret.h>
 
 #include <driver/fontrenderer.h>
 #include <driver/rcinput.h>
@@ -656,7 +657,8 @@ std::string CKeyboardInput::remoteDescribe()
 {
 	std::string out = "Text input: " + title + "\n";
 	if (inputString)
-		out += "Current text: " + (masked ? maskedString() : std::string(inputString->c_str())) + "\n";
+		out += "Current text: " + (masked || remote_secret::title(NONEXISTANT_LOCALE, title)
+			? remote_secret::hidden(inputString->c_str()) : std::string(inputString->c_str())) + "\n";
 	std::string hint = hintText_1.empty() && hint_1 != NONEXISTANT_LOCALE ? g_Locale->getText(hint_1) : hintText_1;
 	if (!hint.empty())
 		out += "Hint: " + hint + "\n";

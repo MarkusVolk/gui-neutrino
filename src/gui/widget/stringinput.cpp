@@ -39,6 +39,7 @@
 #include <gui/widget/buttons.h>
 #include <gui/widget/icons.h>
 #include <gui/widget/msgbox.h>
+#include <gui/widget/remote_secret.h>
 
 #include <system/helpers.h>
 
@@ -609,9 +610,11 @@ int CStringInput::exec( CMenuTarget* parent, const std::string & )
 
 std::string CStringInput::remoteDescribe()
 {
-	std::string out = std::string(remoteMasked() ? "PIN input: " : "Input: ")
-		+ (name == NONEXISTANT_LOCALE ? head : g_Locale->getText(name)) + "\n";
-	if (!remoteMasked()) {
+	std::string title = name == NONEXISTANT_LOCALE ? head : g_Locale->getText(name);
+	std::string out = std::string(remoteMasked() ? "PIN input: " : "Input: ") + title + "\n";
+	if (remote_secret::title(name, title))
+		out += "Current value: " + remote_secret::hidden(*valueString) + "\n";
+	else if (!remoteMasked()) {
 		std::string current = *valueString;
 		out += "Current value: " + trim(current) + "\n";
 	}

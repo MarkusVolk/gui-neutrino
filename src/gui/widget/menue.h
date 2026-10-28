@@ -204,6 +204,7 @@ class CMenuItem : public  CComponentsSignals
 
 		void setLua(lua_State *_luaState, std::string &_luaAction, std::string &_luaId) { luaState = _luaState; luaAction = _luaAction; luaId = _luaId; };
 		virtual const char *getName();
+		neutrino_locale_t getNameLocale() const { return name; }
 		virtual void setName(const std::string& text);
 		virtual void setName(const neutrino_locale_t text);
 		sigc::signal<void> OnPaintItem;

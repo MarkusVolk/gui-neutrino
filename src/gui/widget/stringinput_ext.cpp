@@ -37,6 +37,7 @@
 #include <gui/color.h>
 
 #include <gui/widget/msgbox.h>
+#include <gui/widget/remote_secret.h>
 
 #include <system/helpers.h>
 #include <global.h>
@@ -181,8 +182,9 @@ void CExtendedInput::enableSaveScreen(bool enable)
 
 std::string CExtendedInput::remoteDescribe()
 {
-	std::string out = "Input: " + std::string(name == NONEXISTANT_LOCALE ? nameString : g_Locale->getText(name)) + "\n";
-	out += "Current value: " + *valueString + "\n";
+	std::string title = name == NONEXISTANT_LOCALE ? nameString : g_Locale->getText(name);
+	std::string out = "Input: " + title + "\n";
+	out += "Current value: " + (remote_secret::title(name, title) ? remote_secret::hidden(*valueString) : *valueString) + "\n";
 	out += "A new value keeps this form, " + to_string(valueString->size()) + " characters\n";
 	if (hint_1 != NONEXISTANT_LOCALE)
 		out += std::string("Hint: ") + g_Locale->getText(hint_1) + "\n";
@@ -787,7 +789,10 @@ void CIntInput::onAfterExec()
 std::string CIntInput::remoteDescribe()
 {
 	std::string out = std::string("Input: ") + g_Locale->getText(name) + "\n";
-	out += "Current value: " + to_string(atoi(*valueString)) + "\n";
+	if (remote_secret::title(name, g_Locale->getText(name)))
+		out += "Current value: " + remote_secret::hidden(*valueString) + "\n";
+	else
+		out += "Current value: " + to_string(atoi(*valueString)) + "\n";
 	out += "A whole number of up to " + to_string(m_size) + " digits\n";
 	if (hint_1 != NONEXISTANT_LOCALE)
 		out += std::string("Hint: ") + g_Locale->getText(hint_1) + "\n";
