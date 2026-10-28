@@ -362,6 +362,8 @@ void CTerminal::typeText()
 	std::string text;
 	keyboard.close();
 	CKeyboardInput input(std::string("Terminal"), &text, 255, NULL, NULL, std::string("OK sends the text to the program"), std::string(""));
+	/* the program may be asking for a password, of sudo or ssh */
+	input.setRemoteHidden();
 	input.exec(NULL, "");
 	keyboard.open();
 	g_RCInput->clearRCMsg();

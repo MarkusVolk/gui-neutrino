@@ -149,6 +149,7 @@ CKeyboardInput::CKeyboardInput(const std::string &Name, std::string *Value, int 
 	focus = FOCUS_STRING;
 	force_saveScreen = false;
 	masked = false;
+	remote_hidden = false;
 	pixBuf = NULL;
 }
 
@@ -657,7 +658,7 @@ std::string CKeyboardInput::remoteDescribe()
 {
 	std::string out = "Text input: " + title + "\n";
 	if (inputString)
-		out += "Current text: " + (masked || remote_secret::title(NONEXISTANT_LOCALE, title)
+		out += "Current text: " + (masked || remote_hidden || remote_secret::title(NONEXISTANT_LOCALE, title)
 			? remote_secret::hidden(inputString->c_str()) : std::string(inputString->c_str())) + "\n";
 	std::string hint = hintText_1.empty() && hint_1 != NONEXISTANT_LOCALE ? g_Locale->getText(hint_1) : hintText_1;
 	if (!hint.empty())
