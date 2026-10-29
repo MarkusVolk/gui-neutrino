@@ -1123,7 +1123,7 @@ int CMenuWidget::exec(CMenuTarget* parent, const std::string &)
 						if (selected >= 0 && selected < (int)items.size())
 							items[selected]->paint( false );
 						selected= i;
-						if (selected > page_start[current_page + 1] || selected < page_start[current_page]) {
+						if (selected >= page_start[current_page + 1] || selected < page_start[current_page]) {
 							/* different page */
 							paintItems();
 						}
