@@ -5691,6 +5691,14 @@ void CNeutrinoApp::standbyMode(bool bOnOff, bool fromDeepStandby)
 		lastMode = mode;
 		mode = NeutrinoModes::mode_standby;
 
+		//remember tuned channel-id
+		standby_channel_id = CZapit::getInstance()->GetCurrentChannelID();
+
+		/* before the guide is saved: its wait handles the end of the
+		   timeshift, and standbyToStandby() would put zapit to sleep under
+		   a scan that has not started yet */
+		CEpgScan::getInstance()->Start(true);
+
 		if(!CRecordManager::getInstance()->RecordingStatus() ) {
 			//only save epg when not recording
 			if(g_settings.epg_save && !fromDeepStandby && g_settings.epg_save_standby) {
@@ -5704,17 +5712,7 @@ void CNeutrinoApp::standbyMode(bool bOnOff, bool fromDeepStandby)
 
 		InfoClock->enableInfoClock(false);
 
-
-		//remember tuned channel-id
-		standby_channel_id = CZapit::getInstance()->GetCurrentChannelID();
-
 		exec_controlscript(NEUTRINO_ENTER_STANDBY_SCRIPT);
-
-
-
-
-
-		CEpgScan::getInstance()->Start(true);
 
 		bool alive = CRecordManager::getInstance()->RecordingStatus() || CEpgScan::getInstance()->Running() || CStreamManager::getInstance()->StreamStatus();
 		if (!alive && cpuFreq)
