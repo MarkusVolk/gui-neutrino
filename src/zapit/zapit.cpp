@@ -2967,6 +2967,16 @@ unsigned CZapit::ZapTo(const unsigned int pchannel)
 	return 0;
 }
 
+/* a channel kept from an older channel list: the same service on a transponder
+   whose frequency was rounded otherwise has another id, but the same lower 48 bits */
+static t_channel_id currentChannelId(t_channel_id id)
+{
+	if (!id || CServiceManager::getInstance()->FindChannel(id))
+		return id;
+	CZapitChannel *channel = CServiceManager::getInstance()->FindChannel48(id);
+	return channel ? channel->getChannelID() : id;
+}
+
 bool CZapit::Start(Z_start_arg *ZapStart_arg)
 {
 	if(started)
@@ -3077,6 +3087,9 @@ bool CZapit::Start(Z_start_arg *ZapStart_arg)
 		lastChannelRadio = ZapStart_arg->startchannelradio_id;
 		lastChannelTV = ZapStart_arg->startchanneltv_id;
 	}
+	live_channel_id = currentChannelId(live_channel_id);
+	lastChannelRadio = currentChannelId(lastChannelRadio);
+	lastChannelTV = currentChannelId(lastChannelTV);
 
 	/* CA_INIT_CI or CA_INIT_SC or CA_INIT_BOTH */
 	switch(config.cam_ci)
