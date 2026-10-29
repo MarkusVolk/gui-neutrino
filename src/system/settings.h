@@ -1135,6 +1135,7 @@ struct SNeutrinoSettings
 	// menu
 	int menu_pos;
 	int show_menu_hints;
+	int menu_numbers;
 	// int show_menu_hints_line;
 
 	// epgview

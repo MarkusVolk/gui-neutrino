@@ -422,6 +422,9 @@ int CLuaInstMenu::MenuAddItem(lua_State *L)
 		}
 
 		lua_Unsigned directkey = CRCInput::RC_nokey;	tableLookup(L, "directkey", directkey);
+		/* a script that gives digits means them */
+		if (CRCInput::isNumeric(directkey))
+			D->m->setDigitKeys(CMenuWidget::DIGITS_OWN);
 		lua_Integer pulldown = false;			tableLookup(L, "pulldown", pulldown);
 
 		bool enabled = true;

@@ -92,6 +92,7 @@ int CQuadPiPSetup::exec(CMenuTarget *parent, const std::string &/*actionKey*/)
 int CQuadPiPSetup::showQuadPiPSetup()
 {
 	CMenuWidget *quadpipsetup = new CMenuWidget(LOCALE_QUADPIP, NEUTRINO_ICON_SETTINGS, (int) w_max (35, 15), MN_WIDGET_ID_QUADPIP);
+	quadpipsetup->setDigitKeys(CMenuWidget::DIGITS_OWN);
 
 	// menu head
 	quadpipsetup->addItem(GenericMenuSeparator);

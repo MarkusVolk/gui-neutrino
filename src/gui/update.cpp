@@ -641,6 +641,7 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 		CMenuSelectorTarget *selector = new CMenuSelectorTarget(&selected);
 
 		CMenuWidget m(LOCALE_FLASHUPDATE_CHOOSE_PARTITION, NEUTRINO_ICON_SETTINGS);
+		m.setDigitKeys(CMenuWidget::DIGITS_OWN);
 		m.addItem(GenericMenuSeparator);
 		CMenuForwarder *mf;
 
@@ -1079,6 +1080,7 @@ int CFlashExpert::showMTDSelector(const std::string &actionkey)
 
 	// generate mtd-selector
 	CMenuWidget *mtdselector = new CMenuWidget(LOCALE_SERVICEMENU_UPDATE, NEUTRINO_ICON_UPDATE, width, widget_id);
+	mtdselector->setDigitKeys(CMenuWidget::DIGITS_OWN);
 	mtdselector->addIntroItems(LOCALE_FLASHUPDATE_MTDSELECTOR, NONEXISTANT_LOCALE, CMenuWidget::BTN_TYPE_CANCEL);
 
 	CMTDInfo *mtdInfo = CMTDInfo::getInstance();

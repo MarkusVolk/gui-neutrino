@@ -386,10 +386,11 @@ void CMenuItem::paintItemButton(const bool select_mode, int item_height, const c
 
 	//define icon name depends of numeric value
 	bool isNumeric = CRCInput::isNumeric(directKey);
-#if 0
-	if (isNumeric && !g_settings.menu_numbers_as_icons)
+	/* digits switched off: the key still works where it means something */
+	if (isNumeric && !g_settings.menu_numbers) {
 		icon_name = NULL;
-#endif
+		isNumeric = false;
+	}
 	//define select icon
 	if (selected && offx > 0)
 	{
@@ -452,6 +453,20 @@ void CMenuItem::paintItemButton(const bool select_mode, int item_height, const c
 			frameBuffer->paintIcon(iconName_Info_right, dx + icon_start_x - (icon_w + 2*OFFSET_INNER_MID), y+ ((item_height/2- icon_h/2)) );
 		}
 	}
+}
+
+/* the icon of a digit key, which names nothing but the key */
+static bool digit_icon(const char *icon)
+{
+	return icon && icon[0] >= '0' && icon[0] <= '9' && icon[1] == 0;
+}
+
+void CMenuItem::setDirectKey(neutrino_msg_t key)
+{
+	bool derived = !iconName || !*iconName || digit_icon(iconName);
+	directKey = key;
+	if (derived)
+		setIconName();
 }
 
 void CMenuItem::setIconName()
@@ -675,6 +690,7 @@ void CMenuWidget::Init(const std::string &NameString, const std::string &Icon, c
 	savescreen	= false;
 	preselected 	= -1;
 	nextShortcut	= 1;
+	digit_keys	= DIGITS_AUTO;
 	current_page	= 0;
 	has_hints	= false;
 	brief_hints	= BRIEF_HINT_NO;
@@ -1464,8 +1480,38 @@ void CMenuWidget::checkHints()
 	}
 }
 
+/* every entry that has no key of its own, or only a digit, gets the next
+   digit, also when it is inactive, so that the numbers do not move; digits
+   bound with addKey are left out */
+void CMenuWidget::assignDigitKeys()
+{
+	if (digit_keys != DIGITS_AUTO)
+		return;
+	unsigned int n = 1;
+	for (unsigned int i = 0; i < items.size(); i++) {
+		CMenuItem *item = items[i];
+		if (item->isSeparator() || item->isStatic)
+			continue;
+		if (item->directKey != CRCInput::RC_nokey && !CRCInput::isNumeric(item->directKey))
+			continue;
+		if (item->iconName && *item->iconName && !digit_icon(item->iconName))
+			continue;
+		neutrino_msg_t key = CRCInput::RC_nokey;
+		if (g_settings.menu_numbers) {
+			while (n <= 10 && keyActionMap.count(CRCInput::convertDigitToKey(n % 10)))
+				n++;
+			if (n <= 10)
+				key = CRCInput::convertDigitToKey(n++ % 10);
+		}
+		if (key != item->directKey)
+			item->setDirectKey(key);
+	}
+}
+
 void CMenuWidget::calcSize()
 {
+	assignDigitKeys();
+
 	// recalc min_width
 	min_width = 0;
 	int mwidth = std::min(mwidth_save, 100);
@@ -1538,7 +1584,7 @@ void CMenuWidget::calcSize()
 
 	iconOffset= 0;
 	for (unsigned int i= 0; i< items.size(); i++)
-		if (items[i]->iconName /*&& !g_settings.menu_numbers_as_icons*/)
+		if (items[i]->iconName && (g_settings.menu_numbers || !CRCInput::isNumeric(items[i]->directKey)))
 		{
 			int w, h;
 			frameBuffer->getIconSize(items[i]->iconName, &w, &h);

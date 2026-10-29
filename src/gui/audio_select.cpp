@@ -100,6 +100,7 @@ int CAudioSelectMenuHandler::doMenu ()
 		return menu_return::RETURN_EXIT;
 	}
 	CMenuWidget AudioSelector(LOCALE_AUDIOSELECTMENUE_HEAD, NEUTRINO_ICON_AUDIO, width);
+	AudioSelector.setDigitKeys(CMenuWidget::DIGITS_OWN);
 
 	CSubtitleChangeExec SubtitleChanger;
 

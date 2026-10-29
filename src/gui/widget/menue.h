@@ -160,6 +160,8 @@ class CMenuItem : public  CComponentsSignals
 		virtual bool remoteSet(const std::string &value, std::string &error);
 
 		CMenuItem(bool Active = true, neutrino_msg_t DirectKey = RC_NOKEY, const char * const IconName= NULL, const char * const IconName_Info_right = NULL, bool IsStatic = false);
+		/* a new key; an icon that only showed the old key follows it */
+		void setDirectKey(neutrino_msg_t key);
 
 		virtual ~CMenuItem(){}
 		
@@ -626,11 +628,13 @@ class CMenuWidget : public CMenuTarget, public CComponentsSignals, public CRemot
 		bool			fade;
 		bool			washidden;
 		int			nextShortcut;
+		int			digit_keys;
 
 		void Init(const std::string &NameString, const std::string & Icon, const int mwidth, const mn_widget_id_t &w_index);
 		virtual void paintItems();
 		void checkHints();
 		void calcSize();
+		void assignDigitKeys();
 		void saveScreen();
 		void restoreScreen();
 		void setMenuPos(const int& menu_width);
@@ -719,6 +723,12 @@ class CMenuWidget : public CMenuTarget, public CComponentsSignals, public CRemot
 		/* buttons with a text of their own rather than a locale */
 		void setFooter(const std::vector<button_label_cc> &labels, bool repaint = false);
 
+		enum
+		{
+			DIGITS_AUTO,	/* 1 to 9 and 0 from the top */
+			DIGITS_OWN	/* the digit of an entry means something: a track, a window, minutes */
+		};
+		void setDigitKeys(int mode) { digit_keys = mode; }
 		void setNextShortcut(int sc) { nextShortcut = sc; };
 		int getNextShortcut() { return nextShortcut; };
 		bool gotAction() { return !no_action; };

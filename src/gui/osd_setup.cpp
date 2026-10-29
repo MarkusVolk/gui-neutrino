@@ -1210,6 +1210,11 @@ void COsdSetup::showOsdMenusSetup(CMenuWidget *menu_menus)
 	mc = new CMenuOptionChooser(LOCALE_SETTINGS_MENU_HINTS_LINE, &g_settings.theme.show_menu_hints_line, OPTIONS_OFF0_ON1_OPTIONS, OPTIONS_OFF0_ON1_OPTION_COUNT, true, this);
 	mc->setHint("", LOCALE_MENU_HINT_MENU_HINTS_LINE);
 	submenu_menus->addItem(mc);
+
+	// quick-select digits
+	mc = new CMenuOptionChooser(LOCALE_SETTINGS_MENU_NUMBERS, &g_settings.menu_numbers, OPTIONS_OFF0_ON1_OPTIONS, OPTIONS_OFF0_ON1_OPTION_COUNT, true, this);
+	mc->setHint("", LOCALE_MENU_HINT_MENU_NUMBERS);
+	submenu_menus->addItem(mc);
 }
 
 #define HDD_STATFS_OPTION_COUNT 3
@@ -1501,6 +1506,13 @@ bool COsdSetup::changeNotify(const neutrino_locale_t OptionName, void * data)
 		/* change option after hide, to let hide clear hint */
 		submenu_menus->hide();
 		g_settings.show_menu_hints = * (int*) data;
+		return true;
+	}
+	else if (ARE_LOCALES_EQUAL(OptionName, LOCALE_SETTINGS_MENU_NUMBERS))
+	{
+		/* the menu numbers itself anew when it is painted again */
+		submenu_menus->hide();
+		g_settings.menu_numbers = * (int*) data;
 		return true;
 	}
 	else if ((ARE_LOCALES_EQUAL(OptionName, LOCALE_MISCSETTINGS_INFOBAR_CASYSTEM_DISPLAY))

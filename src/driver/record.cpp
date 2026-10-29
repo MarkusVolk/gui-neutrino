@@ -2017,6 +2017,7 @@ bool CRecordManager::ShowMenu(void)
 	CMenuSelectorTarget * selector = new CMenuSelectorTarget(&select);
 
 	CMenuWidget menu(LOCALE_MAINMENU_RECORDING, NEUTRINO_ICON_RECORDING /*, width*/);
+	menu.setDigitKeys(CMenuWidget::DIGITS_OWN);
 	if (rec_count == 0)
 		menu.addKey(CRCInput::RC_stop, this, "Exit");
 	menu.addIntroItems(NONEXISTANT_LOCALE, NONEXISTANT_LOCALE, CMenuWidget::BTN_TYPE_CANCEL);

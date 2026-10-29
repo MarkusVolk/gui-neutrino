@@ -143,6 +143,7 @@ int CCAMMenuHandler::doMainMenu()
 	char str1[255]={0};
 
 	CMenuWidget* cammenu = new CMenuWidget(LOCALE_CI_SETTINGS, NEUTRINO_ICON_SETTINGS);
+	cammenu->setDigitKeys(CMenuWidget::DIGITS_OWN);
 	cammenu->addIntroItems();
 
 	// CA init CI|CARD|BOTH
@@ -407,6 +408,7 @@ int CCAMMenuHandler::handleCamMsg(const neutrino_msg_t msg, neutrino_msg_data_t 
 		if(pMenu->choice_nb && from_menu) {
 			CMenuWidget* menu = new CMenuWidget(convertDVBUTF8(pMenu->title, strlen(pMenu->title), 0).c_str(), NEUTRINO_ICON_SETTINGS);
 			menu->enableSaveScreen(true);
+			menu->setDigitKeys(CMenuWidget::DIGITS_OWN);
 
 			CMenuSelectorTarget * selector = new CMenuSelectorTarget(&selected);
 			int slen = strlen(pMenu->subtitle);

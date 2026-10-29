@@ -4128,6 +4128,7 @@ void CMoviePlayerGui::getCurrentAudioName(bool file_player, std::string &audiona
 void CMoviePlayerGui::selectAudioPid()
 {
 	CMenuWidget APIDSelector(LOCALE_APIDSELECTOR_HEAD, NEUTRINO_ICON_AUDIO);
+	APIDSelector.setDigitKeys(CMenuWidget::DIGITS_OWN);
 	APIDSelector.addIntroItems();
 
 	int select = -1;

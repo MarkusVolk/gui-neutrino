@@ -57,6 +57,7 @@ int CSubChannelSelectMenu::getNVODMenu(CMenuWidget *menu)
 		return false;
 	if (g_RemoteControl->subChannels.empty())
 		return false;
+	menu->setDigitKeys(CMenuWidget::DIGITS_OWN);
 
 	menu->addItem(GenericMenuSeparator);
 

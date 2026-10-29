@@ -334,6 +334,7 @@ void CAdZapMenu::ShowMenu()
 	bool show_monitor = monitorLifeTime.tv_sec;
 
 	CMenuWidget *menu = new CMenuWidget(LOCALE_ADZAP, NEUTRINO_ICON_SETTINGS, width);
+	menu->setDigitKeys(CMenuWidget::DIGITS_OWN);
 	//menu->addKey(CRCInput::RC_red, this, "disable");
 	menu->addKey(CRCInput::RC_green, this, "enable");
 	menu->addKey(CRCInput::RC_blue, this, "monitor");

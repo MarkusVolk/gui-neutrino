@@ -145,6 +145,7 @@ int COsdLangSetup::showLocalSetup()
 	//prefered audio language
 	CLangSelectNotifier *langNotifier = new CLangSelectNotifier();
 	CMenuWidget prefMenu(LOCALE_AUDIOMENU_PREF_LANGUAGES, NEUTRINO_ICON_LANGUAGE, width, MN_WIDGET_ID_LANGUAGESETUP_PREFAUDIO_LANGUAGE);
+	prefMenu.setDigitKeys(CMenuWidget::DIGITS_OWN);
 	//call menue for prefered audio languages
 	showPrefMenu(&prefMenu, langNotifier);
 

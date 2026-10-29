@@ -1340,6 +1340,7 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	// menu
 	g_settings.menu_pos = configfile.getInt32("menu_pos", CMenuWidget::MENU_POS_CENTER);
 	g_settings.show_menu_hints = configfile.getBool("show_menu_hints", true);
+	g_settings.menu_numbers = configfile.getBool("menu_numbers", true);
 // 	g_settings.show_menu_hints_line = configfile.getBool("show_menu_hints_line", false);
 
 	// epgview
@@ -2242,6 +2243,7 @@ void CNeutrinoApp::saveSetup(const char *fname)
 	// menu
 	configfile.setInt32("menu_pos", g_settings.menu_pos);
 	configfile.setBool("show_menu_hints", g_settings.show_menu_hints);
+	configfile.setBool("menu_numbers", g_settings.menu_numbers);
 // 	configfile.setBool("show_menu_hints_line", g_settings.show_menu_hints_line);
 
 	// epgview
