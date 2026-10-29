@@ -1068,6 +1068,11 @@ static void commandserviceChanged(int connfd, char *data, const unsigned dataLen
 			unlockMessaging();
 			threadEIT.setDemux(cmd->dnum);
 			threadEIT.setCurrentService(uniqueServiceKey);
+		} else {
+			/* the EPG scan waits for this to go on */
+			debug(DEBUG_NORMAL, "commandserviceChanged: max events reached, EIT not read");
+			eventServer->sendEvent(CSectionsdClient::EVT_EIT_COMPLETE, CEventServer::INITID_SECTIONSD,
+					&uniqueServiceKey, sizeof(uniqueServiceKey));
 		}
 		return;
 	}
