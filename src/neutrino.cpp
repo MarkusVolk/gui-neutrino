@@ -674,6 +674,7 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	g_settings.hdd_fs = configfile.getInt32("hdd_fs", 0);
 	g_settings.hdd_sleep = configfile.getInt32("hdd_sleep", 120);
 	g_settings.hdd_noise = configfile.getInt32("hdd_noise", 254);
+	g_settings.hdd_record_uuid = configfile.getString("hdd_record_uuid", "");
 	g_settings.hdd_statfs_mode = configfile.getInt32("hdd_statfs_mode", SNeutrinoSettings::HDD_STATFS_RECORDING);
 // 	g_settings.hdd_format_on_mount_failed = configfile.getInt32("hdd_format_on_mount_failed", 0);
 // 	g_settings.hdd_wakeup = configfile.getInt32("hdd_wakeup", 1);
@@ -1789,6 +1790,7 @@ void CNeutrinoApp::saveSetup(const char *fname)
 	configfile.setInt32("hdd_fs", g_settings.hdd_fs);
 	configfile.setInt32("hdd_sleep", g_settings.hdd_sleep);
 	configfile.setInt32("hdd_noise", g_settings.hdd_noise);
+	configfile.setString("hdd_record_uuid", g_settings.hdd_record_uuid);
 	configfile.setInt32("hdd_statfs_mode", g_settings.hdd_statfs_mode);
 // 	configfile.setInt32("hdd_format_on_mount_failed", g_settings.hdd_format_on_mount_failed);
 // 	configfile.setInt32("hdd_wakeup", g_settings.hdd_wakeup);
@@ -3328,12 +3330,6 @@ TIMER_START();
 			DisplayErrorMessage(g_Locale->getText(LOCALE_ZAPIT_INIT_FAILED));
 	}
 
-#if !defined(ASSUME_MDEV) && !defined(ASSUME_UDEV)
-	mkdir("/media/sda1", 0755);
-	mkdir("/media/sdb1", 0755);
-	my_system(3, "mount", "/dev/sda1", "/media/sda1");
-	my_system(3, "mount", "/dev/sdb1", "/media/sdb1");
-#endif
 	/* as a desktop session (not root) the host's drives are left alone */
 	if (!geteuid())
 		udev_hotplug::start();

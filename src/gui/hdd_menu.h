@@ -27,17 +27,11 @@
 
 #include "widget/menue.h"
 #include <gui/widget/hintbox.h>
+#include <system/storage.h>
 
-struct devtool_s {
-	std::string fmt;
-	std::string fsck;
-	std::string fsck_options;
-	std::string mkfs;
-	std::string mkfs_options;
-	std::string mkfs_labelswitch;
-	bool fsck_supported;
-	bool mkfs_supported;
-};
+#include <list>
+#include <map>
+#include <set>
 
 class CHDDDestExec : public CMenuTarget
 {
@@ -54,47 +48,32 @@ class CHDDMenuHandler : public CMenuTarget
 		std::string umount;
 		bool show_menu;
 		bool in_menu;
-		bool lock_refresh;
-		std::map<std::string, std::string> devtitle;
-		struct hdd_s {
-			std::string devname;
-			std::string fmt;
-			std::string desc;
-			CMenuForwarder *cmf;
-			bool mounted;
-		};
-		std::vector<hdd_s> hdd_list;
-		std::set<std::string> kernel_fs_list;
-		struct cmp_hdd_by_name
-		{
-			bool operator() (const struct hdd_s &c1, const struct hdd_s &c2)
-			{
-				return std::lexicographical_compare(c1.devname.begin(), c1.devname.end(), c2.devname.begin(), c2.devname.end());
-			};
-		};
+		/* formatting or checking: hotplug events only ask for a later look */
+		bool busy;
+		bool rescan;
+		std::vector<storage::Device> devices;
+		std::map<std::string, CMenuForwarder *> mount_items;
+		/* menu items keep a pointer to their option text */
+		std::list<std::string> texts;
+		/* disks the viewer was told they hold nothing to mount, until they go */
+		std::set<std::string> hinted;
 
-		static devtool_s devtools[];
+		static std::string mountDir(const storage::Device &d);
+		static bool mountable(const storage::Device &d);
+		bool mount_dev(const std::string &name);
+		bool umount_dev(const std::string &name);
+		/* mounts what is there and not mounted yet, without asking */
+		void mountAll();
+		bool added(const std::string &name);
+		bool removed(const std::string &name);
+		void askRecordDrive(const std::string &name);
+		bool takeRecordDrive(const std::string &name);
 
-		static bool is_mounted(const char *dev);
-		void getBlkIds();
-		std::string getFmtType(std::string name, std::string part = "");
-		std::string getDefaultPart(std::string dev);
-		bool mount_dev(std::string name);
-		bool umount_dev(std::string name);
-		bool umount_all(std::string dev);
-		bool add_dev(std::string dev, std::string part);
-		bool waitfordev(std::string dev, int maxwait);
-		void check_dev_tools();
-		void check_kernel_fs();
-		devtool_s * get_dev_tool(std::string fmt);
-
-		int showDeviceMenu(std::string dev);
-		int checkDevice(std::string dev);
-		int formatDevice(std::string dev);
+		int showDeviceMenu(const std::string &disk);
+		int checkDevice(const std::string &name);
+		int formatDevice(const std::string &disk);
 		void showError(neutrino_locale_t err);
-		bool scanDevices();
-		void showHint(std::string &messsage);
-		void setRecordPath(std::string &dev);
+		void showHint(const std::string &message);
 		CHDDMenuHandler();
 
 	public:
@@ -102,7 +81,7 @@ class CHDDMenuHandler : public CMenuTarget
 
 		static CHDDMenuHandler* getInstance();
 
-		/* a partition as blkid reports it, for callers outside the menu */
+		/* a filesystem on a partition or a disk, for callers outside the menu */
 		struct Drive {
 			std::string devname;
 			std::string fmt;
@@ -110,9 +89,7 @@ class CHDDMenuHandler : public CMenuTarget
 			bool mounted;
 		};
 		static void listDrives(std::vector<Drive> &drives);
-		/* where the partition is mounted, found by its device number, so that
-		   a root that /proc/mounts names /dev/root is found as well */
-		static std::vector<std::string> mountPoints(const std::string &devname);
+		static std::vector<std::string> mountPoints(const std::string &devname) { return storage::mountPoints(devname); }
 		/* mounted anywhere outside /media: the system runs from it or keeps its data there */
 		static bool isSystemDrive(const std::string &devname);
 		bool mountDrive(const std::string &name) { return mount_dev(name); }
@@ -122,7 +99,6 @@ class CHDDMenuHandler : public CMenuTarget
 
 		int exec( CMenuTarget* parent,  const std::string &actionkey);
 		int doMenu();
-		int filterDevName(const char * name);
 		int handleMsg(const neutrino_msg_t _msg, neutrino_msg_data_t data);
 };
 

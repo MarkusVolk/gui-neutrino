@@ -1081,6 +1081,8 @@ hdd_activate Apply settings
 hdd_allow_set_recdir Allow recordings immediately
 hdd_check Check filesystem
 hdd_check_failed Filesystem-check failed!
+hdd_check_ok Filesystem check finished, no errors found.
+hdd_check_repaired Filesystem check finished, errors were repaired.
 hdd_extended_settings Extended settings
 hdd_fast Fast
 hdd_format Format device
@@ -1111,6 +1113,7 @@ hdd_mount_ok Device ready to use.
 hdd_mount_umount Mount/Unmount
 hdd_noise Acoustic-control (AAM)
 hdd_not_found No device found
+hdd_not_mountable Nothing to mount. The device can be formatted in the Data storage menu.
 hdd_power Internal HDD-power
 hdd_set_recdir Use device for recording ?
 hdd_settings Data storage

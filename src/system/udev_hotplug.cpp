@@ -23,19 +23,13 @@
 
 #include "udev_hotplug.h"
 
-#ifdef ASSUME_UDEV
-
 #include <string>
 
-#include <poll.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-
-#include <libudev.h>
 
 #include <neutrinoMessages.h>
 #include <eventserver.h>
@@ -66,6 +60,18 @@ void send_hotplug(const std::string &data)
 	close(fd);
 }
 
+} /* namespace */
+
+#ifdef ASSUME_UDEV
+
+#include <poll.h>
+#include <pthread.h>
+
+#include <libudev.h>
+
+namespace
+{
+
 void handle(struct udev_device *dev, const char *action)
 {
 	const char *devname = udev_device_get_devnode(dev);
@@ -74,48 +80,11 @@ void handle(struct udev_device *dev, const char *action)
 		return;
 	if (strcmp(action, "add") && strcmp(action, "remove"))
 		return;
-	/* a whole disk only counts when it carries a filesystem itself */
-	if (strcmp(devtype, "partition") && !udev_device_get_property_value(dev, "ID_FS_TYPE"))
+	if (strcmp(devtype, "partition") && strcmp(devtype, "disk"))
 		return;
 
 	printf("[udev_hotplug] %s %s\n", action, devname);
 	send_hotplug(std::string("ACTION=") + action + " DEVNAME=" + devname + " ");
-}
-
-bool mounted(const char *devname)
-{
-	FILE *f = fopen("/proc/mounts", "r");
-	if (!f)
-		return false;
-	char line[512];
-	size_t len = strlen(devname);
-	bool found = false;
-	while (!found && fgets(line, sizeof(line), f))
-		found = !strncmp(line, devname, len) && line[len] == ' ';
-	fclose(f);
-	return found;
-}
-
-/* devices that were there before Neutrino started gave no event; what
- * nobody mounted counts as just added */
-void coldplug(struct udev *udev)
-{
-	struct udev_enumerate *en = udev_enumerate_new(udev);
-	if (!en)
-		return;
-	udev_enumerate_add_match_subsystem(en, "block");
-	udev_enumerate_scan_devices(en);
-	struct udev_list_entry *entry;
-	udev_list_entry_foreach(entry, udev_enumerate_get_list_entry(en)) {
-		struct udev_device *dev = udev_device_new_from_syspath(udev, udev_list_entry_get_name(entry));
-		if (!dev)
-			continue;
-		const char *devname = udev_device_get_devnode(dev);
-		if (devname && !mounted(devname))
-			handle(dev, "add");
-		udev_device_unref(dev);
-	}
-	udev_enumerate_unref(en);
 }
 
 void *run(void *)
@@ -137,7 +106,8 @@ void *run(void *)
 		return NULL;
 	}
 
-	coldplug(udev);
+	/* what was there before Neutrino started gave no event */
+	send_hotplug("ACTION=coldplug ");
 
 	struct pollfd pfd;
 	pfd.fd = udev_monitor_get_fd(mon);
@@ -165,8 +135,10 @@ void udev_hotplug::start()
 
 #else
 
+/* mdev_helper brings the events; only the drives that were there before are left */
 void udev_hotplug::start()
 {
+	send_hotplug("ACTION=coldplug ");
 }
 
 #endif

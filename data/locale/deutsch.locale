@@ -1081,6 +1081,8 @@ hdd_activate Übernehmen
 hdd_allow_set_recdir Erlaube sofort Aufnahmen
 hdd_check Dateisystemprüfung
 hdd_check_failed Datenträgerprüfung fehlgeschlagen
+hdd_check_ok Dateisystemprüfung beendet, keine Fehler gefunden.
+hdd_check_repaired Dateisystemprüfung beendet, Fehler wurden behoben.
 hdd_extended_settings Erweiterte Einstellungen
 hdd_fast Schnell
 hdd_format Formatiere Datenträger
@@ -1111,6 +1113,7 @@ hdd_mount_ok Datenträger bereit
 hdd_mount_umount Mount/Unmount
 hdd_noise Akustikkontrolle (AAM)
 hdd_not_found Kein Datenträger
+hdd_not_mountable Nichts einzuhängen. Der Datenträger kann im Menü Datenträger formatiert werden.
 hdd_power Interne HDD-Stromversorgung
 hdd_set_recdir Diesen Datenträger für die Aufnahme nutzen?
 hdd_settings Datenträger

@@ -21,9 +21,10 @@
 #define __system_udev_hotplug__
 
 /*
- * With --enable-udev nobody runs mdev_helper. This thread follows the
- * block devices through libudev and sends the same EVT_HOTPLUG for every
- * partition, or disk with a filesystem of its own, that is added or removed.
+ * With udev this thread follows the block devices through libudev and sends
+ * EVT_HOTPLUG for every disk and partition that is added or removed; with
+ * mdev, mdev_helper sends them. Either way one ACTION=coldplug at the start
+ * lets Neutrino mount what was there before.
  */
 namespace udev_hotplug
 {

@@ -2850,10 +2850,7 @@ void ep_drive_umount(Call &c)
 	std::string target;
 	if (!record_fallback(c, mp, target) || !free_for_umount(c, mp))
 		return;
-	/* a drive the system mounted elsewhere below /media (the record disk of a
-	   box) is unmounted where it is, not where the menu would have put it */
-	bool ok = mp == "/media/" + name ? CHDDMenuHandler::getInstance()->umountDrive(name) : ::umount(mp.c_str()) == 0;
-	if (!ok) {
+	if (!CHDDMenuHandler::getInstance()->umountDrive(name)) {
 		problem(c.out, 409, "busy", "the drive is still in use");
 		return;
 	}

@@ -570,6 +570,7 @@ struct SNeutrinoSettings
 	int hdd_fs;
 	int hdd_sleep;
 	int hdd_noise;
+	std::string hdd_record_uuid;
 	int hdd_statfs_mode;
 	int hdd_format_on_mount_failed;
 	int hdd_wakeup;

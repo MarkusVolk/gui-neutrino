@@ -19,6 +19,7 @@ libneutrino_system_sources = [
 	'secrets.cpp',
 	'settings.cpp',
 	'stacktrace.cpp',
+	'storage.cpp',
 	'supportinfo.cpp',
 	'sysload.cpp',
 	'udev_hotplug.cpp',
