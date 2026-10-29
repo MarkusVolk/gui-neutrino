@@ -1,2 +1,5 @@
 #!/bin/sh
-
+for s in "${0%/*}"/neutrino.start.d/*; do
+	[ -x "$s" ] && "$s"
+done
+exit 0
