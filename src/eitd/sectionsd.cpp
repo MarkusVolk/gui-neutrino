@@ -614,6 +614,15 @@ debug(DEBUG_ERROR, "addEvent: ch %012" PRIx64 " running %d (%s) got_CN %d", evt.
 					--lastEvent;
 				}
 				unlockMessaging();
+				/* the new event ends after all the others: it is the one left out */
+				if (e->get_channel_id() != messaging_current_servicekey &&
+				    e->times.begin()->startzeit + (long)e->times.begin()->dauer >
+				    (*lastEvent)->times.begin()->startzeit + (long)(*lastEvent)->times.begin()->dauer)
+				{
+					unlockEvents();
+					delete eptr;
+					return;
+				}
 			}
 			t_event_id uniqueKey = (*lastEvent)->uniqueKey();
 			// else debug(DEBUG_ERROR, ">");
@@ -1058,22 +1067,15 @@ static void commandserviceChanged(int connfd, char *data, const unsigned dataLen
 	t_channel_id uniqueServiceKey = cmd->channel_id;
 
 	debug(DEBUG_ERROR, "commandserviceChanged: Service change to " PRINTF_CHANNEL_ID_TYPE " demux #%d", uniqueServiceKey, cmd->dnum);
-	/* assume live demux always 0, other means background scan */
+	/* assume live demux always 0, other means background scan; it reads
+	   EIT with max events reached as well, addEvent makes room */
 	if (cmd->dnum) {
-		/* dont wakeup EIT, if we have max events allready */
-		if (max_events == 0  || (mySIeventsOrderUniqueKey.size() < max_events)) {
-			current_channel_id = uniqueServiceKey;
-			writeLockMessaging();
-			messaging_zap_detected = true;
-			unlockMessaging();
-			threadEIT.setDemux(cmd->dnum);
-			threadEIT.setCurrentService(uniqueServiceKey);
-		} else {
-			/* the EPG scan waits for this to go on */
-			debug(DEBUG_NORMAL, "commandserviceChanged: max events reached, EIT not read");
-			eventServer->sendEvent(CSectionsdClient::EVT_EIT_COMPLETE, CEventServer::INITID_SECTIONSD,
-					&uniqueServiceKey, sizeof(uniqueServiceKey));
-		}
+		current_channel_id = uniqueServiceKey;
+		writeLockMessaging();
+		messaging_zap_detected = true;
+		unlockMessaging();
+		threadEIT.setDemux(cmd->dnum);
+		threadEIT.setCurrentService(uniqueServiceKey);
 		return;
 	}
 
