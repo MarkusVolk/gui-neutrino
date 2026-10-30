@@ -813,7 +813,7 @@ int CNeutrinoApp::loadSetup(const char *fname)
 	setSettingsText(g_settings.epg_dir, configfile.getString("epg_dir", epg_dir));
 	g_settings.epg_cache = configfile.getInt32("epg_cache_time", 7);
 	g_settings.epg_extendedcache = configfile.getInt32("epg_extendedcache_time", 168);
-	g_settings.epg_max_events = configfile.getInt32("epg_max_events", 30000);
+	g_settings.epg_max_events = configfile.getInt32("epg_max_events", 60000);
 	g_settings.epg_old_events = configfile.getInt32("epg_old_events", 1);
 	g_settings.epg_read = configfile.getBool("epg_read", true);
 	g_settings.epg_read_frequently = configfile.getInt32("epg_read_frequently", 1);
