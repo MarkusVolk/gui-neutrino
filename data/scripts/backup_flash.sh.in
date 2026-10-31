@@ -1,35 +1,25 @@
 #!/bin/sh
+# keeps the settings for the image flashed into slot $1 beside the slot
+# directories, where ofgwrite leaves them; restore_flash.sh puts them back
+# at the first start of that image
 
-. /etc/init.d/globals
+for i in $(cat /proc/cmdline); do
+	case "$i" in
+		root=*) DEV=${i#root=} ;;
+		rootsubdir=*) SUB=${i#rootsubdir=} ;;
+	esac
+done
+ROOT=$(awk -v d="$DEV" '$1 == d && $2 != "/" { print $2; exit }' /proc/mounts)
+[ -n "$1" ] && [ -n "$SUB" ] && [ -n "$ROOT" ] || exit 1
+BAKF="$ROOT/.neutrino-restore-$(echo "$SUB" | sed 's/[0-9]*$//')$1.tar.gz"
 
+TOBACKUP="@CONFIGDIR@ /etc/ssh/ssh_host_*"
+[ -e "@CONFIGDIR@/tobackup.conf" ] && TOBACKUP="$TOBACKUP $(sed 's/#.*//' "@CONFIGDIR@/tobackup.conf")"
 RES=""
-VAR="/var/"
-USRF="@CONFIGDIR@/tobackup.conf"
-BAKF="/var/backup_flash.tar.gz"
-
-TOBACKUP=""
-
-SHOWINFO "backup to ${BAKF} ..."
-
-if [ -e "${USRF}" ]; then
-	TOBACKUP="$TOBACKUP ${USRF}"
-	while read i
-		do [ "${i:0:1}" = "#" ] || TOBACKUP="$TOBACKUP ${i%%#*}"
-		done < $USRF
-fi
-
-# check existence and skip files in /var
 for i in $TOBACKUP; do
-	if [ -e "$i" -a ${i:0:${#VAR}} != ${VAR} ]; then
-		SHOWINFO "add  $i"
-		RES="$RES $i"
-	else
-		SHOWINFO "skip $i"
-	fi
+	case "$i" in @CONFIGDIR@/*) continue ;; esac
+	[ -e "$i" ] && RES="$RES $i"
 done
 
-TOBACKUP=$(echo $RES)
-
-tar -czf "${BAKF}" $TOBACKUP 2>&1 >/dev/null
-
-SHOWINFO "done."
+echo "Backup to $BAKF"
+tar -czf "$BAKF" $RES

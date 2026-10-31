@@ -847,6 +847,9 @@ flashupdate.namemode2_hostname_time <partition>+<time>+<hostname>.img
 flashupdate.new_found New image found !
 flashupdate.new_notfound No new images found
 flashupdate.noversion Version check is only supported via online updates.\nAre you sure that you want to continue?
+flashupdate.ofgwrite_failed ofgwrite could not write the image. The box keeps starting the partition running.
+flashupdate.overwrite_partition Partition %d is overwritten.\n\nContinue?
+flashupdate.own_partition The running partition is written. Neutrino ends for it, and the box starts the new image when it is done.\n\nContinue?
 flashupdate.programmingflash programming flash
 flashupdate.proxypassword Password
 flashupdate.proxypassword_hint1 enter the proxyserver password
@@ -865,6 +868,7 @@ flashupdate.readflash Read whole image
 flashupdate.readflashmtd Read one partition
 flashupdate.ready ready
 flashupdate.reallyflashmtd Do you really want to flash?\n\nIf a error occurs or the image is not\nvalid, the box will not boot after flashing.\n\nImagename: %s\nTarget: %s
+flashupdate.recording_running A recording is running. Please update the image after it has ended.
 flashupdate.savesuccess The image was successfully saved \nunder %s.
 flashupdate.selectimage Available images and updates
 flashupdate.settings Update settings

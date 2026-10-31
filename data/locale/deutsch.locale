@@ -847,6 +847,9 @@ flashupdate.namemode2_hostname_time <Partition>+<Zeit>+<Hostname>.img
 flashupdate.new_found Updates verfügbar!
 flashupdate.new_notfound Keine Updates verfügbar!
 flashupdate.noversion Die Versionsüberprüfung ist nur bei Online-Aktualisierungen möglich.\nTrotzdem fortfahren?
+flashupdate.ofgwrite_failed ofgwrite konnte das Image nicht schreiben. Die Box startet weiter die laufende Partition.
+flashupdate.overwrite_partition Partition %d wird überschrieben.\n\nFortfahren?
+flashupdate.own_partition Die laufende Partition wird geschrieben. Neutrino wird dafür beendet, und die Box startet danach mit dem neuen Image.\n\nFortfahren?
 flashupdate.programmingflash programmiere Flash
 flashupdate.proxypassword Passwort
 flashupdate.proxypassword_hint1 Geben sie das Proxy-Passwort ein
@@ -865,6 +868,7 @@ flashupdate.readflash ganzes Flashimage auslesen
 flashupdate.readflashmtd einzelne Partition auslesen
 flashupdate.ready fertig
 flashupdate.reallyflashmtd Wollen Sie den Flashvorgang wirklich durchführen?\n\nFalls ein Fehler auftritt oder das Image nicht\nfunktionfähig ist, wird Ihre Box nicht mehr booten.\n\nImagename: %s\nZiel: %s
+flashupdate.recording_running Eine Aufnahme läuft. Das Image bitte erst nach ihrem Ende aktualisieren.
 flashupdate.savesuccess Das Image wurde erfolgreich unter dem\nDateinamen %s gespeichert.
 flashupdate.selectimage Verfügbare Images und Updates
 flashupdate.settings Update-Einstellungen

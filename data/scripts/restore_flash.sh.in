@@ -1,15 +1,17 @@
 #!/bin/sh
+# puts back the settings backup_flash.sh kept for the slot running
 
-. /etc/init.d/globals
+for i in $(cat /proc/cmdline); do
+	case "$i" in
+		root=*) DEV=${i#root=} ;;
+		rootsubdir=*) SUB=${i#rootsubdir=} ;;
+	esac
+done
+[ -n "$SUB" ] || exit 0
+ROOT=$(awk -v d="$DEV" '$1 == d && $2 != "/" { print $2; exit }' /proc/mounts)
+BAKF="$ROOT/.neutrino-restore-$SUB.tar.gz"
+[ -n "$ROOT" ] && [ -e "$BAKF" ] || exit 0
 
-BAKF="/var/backup_flash.tar.gz"
-
-if [ -e ${BAKF} ]; then
-	SHOWINFO "restore settings from ${BAKF} ..."
-	cd / && tar -xzf "${BAKF}"
-	sync
-	rm -rf "${BAKF}"
-	SHOWINFO "done."
-else
-	SHOWINFO "${BAKF} not found. nothing to restore!"
-fi
+echo "Restore settings from $BAKF"
+tar -xzf "$BAKF" -C / && rm -f "$BAKF"
+sync

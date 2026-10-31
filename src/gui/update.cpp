@@ -55,6 +55,7 @@
 #include <system/flashtool.h>
 #include <system/httptool.h>
 #include <system/helpers.h>
+#include <driver/record.h>
 #include <system/debug.h>
 
 #include <lib/libnet/libnet.h>
@@ -616,21 +617,14 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 		bool flashing = false;
 		showGlobalStatus(100);
 
-		// create settings package
-		int copy_settings = ShowMsg(LOCALE_MESSAGEBOX_INFO, LOCALE_FLASHUPDATE_COPY_SETTINGS, CMsgBox::mbrYes, CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_UPDATE);
-		if (copy_settings == CMsgBox::mbrYes)
+		if (CRecordManager::getInstance()->RecordingStatus())
 		{
-			CHintBox hintBox(LOCALE_MESSAGEBOX_INFO, LOCALE_SETTINGS_BACKUP);
-			hintBox.paint();
-			/*
-			   Settings tarball is created in /tmp directory.
-			   ofgwrite will copy this tarball to new rootfs.
-			   It's untared at first start of new image.
-			*/
-			std::string backup_sh = find_executable("backup.sh");
-			my_system(3, backup_sh.c_str(), "/tmp", "backup_flash"); // file ending is set by backup script;
-			hintBox.hide();
+			hide();
+			DisplayErrorMessage(g_Locale->getText(LOCALE_FLASHUPDATE_RECORDING_RUNNING));
+			return menu_return::RETURN_REPAINT;
 		}
+
+		int copy_settings = ShowMsg(LOCALE_MESSAGEBOX_INFO, LOCALE_FLASHUPDATE_COPY_SETTINGS, CMsgBox::mbrYes, CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_UPDATE);
 
 		// get active partition
 		char c[2] = {0};
@@ -668,51 +662,55 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 		int restart = CMsgBox::mbNo;
 
 		std::string ofgwrite_options("");
-		if (selected > 0 && strcmp(c, to_string(selected).c_str()))
+		bool own = selected > 0 && strcmp(c, to_string(selected).c_str()) == 0;
+		if (selected > 0)
 		{
-			flashing = true;
-			// align ofgwrite options
+			/* the last chance to keep the partition; for the own one ofgwrite
+			   ends Neutrino and restarts the box when it is done */
+			char question[256];
+			snprintf(question, sizeof(question), g_Locale->getText(LOCALE_FLASHUPDATE_OVERWRITE_PARTITION), selected);
+			flashing = ShowMsg(LOCALE_MESSAGEBOX_INFO, own ? g_Locale->getText(LOCALE_FLASHUPDATE_OWN_PARTITION) : question,
+					   CMsgBox::mbrNo, CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_UPDATE) == CMsgBox::mbrYes;
 			ofgwrite_options = "-m" + to_string(selected);
 			dprintf(DEBUG_NORMAL, "[update] ofgwrite_options: %s\n", ofgwrite_options.c_str());
-
-			// start selected partition?
-			restart = ShowMsg(LOCALE_MESSAGEBOX_INFO, LOCALE_FLASHUPDATE_START_SELECTED_PARTITION, CMsgBox::mbrYes, CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_UPDATE);
-			if (restart == CMsgBox::mbrYes)
-			{
-				if (g_settings.hdmi_cec_standby)
-				{
-					videoDecoder->SetCECMode((VIDEO_HDMI_CEC_MODE)0);
-				}
-				std::string startup_new("/boot/");
-				startup_new += g_info.hw_caps->startup_file;
-				startup_new += "_" + to_string(selected);
-				dprintf(DEBUG_NORMAL, "[update] Start selected partition %d (%s)\n", selected, startup_new.c_str());
-#ifndef DRYRUN
-				CFileHelpers fh;
-				fh.copyFile(startup_new.c_str(), "/boot/STARTUP");
-#endif
-			}
 		}
-		else if (selected > 0 && strcmp(c, to_string(selected).c_str()) == 0)
+		if (flashing && !own)
+			restart = ShowMsg(LOCALE_MESSAGEBOX_INFO, LOCALE_FLASHUPDATE_START_SELECTED_PARTITION, CMsgBox::mbrYes, CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_UPDATE);
+		if (flashing && copy_settings == CMsgBox::mbrYes)
 		{
-			flashing = true;
-			ofgwrite_options = "-m" + to_string(selected);
+			/* kept beside the slot directories, the new image puts them back at its first start */
+			CHintBox hintBox(LOCALE_MESSAGEBOX_INFO, LOCALE_SETTINGS_BACKUP);
+			hintBox.paint();
+			std::string backup_sh = find_executable("backup_flash.sh");
+			my_system(2, backup_sh.c_str(), to_string(selected).c_str());
+			hintBox.hide();
 		}
 		if (flashing)
 			ShowHint(LOCALE_MESSAGEBOX_INFO, LOCALE_FLASHUPDATE_START_OFGWRITE);
 		hide();
 
+		/* unpacked beside the image file: /tmp in RAM is too small for it */
+		std::string unpack_dir = getPathName(filename);
 		std::string ofgwrite_caller = find_executable("ofgwrite_caller");
-		dprintf(DEBUG_NORMAL, "[update] calling %s %s %s %s\n", ofgwrite_caller.c_str(), g_settings.update_dir.c_str(), filename.c_str(), ofgwrite_options.c_str());
+		dprintf(DEBUG_NORMAL, "[update] calling %s %s %s %s\n", ofgwrite_caller.c_str(), unpack_dir.c_str(), filename.c_str(), ofgwrite_options.c_str());
 #ifndef DRYRUN
 		if (flashing)
 		{
 			if (FILE *f = fopen("/tmp/.flash.start", "w"))
 				fclose(f);
 
+			/* a timeshift writing to the same drive slows the unpacking down */
+			CRecordManager::getInstance()->StopAutoTimer();
+			CRecordManager::getInstance()->StopAutoRecord();
+
 			CVFD::getInstance()->setMode(CVFD::MODE_MENU_UTF8);
 			CVFD::getInstance()->showMenuText(0, "ofgwrite Flashing Tool", -1, true);
-			my_system(4, ofgwrite_caller.c_str(), g_settings.update_dir.c_str(), filename.c_str(), ofgwrite_options.c_str());
+			if (my_system(4, ofgwrite_caller.c_str(), unpack_dir.c_str(), filename.c_str(), ofgwrite_options.c_str()) != 0)
+			{
+				dprintf(DEBUG_NORMAL, "[update] %s failed\n", ofgwrite_caller.c_str());
+				DisplayErrorMessage(g_Locale->getText(LOCALE_FLASHUPDATE_OFGWRITE_FAILED));
+				return menu_return::RETURN_REPAINT;
+			}
 		}
 
 		/*
@@ -722,8 +720,17 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 
 		dprintf(DEBUG_NORMAL, "[update] %s done\n", ofgwrite_caller.c_str());
 
+		/* the box starts the partition only once it is written */
 		if (restart == CMsgBox::mbrYes)
+		{
+			if (g_settings.hdmi_cec_standby)
+				videoDecoder->SetCECMode((VIDEO_HDMI_CEC_MODE)0);
+			std::string startup_new = std::string("/boot/") + g_info.hw_caps->startup_file + "_" + to_string(selected);
+			dprintf(DEBUG_NORMAL, "[update] Start selected partition %d (%s)\n", selected, startup_new.c_str());
+			CFileHelpers fh;
+			fh.copyFile(startup_new.c_str(), "/boot/STARTUP");
 			CNeutrinoApp::getInstance()->exec(NULL, "reboot");
+		}
 #endif
 		return menu_return::RETURN_EXIT_ALL;
 	}

@@ -1,0 +1,26 @@
+#!/bin/sh
+# flashes the image file $2 with ofgwrite and its options $3, unpacked
+# into $1/.ofgwrite. ofgwrite does not come back when it flashes the slot
+# running: it stops Neutrino, writes from RAM and restarts the box
+
+DIR="$1/.ofgwrite"
+rm -rf "$DIR"
+mkdir -p "$DIR" || exit 1
+case "$2" in
+	*.zip) unzip -o -q "$2" -d "$DIR" ;;
+	*) tar -xzf "$2" -C "$DIR" ;;
+esac
+IMG=$(find "$DIR" -name rootfs.tar.bz2 | head -n 1)
+if [ -z "$IMG" ]; then
+	echo "no rootfs.tar.bz2 in $2"
+	rm -rf "$DIR"
+	exit 1
+fi
+
+for i in $(cat /proc/cmdline); do
+	case "$i" in rootsubdir=*) SUB=${i#rootsubdir=} ;; esac
+done
+ofgwrite $3 "$(dirname "$IMG")"
+RET=$?
+[ "${3#-m}" = "$(echo "$SUB" | sed 's/.*[^0-9]//')" ] || rm -rf "$DIR"
+exit $RET
