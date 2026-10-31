@@ -276,6 +276,8 @@ class CZapit : public OpenThreads::Thread
 		void GetAudioMode(int &mode) { mode = audio_mode; }
 
 		CZapitChannel * GetCurrentChannel();
+		/* HbbTV applications of the channel, once its AIT is read */
+		bool GetAitApps(t_channel_id channel, std::vector<CAitApp> &apps);
 		t_channel_id GetCurrentChannelID() { return live_channel_id; };
 #ifdef ENABLE_PIP
 		t_channel_id GetPipChannelID(int pip = 0) { return pip_channel_id[pip]; };

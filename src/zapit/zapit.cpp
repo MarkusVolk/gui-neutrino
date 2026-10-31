@@ -2721,6 +2721,17 @@ CZapitChannel * CZapit::GetCurrentChannel()
 	return CServiceManager::getInstance()->FindChannel(live_channel_id);
 }
 
+bool CZapit::GetAitApps(t_channel_id channel, std::vector<CAitApp> &apps)
+{
+#if ENABLE_AITSCAN
+	return ait->getApps(channel, apps);
+#else
+	(void)channel;
+	(void)apps;
+	return false;
+#endif
+}
+
 bool CZapit::StartPlayBack(CZapitChannel *thisChannel)
 {
 	INFO("standby %d playing %d forced %d", standby, playing, playbackStopForced);

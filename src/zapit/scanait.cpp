@@ -21,7 +21,6 @@
 #include "debug.h"
 #include "getservices.h"
 #include "scanait.h"
-#include "scan.h"
 #include <hardware/dmx.h>
 #include <dvbsi++/descriptor_tag.h>
 #include <dvbsi++/linkage_descriptor.h>
@@ -29,19 +28,22 @@
 #include <dvbsi++/transport_protocol_descriptor.h>
 #include <dvbsi++/simple_application_location_descriptor.h>
 #include <dvbsi++/simple_application_boundary_descriptor.h>
-#include <math.h>
+#include <algorithm>
+#include <cstring>
 #include <eitd/edvbstring.h>
 #include <system/set_threadname.h>
 
-#define DEBUG_AIT
-#define DEBUG_AIT_UNUSED
-#define DEBUG_LCN
+/* sections are read in slices so Stop() never waits long for a zap */
+#define AIT_READ_SLICE_MS 200
+#define AIT_READ_TIMEOUT_MS 3000
 
 CAit::CAit()
 {
 	dmxnum = 0;
 	pid = 0;
 	running = false;
+	channel_id = 0;
+	apps_channel = 0;
 }
 
 void CAit::clearSections()
@@ -95,39 +97,61 @@ CAit::~CAit()
 	clearSections();
 }
 
+/* all sections of one AIT version, section 0 to last_section_number */
 bool CAit::Read()
 {
-	bool ret = true;
-
 	cDemux *dmx = new cDemux(dmxnum);
 	dmx->Open(DMX_PSI_CHANNEL);
 
 	unsigned char buffer[AIT_SECTION_SIZE];
-
 	unsigned char filter[DMX_FILTER_SIZE];
 	unsigned char mask[DMX_FILTER_SIZE];
 
 	memset(filter, 0x00, DMX_FILTER_SIZE);
 	memset(mask, 0x00, DMX_FILTER_SIZE);
-
-	int flen = 1;
 	filter[0] = 0x74;
 	mask[0] = 0xFF;
 
-	if ((!dmx->sectionFilter(pid, filter, mask, flen)) || (dmx->Read(buffer, AIT_SECTION_SIZE) < 0))
+	bool ok = dmx->sectionFilter(pid, filter, mask, 1);
+	std::vector<bool> seen;
+	int version = -1;
+	int waited = 0;
+	while (ok && running && waited < AIT_READ_TIMEOUT_MS)
 	{
-		printf("CAit::Read: pid %x failed\n", pid);
-		ret = false;
-	}
-	else
-	{
-		printf("CAit::Read: pid %x found\n", pid);
+		int len = dmx->Read(buffer, AIT_SECTION_SIZE, AIT_READ_SLICE_MS);
+		if (len < 0)
+			break;
+		if (len == 0)
+		{
+			waited += AIT_READ_SLICE_MS;
+			continue;
+		}
 		ApplicationInformationSection *ait = new ApplicationInformationSection(buffer);
+		if (version != ait->getVersionNumber())
+		{
+			clearSections();
+			version = ait->getVersionNumber();
+			seen.assign(ait->getLastSectionNumber() + 1, false);
+		}
+		unsigned number = ait->getSectionNumber();
+		if (number >= seen.size() || seen[number])
+		{
+			delete ait;
+			continue;
+		}
+		seen[number] = true;
 		sections.push_back(ait);
+		if (std::find(seen.begin(), seen.end(), false) == seen.end())
+			break;
 	}
 	dmx->Stop();
 	delete dmx;
-	return ret;
+
+	if (sections.empty())
+		printf("CAit::Read: pid %x failed\n", pid);
+	else
+		printf("CAit::Read: pid %x, %u section(s)\n", pid, (unsigned) sections.size());
+	return !sections.empty();
 }
 
 bool CAit::Parse()
@@ -138,25 +162,14 @@ bool CAit::Parse()
 	if (!Read())
 		return false;
 
-	FILE *pFile = fopen("/tmp/ait.txt", "w");
-	if (pFile)
-		fprintf(pFile, "Channel: %s\n", name.c_str());
+	std::vector<CAitApp> found;
 	short int profilecode = 0;
 	int orgid = 0, appid = 0, profileVersion = 0;
 
 	int sectionLength = 0;
 	ApplicationInformationSectionConstIterator sit;
-	for (sit = sections.begin(); sit != sections.end(); ++sit)
+	for (sit = sections.begin(); sit != sections.end() && running; ++sit)
 	{
-
-		if (CServiceScan::getInstance()->Aborted())
-		{
-			if (pFile)
-				fclose(pFile);
-
-			clearSections();
-			return false;
-		}
 		std::list<ApplicationInformation *>::const_iterator i = (*sit)->getApplicationInformation()->begin();
 		sectionLength = (*sit)->getSectionLength() + 3;
 
@@ -169,8 +182,7 @@ bool CAit::Parse()
 			profilecode = 0;
 			orgid = applicationIdentifier->getOrganisationId();
 			appid = applicationIdentifier->getApplicationId();
-			//printf("[ait] found applicaions ids (pid : 0x%x) : orgid : %d, appid : %d\n", pid, orgid, appid);
-			if (controlCode == 1 || controlCode == 2) /* 1:AUTOSTART, 2:PRESENT */
+			if (controlCode == CAitApp::AUTOSTART || controlCode == CAitApp::PRESENT)
 			{
 				for (DescriptorConstIterator desc = (*i)->getDescriptors()->begin();
 					desc != (*i)->getDescriptors()->end(); ++desc)
@@ -197,76 +209,70 @@ bool CAit::Parse()
 						{
 							ApplicationNameDescriptor *nameDescriptor = (ApplicationNameDescriptor *)(*desc);
 							ApplicationNameConstIterator interactionit = nameDescriptor->getApplicationNames()->begin();
-							for (; interactionit != nameDescriptor->getApplicationNames()->end(); ++interactionit)
-							{
+							if (interactionit != nameDescriptor->getApplicationNames()->end())
 								applicationName = (*interactionit)->getApplicationName();
-								//if(controlCode == 1) printf("[ait] applicationname: %s\n", applicationName.c_str());
-								break;
-							}
 							break;
 						}
 						case TRANSPORT_PROTOCOL_DESCRIPTOR:
 						{
 							TransportProtocolDescriptor *transport = (TransportProtocolDescriptor *)(*desc);
-							switch (transport->getProtocolId())
+							if (transport->getProtocolId() == 3) /* interaction channel; carousel and ip are not used */
 							{
-								case 1: /* object carousel */
-									break;
-								case 2: /* ip */
-									break;
-								case 3: /* interaction */
-								{
-									InterActionTransportConstIterator interactionit = transport->getInteractionTransports()->begin();
-									for (; interactionit != transport->getInteractionTransports()->end(); ++interactionit)
-									{
-										TPDescPath = (*interactionit)->getUrlBase()->getUrl();
-										break;
-									}
-									break;
-								}
+								InterActionTransportConstIterator interactionit = transport->getInteractionTransports()->begin();
+								if (interactionit != transport->getInteractionTransports()->end())
+									TPDescPath = (*interactionit)->getUrlBase()->getUrl();
 							}
 							break;
 						}
-						case GRAPHICS_CONSTRAINTS_DESCRIPTOR:
-							break;
 						case SIMPLE_APPLICATION_LOCATION_DESCRIPTOR:
 						{
 							SimpleApplicationLocationDescriptor *applicationlocation = (SimpleApplicationLocationDescriptor *)(*desc);
 							SALDescPath = applicationlocation->getInitialPath();
 							break;
 						}
-						case APPLICATION_USAGE_DESCRIPTOR:
-							break;
-						case SIMPLE_APPLICATION_BOUNDARY_DESCRIPTOR:
-							break;
 					}
 				}
 				hbbtvUrl = TPDescPath + SALDescPath;
 			}
 			if (!hbbtvUrl.empty())
 			{
-				printf("[ait] detected AppID: %d, AppName: %s, Url: %s profilecode: %i orgid: %i sectionLength: %i profileVersion %i\n", appid, applicationName.c_str(), hbbtvUrl.c_str(), profilecode, orgid, sectionLength, profileVersion);
-				if (pFile)
-				{
-					fprintf(pFile, "AppID: %d, AppName: %s, Url: %s\n", appid, applicationName.c_str(), hbbtvUrl.c_str());
-				}
+				printf("[ait] detected AppID: %d, AppName: %s, Url: %s profilecode: %i orgid: %i sectionLength: %i profileVersion %i control: %d\n", appid, applicationName.c_str(), hbbtvUrl.c_str(), profilecode, orgid, sectionLength, profileVersion, controlCode);
+				CAitApp app = { appid, orgid, controlCode, applicationName, hbbtvUrl };
+				found.push_back(app);
 			}
 		}
 	}
-	if (pFile)
-		fclose(pFile);
 	clearSections();
+	if (!running)
+		return false;
+
+	OpenThreads::ScopedLock<OpenThreads::Mutex> lock(apps_mutex);
+	apps_channel = channel_id;
+	apps.swap(found);
 	return true;
 }
 
 bool CAit::Parse(CZapitChannel *const channel)
 {
+	Stop();
+	{
+		OpenThreads::ScopedLock<OpenThreads::Mutex> lock(apps_mutex);
+		apps_channel = 0;
+		apps.clear();
+	}
 	pid = channel->getAitPid();
 	name = channel->getName();
-	unlink("/tmp/ait.txt");
+	channel_id = channel->getChannelID();
 	if (pid > 0)
-	{
 		return Start();
-	}
 	return false;
+}
+
+bool CAit::getApps(t_channel_id channel, std::vector<CAitApp> &out)
+{
+	OpenThreads::ScopedLock<OpenThreads::Mutex> lock(apps_mutex);
+	if (!channel || channel != apps_channel)
+		return false;
+	out = apps;
+	return true;
 }

@@ -23,8 +23,13 @@
 #ifndef __zapit_scan_ait_h__
 #define __zapit_scan_ait_h__
 
+#include <OpenThreads/Mutex>
 #include <OpenThreads/Thread>
 #include <hardware/dmx.h>
+#include <string>
+#include <vector>
+
+#include "channel.h"
 
 #include <dvbsi++/application_information_section.h>
 #include <dvbsi++/application_name_descriptor.h>
@@ -39,6 +44,17 @@
 		micro = (version>>16)&0xff; \
 	}
 
+/* an HbbTV application announced in the AIT of the running channel */
+struct CAitApp
+{
+	enum { AUTOSTART = 1, PRESENT = 2 };
+	int app_id;
+	int org_id;
+	int control_code;
+	std::string name;
+	std::string url;
+};
+
 class CAit : public OpenThreads::Thread
 {
 	private:
@@ -46,7 +62,11 @@ class CAit : public OpenThreads::Thread
 		unsigned short pid;
 		bool running;
 		std::string name;
+		t_channel_id channel_id;
 		ApplicationInformationSectionList sections;
+		OpenThreads::Mutex apps_mutex;
+		t_channel_id apps_channel;
+		std::vector<CAitApp> apps;
 		void clearSections();
 		void run();
 		bool Read();
@@ -59,6 +79,9 @@ class CAit : public OpenThreads::Thread
 		bool Stop();
 		bool Parse();
 		bool Parse(CZapitChannel *const channel);
+		/* the applications of the channel parsed last; false if that is not
+		 * channel or its AIT is not read yet */
+		bool getApps(t_channel_id channel, std::vector<CAitApp> &out);
 };
 
 #endif
