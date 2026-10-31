@@ -159,6 +159,14 @@ static int has_key(const unsigned long *keys, unsigned key)
 	return (keys[key / (8 * sizeof(long))] >> (key % (8 * sizeof(long)))) & 1;
 }
 
+static gboolean dump(gpointer data)
+{
+	(void)data;
+	webkit_web_view_evaluate_javascript(view, "window.__neutrinoDump && window.__neutrinoDump();",
+		-1, NULL, NULL, NULL, NULL, NULL);
+	return G_SOURCE_CONTINUE;
+}
+
 /* every input device with an OK or Enter key is a remote control or keyboard */
 static void open_inputs(void)
 {
@@ -399,6 +407,8 @@ int main(int argc, char **argv)
 
 	open_inputs();
 	open_control();
+	if (debug)
+		g_timeout_add_seconds(5, dump, NULL);
 	if (g_getenv("NEUTRINO_HBBTV_TESTKEYS"))
 		schedule_test_keys(g_getenv("NEUTRINO_HBBTV_TESTKEYS"));
 	webkit_web_view_load_uri(view, argv[1]);

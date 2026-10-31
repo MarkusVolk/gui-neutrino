@@ -366,6 +366,8 @@ void CHbbtv::run(const std::string &url, t_channel_id id, const std::string &cha
 	media.stop();
 	if (control[0] >= 0)
 		close(control[0]);
+	/* the application may have scaled the live picture */
+	videoDecoder->Pig(-1, -1, -1, -1);
 
 	fb->setDisplayHandedOver(false);
 	fb->reapplyMode();

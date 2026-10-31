@@ -3,9 +3,10 @@
  * every frame. The methods live on the element prototypes so they work no
  * matter when an application inserts its <object> or <video> elements.
  *
- * Video is played by the box: WebKit never gets the source, the element
- * stays transparent over the hardware picture, and its state comes from
- * Neutrino through the launcher ("position", "ended", "error").
+ * Video is played by the box: WebKit never gets the source, and its state
+ * comes from Neutrino through the launcher ("position", "ended", "error").
+ * Where a video object or element sits, WebKit's hole punch player clears
+ * the graphics down to the picture, as an HbbTV browser does.
  *
  * License: GPL-2.0-or-later
  */
@@ -106,10 +107,52 @@
 		}
 	});
 
+	/* --- holes onto the picture --- */
+
+	var nativeLoad = HTMLMediaElement.prototype.load;
+	var nativeAppend = Node.prototype.appendChild;
+	function nativeGetter(name) {
+		return Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, name).get;
+	}
+	var nativeReadyState = nativeGetter('readyState');
+	var nativeNetworkState = nativeGetter('networkState');
+	var nativeError = nativeGetter('error');
+
+	function holeSource() {
+		var source = document.createElement('source');
+		source.setAttribute('type', 'video/holepunch');
+		source.setAttribute('src', 'data:,');
+		source.setAttribute('data-neutrino-hole', '');
+		return source;
+	}
+
+	/* a video object cannot load in WebKit, so its children are shown in its place */
+	function punchObject(el) {
+		if (el.__neutrinoHole)
+			return;
+		var video = document.createElement('video');
+		video.setAttribute('style', 'position:absolute;left:0;top:0;width:100%;height:100%;');
+		nativeAppend.call(video, holeSource());
+		nativeAppend.call(el, video);
+		el.__neutrinoHole = video;
+		nativeLoad.call(video);
+	}
+
+	function punchMedia(el) {
+		if (el.__neutrinoHole)
+			return;
+		el.removeAttribute('src');
+		el.__neutrinoHole = holeSource();
+		nativeAppend.call(el, el.__neutrinoHole);
+		nativeLoad.call(el);
+	}
+
 	/* --- playback through Neutrino --- */
 
 	var states = new WeakMap();
 	var current = null;
+	/* the video/broadcast object whose size the live picture follows */
+	var broadcastElement = null;
 	var lastWindow = '';
 
 	function state(el) {
@@ -123,18 +166,22 @@
 	}
 
 	function windowOf(el) {
-		var r = el.getBoundingClientRect();
+		/* an object shown through its fallback content has no box of its own */
+		var hole = el instanceof HTMLObjectElement ? el.__neutrinoHole : null;
+		var r = (hole || el).getBoundingClientRect();
 		var w = window.innerWidth, h = window.innerHeight;
-		if (r.width <= 2 || r.height <= 2 || state(el).fullScreen ||
+		var full = isBroadcast(el) ? broadcast.fullScreen : state(el).fullScreen;
+		if (r.width <= 2 || r.height <= 2 || full ||
 		    (r.left <= 0 && r.top <= 0 && r.right >= w && r.bottom >= h))
 			return 'full';
 		return Math.round(r.left) + ' ' + Math.round(r.top) + ' ' + Math.round(r.width) + ' ' + Math.round(r.height);
 	}
 
 	function followWindow() {
-		if (!current)
+		var el = current || (broadcastElement && broadcastElement.isConnected ? broadcastElement : null);
+		if (!el)
 			return;
-		var win = windowOf(current);
+		var win = windowOf(el);
 		if (win !== lastWindow) {
 			lastWindow = win;
 			send('window ' + win);
@@ -147,6 +194,10 @@
 			stopCurrent();
 		var s = state(el);
 		current = el;
+		if (el instanceof HTMLMediaElement)
+			punchMedia(el);
+		else
+			punchObject(el);
 		s.started = true;
 		s.paused = false;
 		s.ended = false;
@@ -240,12 +291,20 @@
 		stop: function () { return isBroadcast(this) ? broadcast.stop() : av.stop.call(this); },
 		seek: function (ms) { return isBroadcast(this) ? false : av.seek.call(this, ms); },
 		setFullScreen: function (f) {
-			if (isBroadcast(this))
-				return broadcast.setFullScreen(f);
-			state(this).fullScreen = !!f;
+			if (isBroadcast(this)) {
+				broadcast.setFullScreen(f);
+				broadcastElement = this;
+				punchObject(this);
+			} else
+				state(this).fullScreen = !!f;
 			followWindow();
 		},
-		bindToCurrentChannel: function () { return broadcast.bindToCurrentChannel(); },
+		bindToCurrentChannel: function () {
+			broadcastElement = this;
+			punchObject(this);
+			followWindow();
+			return broadcast.bindToCurrentChannel();
+		},
 		setChannel: function (c) { return broadcast.setChannel(c); },
 		prevChannel: function () { return broadcast.prevChannel(); },
 		nextChannel: function () { return broadcast.nextChannel(); },
@@ -300,7 +359,7 @@
 		var s = state(el);
 		if (s.src)
 			return s.src;
-		var source = el.querySelector('source[src]');
+		var source = el.querySelector('source[src]:not([data-neutrino-hole])');
 		return source ? source.src : '';
 	}
 
@@ -443,6 +502,23 @@
 				fire(el, 'ended');
 			} else
 				fire(el, 'error');
+		}
+	};
+
+	/* what the video objects look like, for NEUTRINO_HBBTV_DEBUG */
+	window.__neutrinoDump = function () {
+		var list = document.querySelectorAll('object, video');
+		for (var i = 0; i < list.length; i++) {
+			var el = list[i], r = el.getBoundingClientRect(), hole = el.__neutrinoHole;
+			var parent = el.parentElement;
+			console.log('dump: ' + el.tagName + ' type=' + el.getAttribute('type') +
+				' rect=' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.width) + 'x' + Math.round(r.height) +
+				' display=' + getComputedStyle(el).display + ' parent=' + (parent ? parent.tagName + '.' + parent.className : '-') +
+				' hole=' + (hole ? hole.tagName : 'none') +
+				(hole && hole.tagName === 'VIDEO' ? ' hole-rect=' + JSON.stringify(hole.getBoundingClientRect()) +
+					' ready=' + nativeReadyState.call(hole) + ' network=' + nativeNetworkState.call(hole) +
+					' error=' + (nativeError.call(hole) ? nativeError.call(hole).code : 'none') : '') +
+				(el === broadcastElement ? ' [broadcast]' : '') + (el === current ? ' [current]' : ''));
 		}
 	};
 
