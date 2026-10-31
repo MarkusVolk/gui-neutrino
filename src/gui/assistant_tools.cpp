@@ -480,6 +480,14 @@ static std::string status()
 			       "  " + info.current_name + "\n";
 		if (info.flags & CSectionsdClient::epgflags::has_next)
 			out += std::string(tr(LOCALE_ASSISTANT_TOOL_NEXT)) + ": " + local_time(info.next_zeit.startzeit, "%H:%M") + "  " + info.next_name + "\n";
+		std::vector<CAitApp> apps;
+		if (CZapit::getInstance()->GetAitApps(channel->getChannelID(), apps) && !apps.empty())
+		{
+			std::string names;
+			for (size_t i = 0; i < apps.size(); i++)
+				names += (i ? ", " : "") + (apps[i].name.empty() ? apps[i].url : apps[i].name);
+			out += std::string(tr(LOCALE_ASSISTANT_TOOL_HBBTV)) + ": " + names + "\n";
+		}
 	}
 	out += std::string(tr(LOCALE_ASSISTANT_TOOL_VOLUME)) + ": " + to_string((int)g_settings.current_volume) + "%";
 	if (app->isMuted())

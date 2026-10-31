@@ -894,6 +894,19 @@ void ep_channel_current(Call &c)
 		v["audio"].append(av);
 	}
 	v["streams_known"] = ch->getPidsFlag();
+	std::vector<CAitApp> apps;
+	if (CZapit::getInstance()->GetAitApps(ch->getChannelID(), apps)) {
+		v["hbbtv"] = Json::Value(Json::arrayValue);
+		for (size_t i = 0; i < apps.size(); i++) {
+			Json::Value av(Json::objectValue);
+			av["app_id"] = apps[i].app_id;
+			av["org_id"] = apps[i].org_id;
+			av["name"] = apps[i].name;
+			av["url"] = apps[i].url;
+			av["autostart"] = apps[i].control_code == CAitApp::AUTOSTART;
+			v["hbbtv"].append(av);
+		}
+	}
 	send_json(c.out, 200, v);
 }
 

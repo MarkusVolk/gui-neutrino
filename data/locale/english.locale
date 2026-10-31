@@ -143,6 +143,7 @@ assistant.thinking Thinking
 assistant.too_many_steps given up after too many steps
 assistant.tool_channel Channel
 assistant.tool_conflict Another recording is planned for that time.
+assistant.tool_hbbtv HbbTV
 assistant.tool_in_standby The box is in standby.
 assistant.tool_is_radio is a radio channel and the box is in TV mode.
 assistant.tool_is_tv is a TV channel and the box is in radio mode.

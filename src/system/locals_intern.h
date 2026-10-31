@@ -170,6 +170,7 @@ const char * locale_real_names[] =
 	"assistant.too_many_steps",
 	"assistant.tool_channel",
 	"assistant.tool_conflict",
+	"assistant.tool_hbbtv",
 	"assistant.tool_in_standby",
 	"assistant.tool_is_radio",
 	"assistant.tool_is_tv",
