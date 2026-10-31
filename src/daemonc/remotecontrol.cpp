@@ -161,8 +161,10 @@ int CRemoteControl::handleMsg(const neutrino_msg_t msg, neutrino_msg_data_t data
 		{
 			//printf("[neutrino] EVT_ZAP current %llx data %llx\n", current_channel_id, *(t_channel_id *)data);
 			g_InfoViewer->chanready = 1;
-			// wait for no message from ZAPIT -> someone else has triggered zapping
-			if ((*(t_channel_id *)data) != current_channel_id)
+			// wait for no message from ZAPIT -> someone else has triggered zapping;
+			// a zap that found no tuner (a recording holds it) left zapit where it was
+			if ((*(t_channel_id *)data) != current_channel_id &&
+			    (msg != NeutrinoMessages::EVT_ZAP_FAILED || CZapit::getInstance()->GetCurrentChannelID() == *(t_channel_id *)data))
 			{
 				t_channel_id new_id = *(t_channel_id *)data;
 				CZapitChannel *channel = CServiceManager::getInstance()->FindChannel(new_id);
