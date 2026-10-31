@@ -68,6 +68,7 @@
 		getMaximumValue: function () { return 0x1ff; }
 	});
 
+	var successor = false;
 	var application = traced({
 		privateData: { keyset: keyset, currentChannel: channel },
 		visible: true,
@@ -75,8 +76,17 @@
 		hide: function () { this.visible = false; document.documentElement.style.visibility = 'hidden'; return true; },
 		activate: function () {},
 		deactivate: function () {},
-		createApplication: function (uri) { window.location.href = uri; return application; },
-		destroyApplication: function () { if (bridge) bridge.postMessage({ cmd: 'exit' }); },
+		/* an application hands over to another with createApplication() and then
+		 * calls destroyApplication(); only one without a successor ends HbbTV */
+		createApplication: function (uri) {
+			successor = true;
+			window.location.href = new URL(uri, document.baseURI).href;
+			return application;
+		},
+		destroyApplication: function () {
+			if (!successor && bridge)
+				bridge.postMessage({ cmd: 'exit' });
+		},
 		getOwnerApplication: function () { return application; }
 	});
 
