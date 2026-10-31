@@ -1833,7 +1833,11 @@ int CRecordManager::handleMsg(const neutrino_msg_t msg, neutrino_msg_data_t data
 	else if ((msg == NeutrinoMessages::EVT_TIMER)) {
 		if(data == shift_timer) {
 			shift_timer = 0;
-			if (CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_standby && !FindTimeshift())
+			/* while a zap is under way zapit has still the channel left,
+			   and a recording would zap back to it; the end of the zap arms
+			   the timer again */
+			if (CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_standby && !FindTimeshift() &&
+			    g_RemoteControl->current_channel_id == CZapit::getInstance()->GetCurrentChannelID())
 				StartAutoRecord(true);
 			return messages_return::handled;
 		}
