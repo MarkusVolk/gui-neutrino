@@ -93,6 +93,7 @@ enable_iwd = get_option('iwd')
 enable_bluetooth = get_option('bluetooth')
 enable_mpris = get_option('mpris')
 enable_tray = get_option('tray')
+enable_hbbtv = get_option('hbbtv')
 enable_terminal = get_option('terminal')
 enable_xkbcommon = get_option('xkbcommon')
 enable_udev = get_option('udev')
@@ -126,6 +127,9 @@ enable_aitscan = get_option('aitscan')
 enable_webif = get_option('webif')
 use_dbus = enable_iwd or enable_bluetooth or enable_mpris or enable_tray
 
+if enable_hbbtv and not enable_aitscan
+	error('hbbtv needs aitscan')
+endif
 if enable_terminal and not enable_xkbcommon
 	error('terminal needs xkbcommon')
 endif

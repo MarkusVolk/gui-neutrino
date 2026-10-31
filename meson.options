@@ -73,6 +73,7 @@ option('freesatepg', type : 'boolean', value : false, description : 'Freesat EPG
 option('viasatepg', type : 'boolean', value : false, description : 'ViaSat EPG')
 option('fastscan', type : 'boolean', value : false, description : 'Fastscan')
 option('aitscan', type : 'boolean', value : true, description : 'Application Information Table')
+option('hbbtv', type : 'boolean', value : false, description : 'HbbTV browser on WPE WebKit, started with the red key (needs aitscan)')
 option('pip', type : 'boolean', value : false, description : 'Picture in picture')
 option('quadpip', type : 'boolean', value : false, description : 'Four pictures at once (VU+ 4K models)')
 option('lcd', type : 'boolean', value : false, description : 'Colour LCD of the osmio4kplus')

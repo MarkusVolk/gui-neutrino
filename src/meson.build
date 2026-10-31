@@ -7,6 +7,9 @@ subdir('system')
 subdir('eitd')
 subdir('timerd')
 subdir('nhttpd')
+if enable_hbbtv
+	subdir('hbbtv')
+endif
 
 neutrino_libs = [
 	libneutrino_daemonc,
