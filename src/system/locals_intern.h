@@ -187,6 +187,7 @@ const char * locale_real_names[] =
 	"assistant.tool_no_plugins",
 	"assistant.tool_no_timer",
 	"assistant.tool_no_timers",
+	"assistant.tool_no_tuner",
 	"assistant.tool_not_muted",
 	"assistant.tool_nothing_found",
 	"assistant.tool_now",

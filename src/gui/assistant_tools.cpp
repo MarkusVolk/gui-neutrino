@@ -564,6 +564,12 @@ static bool zap(const Json::Value &input, std::string &result)
 		result = channel->getName() + " " + tr(radio ? LOCALE_ASSISTANT_TOOL_IS_RADIO : LOCALE_ASSISTANT_TOOL_IS_TV);
 		return false;
 	}
+	/* the check of the channel list: zapit would fail and keep the channel */
+	if (!app->channelList->SameTP(channel))
+	{
+		result = channel->getName() + " " + tr(LOCALE_ASSISTANT_TOOL_NO_TUNER);
+		return false;
+	}
 	if (channel->getChannelID() != CZapit::getInstance()->GetCurrentChannelID())
 	{
 		CMoviePlayerGui::getInstance().stopPlayBack();

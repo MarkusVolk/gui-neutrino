@@ -160,6 +160,7 @@ assistant.tool_no_plugin Es gibt kein Plugin
 assistant.tool_no_plugins Keine Plugins installiert.
 assistant.tool_no_timer Es gibt keinen Timer
 assistant.tool_no_timers Keine Timer.
+assistant.tool_no_tuner liegt auf einem anderen Transponder, und die laufende Aufnahme belegt den Tuner.
 assistant.tool_not_muted Ton an
 assistant.tool_nothing_found Nichts gefunden.
 assistant.tool_now Jetzt
