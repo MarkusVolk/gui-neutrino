@@ -210,7 +210,7 @@ bool CAit::Parse()
 							ApplicationNameDescriptor *nameDescriptor = (ApplicationNameDescriptor *)(*desc);
 							ApplicationNameConstIterator interactionit = nameDescriptor->getApplicationNames()->begin();
 							if (interactionit != nameDescriptor->getApplicationNames()->end())
-								applicationName = (*interactionit)->getApplicationName();
+								applicationName = stringDVBUTF8((*interactionit)->getApplicationName());
 							break;
 						}
 						case TRANSPORT_PROTOCOL_DESCRIPTOR:
@@ -233,6 +233,11 @@ bool CAit::Parse()
 					}
 				}
 				hbbtvUrl = TPDescPath + SALDescPath;
+				/* a URL is ASCII; some broadcasters send a stray byte after it */
+				size_t end = 0;
+				while (end < hbbtvUrl.size() && hbbtvUrl[end] > ' ' && hbbtvUrl[end] < 0x7f)
+					end++;
+				hbbtvUrl.resize(end);
 			}
 			if (!hbbtvUrl.empty())
 			{
