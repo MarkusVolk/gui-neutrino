@@ -421,6 +421,8 @@ void CFbAccelARM::blit()
 
 void CFbAccelARM::_blit()
 {
+	if (displayHandedOver())
+		return;
 	if (ioctl(fd, FBIO_BLIT) < 0)
 		printf("FBIO_BLIT failed\n");
 }

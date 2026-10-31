@@ -158,6 +158,7 @@ CFrameBuffer::CFrameBuffer()
 	backupBackground = NULL;
 	backgroundFilename = "";
 	locked = false;
+	display_handed_over = false;
 	shadow_real = NULL;
 	shadow_buf = NULL;
 	shadow_size = 0;

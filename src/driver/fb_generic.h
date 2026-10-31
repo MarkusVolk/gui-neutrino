@@ -151,6 +151,7 @@ class CFrameBuffer : public sigc::trackable
 		static	void switch_signal (int);
 		fb_fix_screeninfo fix;
 		bool locked;
+		bool display_handed_over;
 		std::map<std::string, rawIcon> icon_cache;
 		int cache_size;
 
@@ -209,6 +210,12 @@ class CFrameBuffer : public sigc::trackable
 
 		bool getActive() const;                     // is framebuffer active?
 		void setActive(bool enable);                     // is framebuffer active?
+		/* another program draws on the display: Neutrino neither paints
+		 * nor presents until it is given back */
+		void setDisplayHandedOver(bool on) { display_handed_over = on; setActive(!on); }
+		bool displayHandedOver() const { return display_handed_over; }
+		/* the mode again after another program changed or panned it */
+		int reapplyMode() { return setMode(xRes, yRes, bpp); }
 		virtual void setupGXA() { return; };             // reinitialize stuff
 		virtual void add_gxa_sync_marker() { return; };
 		virtual bool needAlign4Blit() { return false; };
