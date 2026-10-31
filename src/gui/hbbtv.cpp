@@ -97,7 +97,8 @@ bool CHbbtv::startAutostart()
 	{
 		if (apps[i].control_code == CAitApp::AUTOSTART)
 		{
-			run(apps[i].url, id, channel);
+			/* on a TV set the application runs already and gets this red */
+			run(apps[i].url, id, channel, 403);
 			return true;
 		}
 	}
@@ -243,14 +244,16 @@ class CHbbtvMedia
 		}
 };
 
-static pid_t spawn(const std::string &url, const std::string &channel, int control)
+static pid_t spawn(const std::string &url, const std::string &channel, int control, int start_key)
 {
 	/* built before the fork, the child may not allocate */
 	std::vector<std::string> env;
 	for (char **e = environ; *e; e++)
-		if (strncmp(*e, "NEUTRINO_HBBTV_FD=", 18))
+		if (strncmp(*e, "NEUTRINO_HBBTV_FD=", 18) && strncmp(*e, "NEUTRINO_HBBTV_START_KEY=", 25))
 			env.push_back(*e);
 	env.push_back("NEUTRINO_HBBTV_FD=" + to_string(CONTROL_FD));
+	if (start_key)
+		env.push_back("NEUTRINO_HBBTV_START_KEY=" + to_string(start_key));
 	std::vector<char *> envp;
 	for (size_t i = 0; i < env.size(); i++)
 		envp.push_back((char *)env[i].c_str());
@@ -307,7 +310,7 @@ static void stop_browser(pid_t pid)
 	waitpid(pid, NULL, 0);
 }
 
-void CHbbtv::run(const std::string &url, t_channel_id id, const std::string &channel)
+void CHbbtv::run(const std::string &url, t_channel_id id, const std::string &channel, int start_key)
 {
 	CFrameBuffer *fb = CFrameBuffer::getInstance();
 	CNeutrinoApp *app = CNeutrinoApp::getInstance();
@@ -323,7 +326,7 @@ void CHbbtv::run(const std::string &url, t_channel_id id, const std::string &cha
 	int control[2];
 	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, control) < 0)
 		control[0] = control[1] = -1;
-	pid_t pid = spawn(url, channel, control[1]);
+	pid_t pid = spawn(url, channel, control[1], start_key);
 	if (control[1] >= 0)
 		close(control[1]);
 	fcntl(control[0], F_SETFL, fcntl(control[0], F_GETFL) | O_NONBLOCK);

@@ -33,8 +33,9 @@ class CHbbtv
 		static bool startAutostart();
 		/* shows url until the application ends, the channel changes or the
 		 * box leaves TV mode; live TV keeps running underneath. channel is
-		 * "onid.tsid.sid:name" of channel id */
-		static void run(const std::string &url, t_channel_id id, const std::string &channel);
+		 * "onid.tsid.sid:name" of channel id; start_key, if set, is the
+		 * HbbTV key code the application gets once it is ready */
+		static void run(const std::string &url, t_channel_id id, const std::string &channel, int start_key = 0);
 };
 
 #endif

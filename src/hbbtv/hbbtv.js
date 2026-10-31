@@ -64,7 +64,12 @@
 		RED: 0x1, GREEN: 0x2, YELLOW: 0x4, BLUE: 0x8, NAVIGATION: 0x10,
 		VCR: 0x20, SCROLL: 0x40, INFO: 0x80, NUMERIC: 0x100, ALPHA: 0x200, OTHER: 0x400,
 		value: 0x1f,
-		setValue: function (v) { this.value = v; return v; },
+		setValue: function (v) {
+			this.value = v;
+			if (bridge)
+				bridge.postMessage({ cmd: 'keyset', value: v });
+			return v;
+		},
 		getMaximumValue: function () { return 0x1ff; }
 	});
 

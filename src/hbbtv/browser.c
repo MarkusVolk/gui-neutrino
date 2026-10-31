@@ -71,6 +71,9 @@ static const struct {
 
 static struct wpe_view_backend *wpe_backend;
 
+/* the colour key that started HbbTV, for the application once it listens */
+static int start_key;
+
 static void send_key(size_t i, gboolean pressed)
 {
 	char script[512];
@@ -97,16 +100,22 @@ static void send_key(size_t i, gboolean pressed)
 	webkit_web_view_evaluate_javascript(view, script, -1, NULL, NULL, NULL, NULL, NULL);
 }
 
-static gboolean test_key(gpointer data)
+static size_t key_index(int code)
 {
-	int code = GPOINTER_TO_INT(data);
+	for (size_t i = 0; i < G_N_ELEMENTS(keymap); i++)
+		if (keymap[i].code == code)
+			return i;
+	return G_N_ELEMENTS(keymap);
+}
 
-	for (size_t i = 0; i < G_N_ELEMENTS(keymap); i++) {
-		if (keymap[i].code == code) {
-			send_key(i, TRUE);
-			send_key(i, FALSE);
-			break;
-		}
+/* presses and releases the key with the HbbTV code in data */
+static gboolean press_key(gpointer data)
+{
+	size_t i = key_index(GPOINTER_TO_INT(data));
+
+	if (i < G_N_ELEMENTS(keymap)) {
+		send_key(i, TRUE);
+		send_key(i, FALSE);
 	}
 	return G_SOURCE_REMOVE;
 }
@@ -120,7 +129,7 @@ static void schedule_test_keys(const char *spec)
 		unsigned ms = 0;
 		int code = 0;
 		if (sscanf(*i, "%u:%d", &ms, &code) == 2 && code > 0)
-			g_timeout_add(ms, test_key, GINT_TO_POINTER(code));
+			g_timeout_add(ms, press_key, GINT_TO_POINTER(code));
 	}
 	g_strfreev(items);
 }
@@ -201,6 +210,16 @@ static void open_inputs(void)
 	closedir(dir);
 }
 
+/* an application asks for the colour keys through its keyset (red 0x1 to
+ * blue 0x8); the first one that takes the start key gets it */
+static void keyset_changed(int value)
+{
+	if (start_key < 403 || start_key > 406 || !(value & (1 << (start_key - 403))))
+		return;
+	g_timeout_add(300, press_key, GINT_TO_POINTER(start_key));
+	start_key = 0;
+}
+
 static void control_send(const char *line)
 {
 	if (control_fd < 0 || strchr(line, '\n'))
@@ -268,6 +287,11 @@ static void script_message(WebKitUserContentManager *manager, JSCValue *value, g
 	char *s = jsc_value_to_string(cmd);
 	if (g_strcmp0(s, "exit") == 0)
 		g_main_loop_quit(loop);
+	else if (g_strcmp0(s, "keyset") == 0) {
+		JSCValue *v = jsc_value_object_get_property(value, "value");
+		keyset_changed(jsc_value_to_int32(v));
+		g_object_unref(v);
+	}
 	else if (g_strcmp0(s, "media") == 0) {
 		JSCValue *line = jsc_value_object_get_property(value, "line");
 		char *l = jsc_value_to_string(line);
@@ -366,6 +390,8 @@ int main(int argc, char **argv)
 	}
 	setenv("WPE_BACKEND_LIBRARY", BACKEND_LIBRARY, 0);
 	debug = g_getenv("NEUTRINO_HBBTV_DEBUG") != NULL;
+	if (g_getenv("NEUTRINO_HBBTV_START_KEY"))
+		start_key = atoi(g_getenv("NEUTRINO_HBBTV_START_KEY"));
 
 	loop = g_main_loop_new(NULL, FALSE);
 
