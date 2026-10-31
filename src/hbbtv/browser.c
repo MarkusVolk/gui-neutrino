@@ -335,6 +335,20 @@ static gboolean web_process_terminated(WebKitWebView *v, WebKitWebProcessTermina
 	g_main_loop_quit(loop);
 	return TRUE;
 }
+/* the box has no swap: past these the web processes give memory back and
+ * are ended in the end, instead of starving Neutrino */
+static void limit_memory(WebKitWebContext **context)
+{
+	WebKitMemoryPressureSettings *settings = webkit_memory_pressure_settings_new();
+	webkit_memory_pressure_settings_set_memory_limit(settings, 300);
+	webkit_memory_pressure_settings_set_kill_threshold(settings, 1.2);
+	*context = g_object_new(WEBKIT_TYPE_WEB_CONTEXT, "memory-pressure-settings", settings, NULL);
+	webkit_memory_pressure_settings_set_memory_limit(settings, 100);
+	webkit_memory_pressure_settings_set_kill_threshold(settings, 1.5);
+	webkit_network_session_set_memory_pressure_settings(settings);
+	webkit_memory_pressure_settings_free(settings);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -354,6 +368,10 @@ int main(int argc, char **argv)
 		"enable-page-cache", FALSE,
 		"enable-write-console-messages-to-stdout", debug,
 		NULL);
+	/* before anything creates the network session */
+	WebKitWebContext *context;
+	limit_memory(&context);
+
 	const char *proxy = g_getenv("NEUTRINO_HBBTV_PROXY");
 	if (proxy) {
 		WebKitNetworkProxySettings *ps = webkit_network_proxy_settings_new(proxy, NULL);
@@ -368,7 +386,8 @@ int main(int argc, char **argv)
 	g_signal_connect(manager, "script-message-received::neutrino", G_CALLBACK(script_message), NULL);
 
 	view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "backend", backend, "settings", settings,
-		"user-content-manager", manager, NULL);
+		"user-content-manager", manager, "web-context", context, NULL);
+	g_object_unref(context);
 	g_object_unref(settings);
 	g_object_unref(manager);
 

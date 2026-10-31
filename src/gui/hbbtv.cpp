@@ -274,6 +274,13 @@ static pid_t spawn(const std::string &url, const std::string &channel, int contr
 		sa.sa_handler = SIG_DFL;
 		for (int i = 1; i < NSIG; i++)
 			sigaction(i, &sa, NULL);
+		/* short of memory the kernel ends the browser, never Neutrino */
+		int oom = open("/proc/self/oom_score_adj", O_WRONLY);
+		if (oom >= 0)
+		{
+			(void)!write(oom, "1000", 4);
+			::close(oom);
+		}
 		if (control != CONTROL_FD)
 			dup2(control, CONTROL_FD);
 		else
