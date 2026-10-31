@@ -61,7 +61,7 @@ static const struct {
 	{ KEY_BACK, 461, 0 }, { KEY_BACKSPACE, 461, 0 },
 	{ KEY_RED, 403, 0 }, { KEY_GREEN, 404, 0 }, { KEY_YELLOW, 405, 0 }, { KEY_BLUE, 406, 0 },
 	{ KEY_PLAY, 415, 0 }, { KEY_PAUSE, 19, 0 }, { KEY_PLAYPAUSE, 402, 0 }, { KEY_STOP, 413, 0 },
-	{ KEY_FASTFORWARD, 417, 0 }, { KEY_REWIND, 412, 0 },
+	{ KEY_FASTFORWARD, 417, 0 }, { KEY_FORWARD, 417, 0 }, { KEY_REWIND, 412, 0 },
 	{ KEY_NEXT, 425, 0 }, { KEY_PREVIOUS, 424, 0 },
 	{ KEY_0, 48, WPE_KEY_0 }, { KEY_1, 49, WPE_KEY_1 }, { KEY_2, 50, WPE_KEY_2 }, { KEY_3, 51, WPE_KEY_3 },
 	{ KEY_4, 52, WPE_KEY_4 }, { KEY_5, 53, WPE_KEY_5 }, { KEY_6, 54, WPE_KEY_6 }, { KEY_7, 55, WPE_KEY_7 },
@@ -134,6 +134,14 @@ static void schedule_test_keys(const char *spec)
 	g_strfreev(items);
 }
 
+static size_t key_of_device(unsigned code)
+{
+	for (size_t i = 0; i < G_N_ELEMENTS(keymap); i++)
+		if (keymap[i].key == code)
+			return i;
+	return G_N_ELEMENTS(keymap);
+}
+
 static gboolean input_cb(GIOChannel *channel, GIOCondition cond, gpointer data)
 {
 	struct input_event ev;
@@ -150,15 +158,13 @@ static gboolean input_cb(GIOChannel *channel, GIOCondition cond, gpointer data)
 				g_main_loop_quit(loop);
 			continue;
 		}
-		for (size_t i = 0; i < G_N_ELEMENTS(keymap); i++) {
-			if (keymap[i].key != ev.code)
-				continue;
-			if (debug)
-				fprintf(stderr, "neutrino-hbbtv: key %u %s -> %d%s\n", ev.code, ev.value ? "down" : "up",
-					keymap[i].code, keymap[i].sym ? " (key event)" : "");
-			send_key(i, ev.value != 0);
-			break;
-		}
+		size_t i = key_of_device(ev.code);
+		if (i == G_N_ELEMENTS(keymap))
+			continue;
+		if (debug)
+			fprintf(stderr, "neutrino-hbbtv: key %u %s -> %d%s\n", ev.code, ev.value ? "down" : "up",
+				keymap[i].code, keymap[i].sym ? " (key event)" : "");
+		send_key(i, ev.value != 0);
 	}
 	return G_SOURCE_CONTINUE;
 }
@@ -232,6 +238,51 @@ static void control_send(const char *line)
 	g_free(l);
 }
 
+/* the screen text for Neutrino, on one line */
+static void screen_ready(GObject *object, GAsyncResult *result, gpointer data)
+{
+	JSCValue *value = webkit_web_view_evaluate_javascript_finish(WEBKIT_WEB_VIEW(object), result, NULL);
+	char *text = value && jsc_value_is_string(value) ? jsc_value_to_string(value) : g_strdup("");
+	GString *line = g_string_new("screen ");
+
+	(void)data;
+	for (const char *p = text; *p; p++) {
+		if (*p == '\n')
+			g_string_append(line, "\\n");
+		else if (*p == '\\')
+			g_string_append(line, "\\\\");
+		else if ((unsigned char)*p >= ' ')
+			g_string_append_c(line, *p);
+	}
+	control_send(line->str);
+	g_string_free(line, TRUE);
+	g_free(text);
+	if (value)
+		g_object_unref(value);
+}
+
+/* "key <code>" is a key Neutrino got from a remote client, with the code of
+ * the input device; "describe" asks for the screen text */
+static void control_line(const char *line)
+{
+	if (g_str_has_prefix(line, "key ")) {
+		size_t i = key_of_device(atoi(line + 4));
+		if (i < G_N_ELEMENTS(keymap)) {
+			send_key(i, TRUE);
+			send_key(i, FALSE);
+		}
+	} else if (g_strcmp0(line, "describe") == 0) {
+		webkit_web_view_evaluate_javascript(view, "window.__neutrinoScreen ? window.__neutrinoScreen() : document.title",
+			-1, NULL, NULL, NULL, screen_ready, NULL);
+	} else {
+		char *quoted = g_strescape(line, NULL);
+		char *script = g_strdup_printf("window.__neutrinoMedia && window.__neutrinoMedia(\"%s\");", quoted);
+		webkit_web_view_evaluate_javascript(view, script, -1, NULL, NULL, NULL, NULL, NULL);
+		g_free(script);
+		g_free(quoted);
+	}
+}
+
 static gboolean control_cb(GIOChannel *channel, GIOCondition cond, gpointer data)
 {
 	char buf[1024];
@@ -252,11 +303,7 @@ static gboolean control_cb(GIOChannel *channel, GIOCondition cond, gpointer data
 	char *end;
 	while ((end = strchr(control_in->str, '\n'))) {
 		*end = 0;
-		char *quoted = g_strescape(control_in->str, NULL);
-		char *script = g_strdup_printf("window.__neutrinoMedia && window.__neutrinoMedia(\"%s\");", quoted);
-		webkit_web_view_evaluate_javascript(view, script, -1, NULL, NULL, NULL, NULL, NULL);
-		g_free(script);
-		g_free(quoted);
+		control_line(control_in->str);
 		g_string_erase(control_in, 0, end - control_in->str + 1);
 	}
 	return G_SOURCE_CONTINUE;

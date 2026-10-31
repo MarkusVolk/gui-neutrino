@@ -537,6 +537,40 @@
 		}
 	};
 
+	/* what a remote client reads with tv_screen: the page, what the
+	 * application highlights and the text on screen */
+	window.__neutrinoScreen = function () {
+		function text(el) {
+			return (el.innerText || '').replace(/\s+/g, ' ').trim();
+		}
+		var out = [];
+		if (document.title)
+			out.push('Page: ' + document.title);
+		out.push('Address: ' + location.href);
+		var marked = [];
+		var a = document.activeElement;
+		if (a && a !== document.body && text(a))
+			marked.push(text(a));
+		var mark = /(^|[\s_-])(focus|focused|selected|active|current|highlight)($|[\s_-])/i;
+		var list = document.querySelectorAll('[class]');
+		for (var i = 0; i < list.length && marked.length < 5; i++) {
+			var el = list[i];
+			if (typeof el.className !== 'string' || !mark.test(el.className) || !el.getClientRects().length)
+				continue;
+			var t = text(el);
+			if (t && t.length < 200 && marked.indexOf(t) < 0)
+				marked.push(t);
+		}
+		if (marked.length)
+			out.push('Highlighted: ' + marked.join(' | '));
+		var body = document.body ? document.body.innerText.replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim() : '';
+		if (body.length > 2000)
+			body = body.substr(0, 2000) + ' ...';
+		if (body)
+			out.push('Text:\n' + body);
+		return out.join('\n');
+	};
+
 	/* an application that ends or removes its player stops the video */
 	window.addEventListener('pagehide', stopCurrent);
 	new MutationObserver(function () {

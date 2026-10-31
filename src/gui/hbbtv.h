@@ -22,6 +22,7 @@
 
 #include <string>
 #include <zapit/client/zapittypes.h>
+#include <zapit/scanait.h>
 
 class CHbbtv
 {
@@ -31,11 +32,20 @@ class CHbbtv
 		/* starts the AUTOSTART application of the running channel; false if
 		 * there is none, so the key can do what it does otherwise */
 		static bool startAutostart();
-		/* shows url until the application ends, the channel changes or the
-		 * box leaves TV mode; live TV keeps running underneath. channel is
+		/* starts the application of the running channel with this URL;
+		 * false if the channel has none such */
+		static bool start(const std::string &url);
+		/* true while an application is on screen, which goes to app */
+		static bool open(CAitApp *app = NULL);
+		/* ends the application on screen */
+		static void close();
+
+	private:
+		/* shows app until it ends, the channel changes or the box leaves TV
+		 * mode; live TV keeps running underneath. channel is
 		 * "onid.tsid.sid:name" of channel id; start_key, if set, is the
 		 * HbbTV key code the application gets once it is ready */
-		static void run(const std::string &url, t_channel_id id, const std::string &channel, int start_key = 0);
+		static void run(const CAitApp &app, t_channel_id id, const std::string &channel, int start_key);
 };
 
 #endif

@@ -30,6 +30,7 @@
 #include <driver/record.h>
 #include <eitd/sectionsd.h>
 #include <gui/channellist.h>
+#include <gui/hbbtv.h>
 #include <gui/movieplayer.h>
 #include <gui/widget/remote_path.h>
 #include <gui/widget/remote_ui.h>
@@ -187,6 +188,15 @@ static const struct
 		"\"folder\":{\"type\":\"string\",\"enum\":[\"movies\",\"music\",\"pictures\",\"recordings\"]},"
 		"\"path\":{\"type\":\"string\",\"description\":\"a folder below it, as tv_media names it\"}},"
 		"\"required\":[\"folder\"]}"
+	},
+	{
+		"tv_hbbtv",
+		"Open the HbbTV application of the running channel: without app the one the red key opens, "
+		"else the one with that name or number as tv_status lists them. close ends the open one. While "
+		"one is open, tv_screen reads it and tv_key operates it.",
+		"{\"type\":\"object\",\"properties\":{"
+		"\"app\":{\"type\":\"string\",\"description\":\"name or number of an application\"},"
+		"\"close\":{\"type\":\"boolean\"}}}"
 	},
 	{
 		"tv_media_play",
@@ -483,9 +493,15 @@ static std::string status()
 		std::vector<CAitApp> apps;
 		if (CZapit::getInstance()->GetAitApps(channel->getChannelID(), apps) && !apps.empty())
 		{
+			CAitApp shown;
+			bool open = CHbbtv::open(&shown);
 			std::string names;
 			for (size_t i = 0; i < apps.size(); i++)
+			{
 				names += (i ? ", " : "") + (apps[i].name.empty() ? apps[i].url : apps[i].name);
+				if (open && apps[i].url == shown.url)
+					names += std::string(" (") + tr(LOCALE_ASSISTANT_TOOL_HBBTV_OPEN) + ")";
+			}
 			out += std::string(tr(LOCALE_ASSISTANT_TOOL_HBBTV)) + ": " + names + "\n";
 		}
 	}
@@ -1250,6 +1266,63 @@ static bool remote_refused(std::string &result)
 	return true;
 }
 
+static bool hbbtv(const Json::Value &input, std::string &result)
+{
+	CAitApp shown;
+	if (input["close"].isBool() && input["close"].asBool())
+	{
+		if (!CHbbtv::open())
+		{
+			result = "no HbbTV application is open";
+			return false;
+		}
+		CHbbtv::close();
+		result = "closed";
+		return true;
+	}
+	if (remote_refused(result))
+		return false;
+	if (!CHbbtv::available())
+	{
+		result = "this box has no HbbTV";
+		return false;
+	}
+	if (CHbbtv::open(&shown))
+	{
+		result = (shown.name.empty() ? shown.url : shown.name) + " is open already; close it first";
+		return false;
+	}
+	CZapitChannel *channel = current_channel();
+	std::vector<CAitApp> apps;
+	if (CNeutrinoApp::getInstance()->getMode() != NeutrinoModes::mode_tv || !channel ||
+	    !CZapit::getInstance()->GetAitApps(channel->getChannelID(), apps) || apps.empty())
+	{
+		result = "the running channel has no HbbTV application";
+		return false;
+	}
+	std::string want = lower(input["app"].asString());
+	bool number = !want.empty() && want.find_first_not_of("0123456789") == std::string::npos;
+	const CAitApp *app = NULL;
+	for (size_t i = 0; i < apps.size() && !app; i++)
+		if (want.empty() ? apps[i].control_code == CAitApp::AUTOSTART :
+		    number ? atoi(want.c_str()) == (int)i + 1 : lower(apps[i].name).find(want) != std::string::npos)
+			app = &apps[i];
+	if (!app)
+	{
+		result = want.empty() ? "the channel has no application for the red key" :
+			 "no application \"" + input["app"].asString() + "\"";
+		return false;
+	}
+	std::string url = app->url;
+	if (!main_call::post([url] { CHbbtv::start(url); }))
+	{
+		result = "the box did not take it";
+		return false;
+	}
+	result = "opens " + (app->name.empty() ? url : app->name) + "; read it with tv_screen in a few seconds";
+	return true;
+}
+
 static bool screen(std::string &result)
 {
 	CRemoteUi *ui = CRemoteUi::top();
@@ -1334,8 +1407,10 @@ static bool press_key(const Json::Value &input, std::string &result)
 	{
 		if (want != keys[i].name)
 			continue;
+		/* in an HbbTV application back is its own key, exit ends it */
+		neutrino_msg_t key = want == "back" && CHbbtv::open() ? (neutrino_msg_t)CRCInput::RC_back : keys[i].key;
 		for (int t = 0; t < times; t++)
-			g_RCInput->postMsg(keys[i].key, 0, false);
+			g_RCInput->postMsg(key, 0, false);
 		result = "pressed; look with tv_screen";
 		return true;
 	}
@@ -1387,6 +1462,8 @@ bool CAssistantTools::call(const std::string &name, const Json::Value &input, st
 		return media_list(input, result);
 	if (name == "tv_media_play")
 		return media_play(input, result);
+	if (name == "tv_hbbtv")
+		return hbbtv(input, result);
 	if (name == "tv_screen")
 		return screen(result);
 	if (name == "tv_select")

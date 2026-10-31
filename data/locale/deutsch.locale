@@ -144,6 +144,7 @@ assistant.too_many_steps nach zu vielen Schritten aufgegeben
 assistant.tool_channel Sender
 assistant.tool_conflict Für diese Zeit ist schon eine Aufnahme geplant.
 assistant.tool_hbbtv HbbTV
+assistant.tool_hbbtv_open geöffnet
 assistant.tool_in_standby Die Box ist im Standby.
 assistant.tool_is_radio ist ein Radiosender und die Box ist im TV-Modus.
 assistant.tool_is_tv ist ein Fernsehsender und die Box ist im Radio-Modus.
