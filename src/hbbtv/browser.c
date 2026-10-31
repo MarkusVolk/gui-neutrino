@@ -47,36 +47,46 @@ static gboolean debug;
 static int control_fd = -1;
 static GString *control_in;
 
-/* keyCode values of the HbbTV key set (OIPF DAE, KeyEvent VK_*) */
+/* keyCode values of the HbbTV key set (OIPF DAE, KeyEvent VK_*); keys that
+ * a keyboard has as well go in as real key events (sym), the others are
+ * made up in the page */
 static const struct {
 	unsigned short key;
 	int code;
+	uint32_t sym;
 } keymap[] = {
-	{ KEY_UP, 38 }, { KEY_DOWN, 40 }, { KEY_LEFT, 37 }, { KEY_RIGHT, 39 },
-	{ KEY_OK, 13 }, { KEY_ENTER, 13 }, { KEY_SELECT, 13 },
-	{ KEY_BACK, 461 }, { KEY_BACKSPACE, 461 },
-	{ KEY_RED, 403 }, { KEY_GREEN, 404 }, { KEY_YELLOW, 405 }, { KEY_BLUE, 406 },
-	{ KEY_PLAY, 415 }, { KEY_PAUSE, 19 }, { KEY_PLAYPAUSE, 402 }, { KEY_STOP, 413 },
-	{ KEY_FASTFORWARD, 417 }, { KEY_REWIND, 412 },
-	{ KEY_NEXT, 425 }, { KEY_PREVIOUS, 424 },
-	{ KEY_0, 48 }, { KEY_1, 49 }, { KEY_2, 50 }, { KEY_3, 51 }, { KEY_4, 52 },
-	{ KEY_5, 53 }, { KEY_6, 54 }, { KEY_7, 55 }, { KEY_8, 56 }, { KEY_9, 57 },
-	{ KEY_INFO, 457 }, { KEY_TEXT, 459 },
+	{ KEY_UP, 38, WPE_KEY_Up }, { KEY_DOWN, 40, WPE_KEY_Down },
+	{ KEY_LEFT, 37, WPE_KEY_Left }, { KEY_RIGHT, 39, WPE_KEY_Right },
+	{ KEY_OK, 13, WPE_KEY_Return }, { KEY_ENTER, 13, WPE_KEY_Return }, { KEY_SELECT, 13, WPE_KEY_Return },
+	{ KEY_BACK, 461, 0 }, { KEY_BACKSPACE, 461, 0 },
+	{ KEY_RED, 403, 0 }, { KEY_GREEN, 404, 0 }, { KEY_YELLOW, 405, 0 }, { KEY_BLUE, 406, 0 },
+	{ KEY_PLAY, 415, 0 }, { KEY_PAUSE, 19, 0 }, { KEY_PLAYPAUSE, 402, 0 }, { KEY_STOP, 413, 0 },
+	{ KEY_FASTFORWARD, 417, 0 }, { KEY_REWIND, 412, 0 },
+	{ KEY_NEXT, 425, 0 }, { KEY_PREVIOUS, 424, 0 },
+	{ KEY_0, 48, WPE_KEY_0 }, { KEY_1, 49, WPE_KEY_1 }, { KEY_2, 50, WPE_KEY_2 }, { KEY_3, 51, WPE_KEY_3 },
+	{ KEY_4, 52, WPE_KEY_4 }, { KEY_5, 53, WPE_KEY_5 }, { KEY_6, 54, WPE_KEY_6 }, { KEY_7, 55, WPE_KEY_7 },
+	{ KEY_8, 56, WPE_KEY_8 }, { KEY_9, 57, WPE_KEY_9 },
+	{ KEY_INFO, 457, 0 }, { KEY_TEXT, 459, 0 },
 };
 
-static int vk_code(unsigned short key)
-{
-	for (size_t i = 0; i < G_N_ELEMENTS(keymap); i++)
-		if (keymap[i].key == key)
-			return keymap[i].code;
-	return 0;
-}
+static struct wpe_view_backend *wpe_backend;
 
-/* KeyboardEvent cannot be constructed with a keyCode, HbbTV apps read only that */
-static void send_key(int code, gboolean pressed)
+static void send_key(size_t i, gboolean pressed)
 {
 	char script[512];
+	int code = keymap[i].code;
 
+	if (keymap[i].sym) {
+		struct wpe_input_keyboard_event event = {
+			.time = g_get_monotonic_time() / 1000,
+			.key_code = keymap[i].sym,
+			.hardware_key_code = keymap[i].key + 8,
+			.pressed = pressed,
+		};
+		wpe_view_backend_dispatch_keyboard_event(wpe_backend, &event);
+		return;
+	}
+	/* KeyboardEvent cannot be constructed with a keyCode, HbbTV apps read only that */
 	snprintf(script, sizeof(script),
 		"(function(){var t=document.activeElement||document.body||document;"
 		"var e=new KeyboardEvent('%s',{bubbles:true,cancelable:true});"
@@ -91,8 +101,13 @@ static gboolean test_key(gpointer data)
 {
 	int code = GPOINTER_TO_INT(data);
 
-	send_key(code, TRUE);
-	send_key(code, FALSE);
+	for (size_t i = 0; i < G_N_ELEMENTS(keymap); i++) {
+		if (keymap[i].code == code) {
+			send_key(i, TRUE);
+			send_key(i, FALSE);
+			break;
+		}
+	}
 	return G_SOURCE_REMOVE;
 }
 
@@ -126,11 +141,15 @@ static gboolean input_cb(GIOChannel *channel, GIOCondition cond, gpointer data)
 				g_main_loop_quit(loop);
 			continue;
 		}
-		int code = vk_code(ev.code);
-		if (debug)
-			fprintf(stderr, "neutrino-hbbtv: key %u %s -> %d\n", ev.code, ev.value ? "down" : "up", code);
-		if (code)
-			send_key(code, ev.value != 0);
+		for (size_t i = 0; i < G_N_ELEMENTS(keymap); i++) {
+			if (keymap[i].key != ev.code)
+				continue;
+			if (debug)
+				fprintf(stderr, "neutrino-hbbtv: key %u %s -> %d%s\n", ev.code, ev.value ? "down" : "up",
+					keymap[i].code, keymap[i].sym ? " (key event)" : "");
+			send_key(i, ev.value != 0);
+			break;
+		}
 	}
 	return G_SOURCE_CONTINUE;
 }
@@ -328,7 +347,8 @@ int main(int argc, char **argv)
 
 	loop = g_main_loop_new(NULL, FALSE);
 
-	WebKitWebViewBackend *backend = webkit_web_view_backend_new(wpe_view_backend_create(), NULL, NULL);
+	wpe_backend = wpe_view_backend_create();
+	WebKitWebViewBackend *backend = webkit_web_view_backend_new(wpe_backend, NULL, NULL);
 	WebKitSettings *settings = webkit_settings_new_with_settings(
 		"user-agent", USER_AGENT,
 		"enable-page-cache", FALSE,
