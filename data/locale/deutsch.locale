@@ -1200,6 +1200,7 @@ keybindingmenu.channellist Kanalliste
 keybindingmenu.channelup Kanal hoch
 keybindingmenu.edit Tastenbelegungen bearbeiten
 keybindingmenu.favorites Favoriten
+keybindingmenu.hbbtv_red Rot startet HbbTV
 keybindingmenu.head Tastenbelegungen
 keybindingmenu.lastchannel Letzter Kanal
 keybindingmenu.longkeypress_duration Langer Tastendruck
@@ -1570,6 +1571,7 @@ menu.hint_key_channelup Weisen Sie eine Taste für das Hochschalten in der Kanal
 menu.hint_key_favorites Weisen Sie eine Taste für das Anzeigen der Favoriten zu
 menu.hint_key_format_mode_active Die Taste für das Videoformat deaktivieren/aktivieren
 menu.hint_key_hardware Definieren Sie, welche Fernbedienung Sie verwenden möchten. Die Bestätigung erfolgt mit der Ausgewählten
+menu.hint_key_hbbtv_red Die rote Taste startet die HbbTV-Anwendung des Senders, sofern er eine hat; sonst tut sie, was ihr zugewiesen ist
 menu.hint_key_history Definieren Sie eine Taste für das Anzeigen der letzten Programme, die Sie schauten
 menu.hint_key_lastchannel Definieren Sie eine Taste, die in den vorher eingestellten Kanal zurückschaltet
 menu.hint_key_left_exit Weisen Sie der Taste 'links' das Wechseln in das vorherige Menü zu

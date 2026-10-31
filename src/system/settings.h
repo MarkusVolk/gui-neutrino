@@ -1382,6 +1382,7 @@ struct SNeutrinoSettings
 
 	// key options
 	int bouquetlist_mode;
+	int hbbtv_red_key;
 	int menu_left_exit;
 	int repeat_blocker;
 	int repeat_genericblocker;

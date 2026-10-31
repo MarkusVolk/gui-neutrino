@@ -1200,6 +1200,7 @@ keybindingmenu.channellist Channellist
 keybindingmenu.channelup channel up
 keybindingmenu.edit Edit keybindings
 keybindingmenu.favorites Favorites
+keybindingmenu.hbbtv_red Red starts HbbTV
 keybindingmenu.head Keybindings
 keybindingmenu.lastchannel Quick zap
 keybindingmenu.longkeypress_duration Long key-press
@@ -1570,6 +1571,7 @@ menu.hint_key_channelup Assign button for fast switch to next\nchannel in channe
 menu.hint_key_favorites Assign button to show favorites
 menu.hint_key_format_mode_active Disable/enable key for the video format conversion
 menu.hint_key_hardware Change remote control type
+menu.hint_key_hbbtv_red The red key starts the HbbTV application of the channel, if it has one; otherwise it does what it is set to
 menu.hint_key_history Assign button to show channel\nchannel switch history
 menu.hint_key_lastchannel Assign button for fast zap to\nprevious channel in history
 menu.hint_key_left_exit Allow return to previous menu with 'left' key

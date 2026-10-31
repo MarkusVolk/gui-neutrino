@@ -82,6 +82,7 @@
 #ifdef ENABLE_GRAPHLCD
 #include "gui/glcdthemes.h"
 #endif
+#include "gui/hbbtv.h"
 #include "gui/hdd_menu.h"
 #include "gui/infoviewer.h"
 #include "gui/mediaplayer.h"
@@ -3838,6 +3839,9 @@ void CNeutrinoApp::RealRun()
 			else if ((mode == NeutrinoModes::mode_webtv) && msg == (neutrino_msg_t) g_settings.mpkey_subtitle) {
 				CMoviePlayerGui::getInstance(true).selectSubtitle();
 			}
+			/* red starts the channel's HbbTV application, like a TV set */
+			else if (msg == CRCInput::RC_red && g_settings.hbbtv_red_key && CHbbtv::startAutostart()) {
+			}
 			/* after sensitive key bind, check user menu */
 			else if (usermenu.showUserMenu(msg)) {
 			}
@@ -6495,6 +6499,7 @@ void CNeutrinoApp::loadKeys(const char *fname)
 
 	// key options
 	g_settings.bouquetlist_mode = tconfig->getInt32("bouquetlist_mode", SNeutrinoSettings::CHANNELLIST);
+	g_settings.hbbtv_red_key = tconfig->getInt32("hbbtv_red_key", 1);
 	g_settings.menu_left_exit = tconfig->getInt32("menu_left_exit", 0);
 	g_settings.repeat_blocker = tconfig->getInt32("repeat_blocker", 450);
 	g_settings.repeat_genericblocker = tconfig->getInt32("repeat_genericblocker", 100);
@@ -6590,6 +6595,7 @@ void CNeutrinoApp::saveKeys(const char *fname)
 
 	// key options
 	tconfig->setInt32("bouquetlist_mode", g_settings.bouquetlist_mode);
+	tconfig->setInt32("hbbtv_red_key", g_settings.hbbtv_red_key);
 	tconfig->setInt32("menu_left_exit", g_settings.menu_left_exit);
 	tconfig->setInt32("repeat_blocker", g_settings.repeat_blocker);
 	tconfig->setInt32("repeat_genericblocker", g_settings.repeat_genericblocker);

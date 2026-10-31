@@ -41,6 +41,7 @@
 #include <neutrino.h>
 #include <neutrino_menue.h>
 
+#include <gui/hbbtv.h>
 #include <gui/widget/icons.h>
 #include <gui/widget/menue_options.h>
 #include <gui/widget/msgbox.h>
@@ -438,6 +439,12 @@ void CKeybindSetup::showKeyBindSetup(CMenuWidget *bindSettings)
 
 	// misc
 	bindSettings->addItem(new CMenuSeparator(CMenuSeparator::LINE | CMenuSeparator::STRING, LOCALE_KEYBINDINGMENU_MISC));
+	if (CHbbtv::available())
+	{
+		mc = new CMenuOptionChooser(LOCALE_KEYBINDINGMENU_HBBTV_RED, &g_settings.hbbtv_red_key, OPTIONS_OFF0_ON1_OPTIONS, OPTIONS_OFF0_ON1_OPTION_COUNT, true);
+		mc->setHint("", LOCALE_MENU_HINT_KEY_HBBTV_RED);
+		bindSettings->addItem(mc);
+	}
 	//bindSettings->addItem(new CMenuForwarder(keydescription[NKEY_PLUGIN], true, NULL, keychooser[NKEY_PLUGIN]));
 
 	// special keys
