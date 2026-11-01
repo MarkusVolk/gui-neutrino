@@ -705,7 +705,14 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 
 			CVFD::getInstance()->setMode(CVFD::MODE_MENU_UTF8);
 			CVFD::getInstance()->showMenuText(0, "ofgwrite Flashing Tool", -1, true);
-			if (my_system(4, ofgwrite_caller.c_str(), unpack_dir.c_str(), filename.c_str(), ofgwrite_options.c_str()) != 0)
+			/* ofgwrite draws its progress itself; Neutrino must not paint over it */
+			CFrameBuffer *fb = CFrameBuffer::getInstance();
+			unsigned int xres = fb->getScreenWidth(true), yres = fb->getScreenHeight(true);
+			fb->setDisplayHandedOver(true);
+			int ret = my_system(4, ofgwrite_caller.c_str(), unpack_dir.c_str(), filename.c_str(), ofgwrite_options.c_str());
+			fb->setDisplayHandedOver(false);
+			fb->setMode(xres, yres, 32);
+			if (ret != 0)
 			{
 				dprintf(DEBUG_NORMAL, "[update] %s failed\n", ofgwrite_caller.c_str());
 				DisplayErrorMessage(g_Locale->getText(LOCALE_FLASHUPDATE_OFGWRITE_FAILED));
