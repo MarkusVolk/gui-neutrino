@@ -176,7 +176,6 @@ int CNetworkSetup::exec(CMenuTarget *parent, const std::string &actionKey)
 
 void CNetworkSetup::readNetworkSettings()
 {
-	network_automatic_start = networkConfig->automatic_start;
 	network_dhcp 		= networkConfig->inet_static ? NETWORK_DHCP_OFF : NETWORK_DHCP_ON;
 
 	network_address		= networkConfig->address;
@@ -190,7 +189,6 @@ void CNetworkSetup::readNetworkSettings()
 
 void CNetworkSetup::backupNetworkSettings()
 {
-	old_network_automatic_start 	= networkConfig->automatic_start;
 	old_network_dhcp 		= networkConfig->inet_static ? NETWORK_DHCP_OFF : NETWORK_DHCP_ON;
 
 	old_network_address		= networkConfig->address;
@@ -347,14 +345,6 @@ int CNetworkSetup::showNetworkSetup()
 	//hostname
 	CKeyboardInput networkSettings_Hostname(LOCALE_NETWORKMENU_HOSTNAME, &network_hostname, 0, NULL, NULL, LOCALE_NETWORKMENU_HOSTNAME_HINT1, LOCALE_NETWORKMENU_HOSTNAME_HINT2);
 
-	//auto start
-	CMenuOptionChooser *o1 = NULL;
-	if (networkConfig->hasAutomaticStart())
-	{
-		o1 = new CMenuOptionChooser(LOCALE_NETWORKMENU_SETUPONSTARTUP, &network_automatic_start, OPTIONS_OFF0_ON1_OPTIONS, OPTIONS_OFF0_ON1_OPTION_COUNT, can_configure);
-		o1->setHint("", LOCALE_MENU_HINT_NET_SETUPONSTARTUP);
-	}
-
 	//dhcp
 	network_dhcp 	= networkConfig->inet_static ? NETWORK_DHCP_OFF : NETWORK_DHCP_ON;
 
@@ -383,8 +373,6 @@ int CNetworkSetup::showNetworkSetup()
 	CMenuOptionChooser *o2 = new CMenuOptionChooser(LOCALE_NETWORKMENU_DHCP, &network_dhcp, OPTIONS_OFF0_ON1_OPTIONS, OPTIONS_OFF0_ON1_OPTION_COUNT, can_configure, this);
 	o2->setHint("", LOCALE_MENU_HINT_NET_DHCP);
 
-	if (o1)
-		configEnable.Add(o1);
 	configEnable.Add(o2);
 	configEnable.Add(m8);
 
@@ -418,8 +406,6 @@ int CNetworkSetup::showNetworkSetup()
 	else
 		delete ifSelect;
 
-	if (o1)
-		networkSettings->addItem(o1);	//set on start
 	networkSettings->addItem(GenericMenuSeparatorLine);
 	//------------------------------------------------
 	{
@@ -674,7 +660,6 @@ bool CNetworkSetup::checkIntSettings()
 {
 	n_isettings_t n_isettings[]	=
 	{
-		{old_network_automatic_start, 	network_automatic_start},
 		{old_network_dhcp, 		network_dhcp		}
 	};
 	for (uint i = 0; i < (sizeof(n_isettings) / sizeof(n_isettings[0])); i++)
@@ -730,7 +715,6 @@ bool CNetworkSetup::settingsChanged()
 //prepares internal settings before commit
 void CNetworkSetup::prepareSettings()
 {
-	networkConfig->automatic_start 	= (network_automatic_start == 1);
 	networkConfig->inet_static 	= (network_dhcp ? false : true);
 	networkConfig->address 		= network_address;
 	networkConfig->netmask 		= network_netmask;
@@ -850,7 +834,6 @@ void CNetworkSetup::restoreNetworkSettings()
 
 	mac_addr			= networkConfig->mac_addr;
 
-	network_automatic_start		= old_network_automatic_start;
 	network_dhcp			= old_network_dhcp;
 	network_address			= old_network_address;
 	network_netmask			= old_network_netmask;
@@ -859,7 +842,6 @@ void CNetworkSetup::restoreNetworkSettings()
 	network_gateway			= old_network_gateway;
 	network_hostname		= old_network_hostname;
 
-	networkConfig->automatic_start 	= network_automatic_start;
 	networkConfig->inet_static 	= (network_dhcp ? false : true);
 	networkConfig->address 		= network_address;
 	networkConfig->netmask 		= network_netmask;

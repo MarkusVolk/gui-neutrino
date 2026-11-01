@@ -227,11 +227,6 @@ bool CNetworkConfig::canConfigure(void)
 	return !other_file_wins(ifname);
 }
 
-bool CNetworkConfig::hasAutomaticStart(void)
-{
-	return false;
-}
-
 static void read_iwd_profile(const std::string &file, std::string &address, std::string &netmask, std::string &gateway, std::string &nameserver)
 {
 	std::ifstream in(file.c_str());
@@ -319,7 +314,6 @@ static std::string iwd_profile_content(const std::string &file, const std::strin
 void CNetworkConfig::backendRead(void)
 {
 	inet_static = false;
-	automatic_start = true;
 
 	if (is_wireless(ifname) && iwd_configures_network())
 	{

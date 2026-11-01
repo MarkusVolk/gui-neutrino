@@ -86,7 +86,6 @@ private:
 	CScanSettings			scanSettings;
 	CPersonalizeGui			personalize;
 	int                             network_dhcp;
-	int                             network_automatic_start;
 
 	int				mode;
 	int				lastMode;

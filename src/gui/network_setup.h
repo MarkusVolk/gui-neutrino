@@ -49,7 +49,6 @@ class CNetworkSetup : public CMenuTarget, CChangeObserver
 		bool settings_written;
 
 		int network_dhcp;
-		int network_automatic_start;
 		std::string network_address;
 		std::string network_netmask;
 		std::string network_broadcast;
@@ -60,7 +59,6 @@ class CNetworkSetup : public CMenuTarget, CChangeObserver
 		std::string mac_addr;
 
 		int old_network_dhcp;
-		int old_network_automatic_start;
 		std::string old_network_address;
 		std::string old_network_netmask;
 		std::string old_network_broadcast;

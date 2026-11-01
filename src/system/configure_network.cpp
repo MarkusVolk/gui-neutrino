@@ -36,9 +36,7 @@ CNetworkConfig::CNetworkConfig()
 {
 	netGetNameserver(nameserver);
 	ifname = "eth0";
-	orig_automatic_start = false;
 	orig_inet_static = false;
-	automatic_start = false;
 	inet_static = false;
 	wireless = false;
 }
@@ -126,7 +124,6 @@ void CNetworkConfig::init_vars(void)
 
 void CNetworkConfig::copy_to_orig(void)
 {
-	orig_automatic_start = automatic_start;
 	orig_address         = address;
 	orig_netmask         = netmask;
 	orig_broadcast       = broadcast;
@@ -140,8 +137,6 @@ void CNetworkConfig::copy_to_orig(void)
 bool CNetworkConfig::modified_from_orig(void)
 {
 #ifdef DEBUG
-		if(orig_automatic_start != automatic_start)
-			printf("CNetworkConfig::modified_from_orig: automatic_start changed\n");
 		if(orig_address         != address        )
 			printf("CNetworkConfig::modified_from_orig: address changed\n");
 		if(orig_netmask         != netmask        )
@@ -167,24 +162,11 @@ bool CNetworkConfig::modified_from_orig(void)
 			return 1;
 	}
 	return (
-		(orig_automatic_start != automatic_start) ||
 		(orig_hostname        != hostname       ) ||
 		(orig_inet_static     != inet_static    ) ||
 		(orig_ifname	      != ifname)
 		);
 
-#if 0
-	return (
-		(orig_automatic_start != automatic_start) ||
-		(orig_address         != address        ) ||
-		(orig_netmask         != netmask        ) ||
-		(orig_broadcast       != broadcast      ) ||
-		(orig_gateway         != gateway        ) ||
-		(orig_hostname        != hostname       ) ||
-		(orig_inet_static     != inet_static    ) ||
-		(orig_ifname	      != ifname)
-		);
-#endif
 }
 
 bool CNetworkConfig::commitConfig(void)

@@ -27,7 +27,6 @@
 class CNetworkConfig
 {
  private:
-	bool        orig_automatic_start;
 	std::string orig_address;
 	std::string orig_netmask;
 	std::string orig_broadcast;
@@ -46,7 +45,6 @@ class CNetworkConfig
 	void waitForAddress(void);
 
  public:
-	bool        automatic_start;
 	std::string address;
 	std::string netmask;
 	std::string broadcast;
@@ -81,7 +79,6 @@ class CNetworkConfig
 	 * connected to a network iwd knows */
 	bool canConfigure(void);
 	/* the backend knows an interface that is configured but not started at boot */
-	bool hasAutomaticStart(void);
 
 	static bool validHostname(const std::string &name);
 	static bool validAddress(const std::string &address);

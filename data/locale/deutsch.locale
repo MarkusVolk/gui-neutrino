@@ -1722,7 +1722,6 @@ menu.hint_net_proxypass Geben Sie ihr Passwort für den Proxy-Server ein, wenn e
 menu.hint_net_proxyserver Geben Sie den Namen des Proxy-Servers ein
 menu.hint_net_proxyuser Geben Sie ihren Benutzernamen für den Proxy-Server ein, wenn es erforderlich ist
 menu.hint_net_services Konfigurieren Sie Netzwerk-Dienste wie Telnet, FTP und UPnP
-menu.hint_net_setuponstartup Startet das Netzwerk automatisch beim Starten der Box
 menu.hint_net_show Zeigen Ihnen die aktuellen Netzwerkeinstellungen
 menu.hint_net_ssid Geben Sie die SSID des WLAN ein, mit dem Sie eine Verbindung herstellen möchten
 menu.hint_net_ssid_scan Nach verfügbaren WLAN-Netzwerken suchen
@@ -2437,7 +2436,6 @@ networkmenu.password Passwort (PSK)
 networkmenu.reset_settings_now Sollen die vorherigen Einstellungen \nwieder hergestellt werden?
 networkmenu.select_if Schnittstelle
 networkmenu.services Netzwerkservice
-networkmenu.setuponstartup Schnittstelle beim Start aktivieren
 networkmenu.show Aktive Einstellungen zeigen
 networkmenu.ssid Netzwerkname (SSID)
 networkmenu.ssid_scan WLAN-Netzwerke suchen

@@ -85,13 +85,9 @@ bool CNetworkConfig::canConfigure(void)
 	return !systemManaged();
 }
 
-bool CNetworkConfig::hasAutomaticStart(void)
-{
-	return true;
-}
-
 void CNetworkConfig::backendRead(void)
 {
+	bool automatic_start;
 	inet_static = getInetAttributes(ifname, automatic_start, address, netmask, broadcast, gateway);
 }
 
@@ -106,7 +102,7 @@ bool CNetworkConfig::backendCommit(bool modified, bool nameserver_changed)
 		if (inet_static)
 		{
 			if (validAddress(address) && validAddress(netmask) && (gateway.empty() || validAddress(gateway)))
-				ok = setStaticAttributes(ifname, automatic_start, address, netmask, broadcast, gateway, wpa_conf) && ok;
+				ok = setStaticAttributes(ifname, true, address, netmask, broadcast, gateway, wpa_conf) && ok;
 			else
 			{
 				printf("CNetworkConfig::commitConfig: invalid address, %s not written\n", ifname.c_str());
@@ -114,7 +110,7 @@ bool CNetworkConfig::backendCommit(bool modified, bool nameserver_changed)
 			}
 		}
 		else
-			ok = setDhcpAttributes(ifname, automatic_start, wpa_conf) && ok;
+			ok = setDhcpAttributes(ifname, true, wpa_conf) && ok;
 		if (!ok)
 			printf("CNetworkConfig::commitConfig: /etc/network/interfaces not written\n");
 
