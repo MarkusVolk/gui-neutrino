@@ -1,13 +1,14 @@
 # sourced by the flash scripts: where a slot of a multiboot box lives
 
 # DEV and SUB of the slot whose kernel command line is in $1: /proc/cmdline
-# for the slot running, /boot/STARTUP_<n> for slot n
+# for the slot running, the STARTUP file of slot n; the HD60's has it in
+# bootargs=root=...
 slot_of()
 {
 	DEV=; SUB=
 	for i in $(tr "'" ' ' < "$1"); do
 		case "$i" in
-			root=*) DEV=${i#root=} ;;
+			root=*|*=root=*) DEV=${i#*root=} ;;
 			rootsubdir=*) SUB=${i#rootsubdir=} ;;
 		esac
 	done
