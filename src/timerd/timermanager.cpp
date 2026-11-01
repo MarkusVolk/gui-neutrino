@@ -109,6 +109,15 @@ static void timerWait(const struct timespec *abstime)
 	pthread_cleanup_pop(1);
 }
 
+/* lets the timer thread start its next round now */
+static void timerWakeup()
+{
+	pthread_mutex_lock(&dummy_mutex);
+	timer_wakeup = true;
+	pthread_cond_signal(&dummy_cond);
+	pthread_mutex_unlock(&dummy_mutex);
+}
+
 //------------------------------------------------------------
 /* the times a recording's programme takes, without its safety times */
 static void programmeTimes(const CTimerEvent_Record *r, int pre, int post, time_t &from, time_t &to)
@@ -387,12 +396,7 @@ int CTimerManager::addEvent(CTimerEvent* evt, bool save)
 	bool due = (evt->announceTime > 0 && evt->announceTime <= now) || (evt->alarmTime > 0 && evt->alarmTime <= now);
 	pthread_mutex_unlock(&tm_eventsMutex);
 	if (due)
-	{
-		pthread_mutex_lock(&dummy_mutex);
-		timer_wakeup = true;
-		pthread_cond_signal(&dummy_cond);
-		pthread_mutex_unlock(&dummy_mutex);
-	}
+		timerWakeup();
 	return eventID;					// return unique id
 }
 
@@ -412,6 +416,9 @@ bool CTimerManager::removeEvent(int peventID)
 	else
 		res = false;
 	pthread_mutex_unlock(&tm_eventsMutex);
+	/* a timer that is over leaves the list at once, not up to a round later */
+	if (res)
+		timerWakeup();
 	return res;
 }
 //------------------------------------------------------------
@@ -430,6 +437,8 @@ bool CTimerManager::stopEvent(int peventID)
 	else
 		res = false;
 	pthread_mutex_unlock(&tm_eventsMutex);
+	if (res)
+		timerWakeup();
 	return res;
 }
 
