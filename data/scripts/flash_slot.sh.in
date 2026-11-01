@@ -1,0 +1,34 @@
+# sourced by the flash scripts: where a slot of a multiboot box lives
+
+# DEV and SUB of the slot whose kernel command line is in $1: /proc/cmdline
+# for the slot running, /boot/STARTUP_<n> for slot n
+slot_of()
+{
+	DEV=; SUB=
+	for i in $(tr "'" ' ' < "$1"); do
+		case "$i" in
+			root=*) DEV=${i#root=} ;;
+			rootsubdir=*) SUB=${i#rootsubdir=} ;;
+		esac
+	done
+	[ -n "$DEV" ] && [ -n "$SUB" ]
+}
+
+# ROOT, where the partition DEV holding the slot directories is mounted;
+# mounted below /mnt when no fstab entry did (ofgwrite cannot move mounts
+# below /tmp), slot_done unmounts it again
+slot_root()
+{
+	ROOT=$(awk -v d="$DEV" '$1 == d && $2 != "/" { print $2; exit }' /proc/mounts)
+	[ -n "$ROOT" ] && return 0
+	ROOT=/mnt/slot-${DEV##*/}
+	mkdir -p "$ROOT" && mount "$DEV" "$ROOT" && SLOT_MOUNTS="$SLOT_MOUNTS $ROOT"
+}
+
+slot_done()
+{
+	for m in $SLOT_MOUNTS; do
+		umount "$m" && rmdir "$m"
+	done
+	SLOT_MOUNTS=
+}

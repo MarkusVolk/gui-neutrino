@@ -846,6 +846,7 @@ flashupdate.namemode2_default <partition>+<time>.img
 flashupdate.namemode2_hostname_time <partition>+<time>+<hostname>.img
 flashupdate.new_found New image found !
 flashupdate.new_notfound No new images found
+flashupdate.no_room Partition %d has no room for this image. Nothing was written.
 flashupdate.noversion Version check is only supported via online updates.\nAre you sure that you want to continue?
 flashupdate.ofgwrite_failed ofgwrite could not write the image. The box keeps starting the partition running.
 flashupdate.overwrite_partition Partition %d is overwritten.\n\nContinue?

@@ -873,6 +873,7 @@ const char * locale_real_names[] =
 	"flashupdate.namemode2_hostname_time",
 	"flashupdate.new_found",
 	"flashupdate.new_notfound",
+	"flashupdate.no_room",
 	"flashupdate.noversion",
 	"flashupdate.ofgwrite_failed",
 	"flashupdate.overwrite_partition",

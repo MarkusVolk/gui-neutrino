@@ -1,17 +1,11 @@
 #!/bin/sh
-# keeps the settings for the image flashed into slot $1 beside the slot
-# directories, where ofgwrite leaves them; restore_flash.sh puts them back
-# at the first start of that image
+# keeps the settings for the image flashed into the slot of the STARTUP
+# file $1 beside its slot directory, where ofgwrite leaves them;
+# restore_flash.sh puts them back at the first start of that image
 
-for i in $(cat /proc/cmdline); do
-	case "$i" in
-		root=*) DEV=${i#root=} ;;
-		rootsubdir=*) SUB=${i#rootsubdir=} ;;
-	esac
-done
-ROOT=$(awk -v d="$DEV" '$1 == d && $2 != "/" { print $2; exit }' /proc/mounts)
-[ -n "$1" ] && [ -n "$SUB" ] && [ -n "$ROOT" ] || exit 1
-BAKF="$ROOT/.neutrino-restore-$(echo "$SUB" | sed 's/[0-9]*$//')$1.tar.gz"
+. "$(dirname "$0")/flash_slot.sh"
+slot_of "$1" && slot_root || exit 1
+BAKF="$ROOT/.neutrino-restore-$SUB.tar.gz"
 
 TOBACKUP="@CONFIGDIR@ /etc/ssh/ssh_host_*"
 [ -e "@CONFIGDIR@/tobackup.conf" ] && TOBACKUP="$TOBACKUP $(sed 's/#.*//' "@CONFIGDIR@/tobackup.conf")"
@@ -23,3 +17,6 @@ done
 
 echo "Backup to $BAKF"
 tar -czf "$BAKF" $RES
+RET=$?
+slot_done
+exit $RET

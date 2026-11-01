@@ -1,20 +1,14 @@
 #!/bin/sh
 # puts back the settings backup_flash.sh kept for the slot running
 
-for i in $(cat /proc/cmdline); do
-	case "$i" in
-		root=*) DEV=${i#root=} ;;
-		rootsubdir=*) SUB=${i#rootsubdir=} ;;
-	esac
-done
-[ -n "$SUB" ] || exit 0
-ROOT=$(awk -v d="$DEV" '$1 == d && $2 != "/" { print $2; exit }' /proc/mounts)
-[ -n "$ROOT" ] || exit 0
+. "$(dirname "$0")/flash_slot.sh"
+slot_of /proc/cmdline && slot_root || exit 0
 # the image ofgwrite_caller unpacked for the update of this slot
 rm -rf "$ROOT/.ofgwrite"
 BAKF="$ROOT/.neutrino-restore-$SUB.tar.gz"
-[ -e "$BAKF" ] || exit 0
-
-echo "Restore settings from $BAKF"
-tar -xzf "$BAKF" -C / && rm -f "$BAKF"
-sync
+if [ -e "$BAKF" ]; then
+	echo "Restore settings from $BAKF"
+	tar -xzf "$BAKF" -C / && rm -f "$BAKF"
+	sync
+fi
+slot_done

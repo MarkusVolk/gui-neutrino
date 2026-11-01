@@ -846,6 +846,7 @@ flashupdate.namemode2_default <Partition>+<Zeit>.img
 flashupdate.namemode2_hostname_time <Partition>+<Zeit>+<Hostname>.img
 flashupdate.new_found Updates verfügbar!
 flashupdate.new_notfound Keine Updates verfügbar!
+flashupdate.no_room Partition %d hat keinen Platz für dieses Image. Es wurde nichts geschrieben.
 flashupdate.noversion Die Versionsüberprüfung ist nur bei Online-Aktualisierungen möglich.\nTrotzdem fortfahren?
 flashupdate.ofgwrite_failed ofgwrite konnte das Image nicht schreiben. Die Box startet weiter die laufende Partition.
 flashupdate.overwrite_partition Partition %d wird überschrieben.\n\nFortfahren?

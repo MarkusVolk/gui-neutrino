@@ -1,21 +1,29 @@
 #!/bin/sh
-# flashes the image file $2 with ofgwrite and its options $3. It is
+# flashes the image file $2 with ofgwrite into slot $3, whose STARTUP file
+# is $4, and with $5 = settings keeps the settings for it. The image is
 # unpacked beside the slot directories, which is faster than a stick and
-# where restore_flash.sh removes it, or else into $1. ofgwrite does not
-# come back when it flashes the slot running: it stops Neutrino, writes
-# from RAM and restarts the box
+# where restore_flash.sh removes it, or into $1 when there is no room.
+# ofgwrite does not come back when it flashes the slot running: it stops
+# Neutrino, writes from RAM and restarts the box.
+# Exit 2: the slot's partition has no room for the image.
 
-for i in $(cat /proc/cmdline); do
-	case "$i" in
-		root=*) DEV=${i#root=} ;;
-		rootsubdir=*) SUB=${i#rootsubdir=} ;;
-	esac
-done
-ROOT=$(awk -v d="$DEV" '$1 == d && $2 != "/" { print $2; exit }' /proc/mounts)
-[ -n "$SUB" ] && [ -n "$ROOT" ] && DIR="$ROOT/.ofgwrite" || DIR="$1/.ofgwrite"
+. "$(dirname "$0")/flash_slot.sh"
+kb() { [ -e "$1" ] && du -sk "$1" | cut -f1 || echo 0; }
+free_kb() { df -Pk "$1" | awk 'NR == 2 { print $4 }'; }
+
+DIR="$1/.ofgwrite"
+OWN=0
+if slot_of /proc/cmdline && slot_root; then
+	RDEV=$DEV; RSUB=$SUB
+	[ "$(free_kb "$ROOT")" -gt $(( $(kb "$2") * 2 )) ] && DIR="$ROOT/.ofgwrite"
+fi
+slot_of "$4" || exit 1
+[ "$DEV" = "$RDEV" ] && [ "$SUB" = "$RSUB" ] && OWN=1
+
+finish() { [ $OWN = 1 ] && [ "$1" = 0 ] || rm -rf "$DIR"; slot_done; exit $1; }
 
 rm -rf "$DIR"
-mkdir -p "$DIR" || exit 1
+mkdir -p "$DIR" || finish 1
 case "$2" in
 	*.zip) unzip -o -q "$2" -d "$DIR" ;;
 	*) tar -xzf "$2" -C "$DIR" ;;
@@ -23,11 +31,23 @@ esac
 IMG=$(find "$DIR" -name rootfs.tar.bz2 | head -n 1)
 if [ -z "$IMG" ]; then
 	echo "no rootfs.tar.bz2 in $2"
-	rm -rf "$DIR"
-	exit 1
+	finish 1
 fi
 
-ofgwrite $3 "$(dirname "$IMG")"
-RET=$?
-[ "${3#-m}" = "$(echo "$SUB" | sed 's/.*[^0-9]//')" ] || rm -rf "$DIR"
-exit $RET
+# ofgwrite deletes the slot directory first and stops where the
+# partition runs full, which leaves the slot without a system
+slot_root || finish 1
+ROOM=$(( $(free_kb "$ROOT") + $(kb "$ROOT/$SUB") ))
+if [ $ROOM -lt $(( $(kb "$IMG") * 4 )) ]; then
+	NEED=$(( $(bunzip2 -c "$IMG" | wc -c) / 1024 * 21 / 20 ))
+	if [ $ROOM -lt $NEED ]; then
+		echo "slot $3 needs $NEED KB, $ROOM KB are there"
+		finish 2
+	fi
+fi
+
+if [ "$5" = settings ]; then
+	"$(dirname "$0")/backup_flash.sh" "$4" || finish 1
+fi
+ofgwrite -m"$3" "$(dirname "$IMG")"
+finish $?

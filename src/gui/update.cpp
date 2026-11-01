@@ -661,8 +661,8 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 
 		int restart = CMsgBox::mbNo;
 
-		std::string ofgwrite_options("");
 		bool own = selected > 0 && strcmp(c, to_string(selected).c_str()) == 0;
+		std::string startup_new = std::string("/boot/") + g_info.hw_caps->startup_file + "_" + to_string(selected);
 		if (selected > 0)
 		{
 			/* the last chance to keep the partition; for the own one ofgwrite
@@ -671,20 +671,9 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 			snprintf(question, sizeof(question), g_Locale->getText(LOCALE_FLASHUPDATE_OVERWRITE_PARTITION), selected);
 			flashing = ShowMsg(LOCALE_MESSAGEBOX_INFO, own ? g_Locale->getText(LOCALE_FLASHUPDATE_OWN_PARTITION) : question,
 					   CMsgBox::mbrNo, CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_UPDATE) == CMsgBox::mbrYes;
-			ofgwrite_options = "-m" + to_string(selected);
-			dprintf(DEBUG_NORMAL, "[update] ofgwrite_options: %s\n", ofgwrite_options.c_str());
 		}
 		if (flashing && !own)
 			restart = ShowMsg(LOCALE_MESSAGEBOX_INFO, LOCALE_FLASHUPDATE_START_SELECTED_PARTITION, CMsgBox::mbrYes, CMsgBox::mbYes | CMsgBox::mbNo, NEUTRINO_ICON_UPDATE);
-		if (flashing && copy_settings == CMsgBox::mbrYes)
-		{
-			/* kept beside the slot directories, the new image puts them back at its first start */
-			CHintBox hintBox(LOCALE_MESSAGEBOX_INFO, LOCALE_SETTINGS_BACKUP);
-			hintBox.paint();
-			std::string backup_sh = find_executable("backup_flash.sh");
-			my_system(2, backup_sh.c_str(), to_string(selected).c_str());
-			hintBox.hide();
-		}
 		if (flashing)
 			ShowHint(LOCALE_MESSAGEBOX_INFO, LOCALE_FLASHUPDATE_START_OFGWRITE);
 		hide();
@@ -692,7 +681,9 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 		/* where ofgwrite_caller unpacks without slot directories: /tmp in RAM is too small */
 		std::string unpack_dir = getPathName(filename);
 		std::string ofgwrite_caller = find_executable("ofgwrite_caller");
-		dprintf(DEBUG_NORMAL, "[update] calling %s %s %s %s\n", ofgwrite_caller.c_str(), unpack_dir.c_str(), filename.c_str(), ofgwrite_options.c_str());
+		/* the settings are kept beside the slot directory, the new image puts them back at its first start */
+		const char *settings = copy_settings == CMsgBox::mbrYes ? "settings" : "";
+		dprintf(DEBUG_NORMAL, "[update] calling %s %s %s %d %s %s\n", ofgwrite_caller.c_str(), unpack_dir.c_str(), filename.c_str(), selected, startup_new.c_str(), settings);
 #ifndef DRYRUN
 		if (flashing)
 		{
@@ -709,13 +700,18 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 			CFrameBuffer *fb = CFrameBuffer::getInstance();
 			unsigned int xres = fb->getScreenWidth(true), yres = fb->getScreenHeight(true);
 			fb->setDisplayHandedOver(true);
-			int ret = my_system(4, ofgwrite_caller.c_str(), unpack_dir.c_str(), filename.c_str(), ofgwrite_options.c_str());
+			int ret = my_system(6, ofgwrite_caller.c_str(), unpack_dir.c_str(), filename.c_str(), to_string(selected).c_str(), startup_new.c_str(), settings);
 			fb->setDisplayHandedOver(false);
 			fb->setMode(xres, yres, 32);
 			if (ret != 0)
 			{
 				dprintf(DEBUG_NORMAL, "[update] %s failed\n", ofgwrite_caller.c_str());
-				DisplayErrorMessage(g_Locale->getText(LOCALE_FLASHUPDATE_OFGWRITE_FAILED));
+				if (ret == 2) {
+					char msg[256];
+					snprintf(msg, sizeof(msg), g_Locale->getText(LOCALE_FLASHUPDATE_NO_ROOM), selected);
+					DisplayErrorMessage(msg);
+				} else
+					DisplayErrorMessage(g_Locale->getText(LOCALE_FLASHUPDATE_OFGWRITE_FAILED));
 				return menu_return::RETURN_REPAINT;
 			}
 		}
@@ -732,7 +728,6 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 		{
 			if (g_settings.hdmi_cec_standby)
 				videoDecoder->SetCECMode((VIDEO_HDMI_CEC_MODE)0);
-			std::string startup_new = std::string("/boot/") + g_info.hw_caps->startup_file + "_" + to_string(selected);
 			dprintf(DEBUG_NORMAL, "[update] Start selected partition %d (%s)\n", selected, startup_new.c_str());
 			CFileHelpers fh;
 			fh.copyFile(startup_new.c_str(), "/boot/STARTUP");
