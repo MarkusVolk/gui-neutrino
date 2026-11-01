@@ -418,6 +418,10 @@ void CHbbtv::run(const CAitApp &ait_app, t_channel_id id, const std::string &cha
 	g_RCInput->clearRCMsg();
 	g_RCInput->stopInput();
 	fb->setDisplayHandedOver(true);
+	/* applications lay out for 1280x720: the browser draws that many pixels
+	   and the display layer scales them, less than half the work for the GPU */
+	unsigned int xres = fb->getScreenWidth(true), yres = fb->getScreenHeight(true);
+	fb->setMode(1280, 720, 32);
 
 	int control[2];
 	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, control) < 0)
@@ -495,7 +499,7 @@ void CHbbtv::run(const CAitApp &ait_app, t_channel_id id, const std::string &cha
 	videoDecoder->Pig(-1, -1, -1, -1);
 
 	fb->setDisplayHandedOver(false);
-	fb->reapplyMode();
+	fb->setMode(xres, yres, 32);
 	fb->paintBackground();
 	fb->blit();
 	g_RCInput->restartInput();
