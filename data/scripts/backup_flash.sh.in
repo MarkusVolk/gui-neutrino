@@ -7,7 +7,10 @@
 slot_of "$1" && slot_root || exit 1
 BAKF="$ROOT/.neutrino-restore-$SUB.tar.gz"
 
-TOBACKUP="@CONFIGDIR@ /etc/ssh/ssh_host_*"
+# the system files a box needs to come up as before, whatever an older
+# tobackup.conf in CONFIGDIR lists
+TOBACKUP="@CONFIGDIR@ /etc/ssh/ssh_host_* /etc/hostname /etc/localtime /etc/timezone
+	/etc/network/interfaces /etc/wpa_supplicant.conf /var/lib/iwd /var/lib/tailscale"
 [ -e "@CONFIGDIR@/tobackup.conf" ] && TOBACKUP="$TOBACKUP $(sed 's/#.*//' "@CONFIGDIR@/tobackup.conf")"
 RES=""
 for i in $TOBACKUP; do

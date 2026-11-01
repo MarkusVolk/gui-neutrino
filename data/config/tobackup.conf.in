@@ -40,7 +40,12 @@
 /etc/exports
 /etc/hostname
 /etc/hosts
+/etc/localtime
+/etc/timezone
 /etc/network/interfaces
+/etc/wpa_supplicant.conf
+/var/lib/iwd/
+/var/lib/tailscale/
 /etc/profile.local
 /etc/rc.local
 /etc/samba/smb.conf
