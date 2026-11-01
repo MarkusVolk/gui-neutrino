@@ -209,12 +209,13 @@ void CHDDMenuHandler::mountAll()
 
 	/* until a drive is chosen, the first SATA disk keeps /media/record, as
 	   the udev rule of the boxes did before; a box without one, like the
-	   HD60, records to its first USB drive */
+	   HD60, records to its first USB drive. Older kernels, like the HD51's,
+	   give the built-in disk no transport */
 	if (g_settings.hdd_record_uuid.empty() && below(g_settings.network_nfs_recordingdir, RECORD_MOUNT)) {
 		for (int usb = 0; usb < 2 && g_settings.hdd_record_uuid.empty(); usb++)
 			for (size_t i = 0; i < list.size(); i++) {
 				const std::string &tran = list[i].tran;
-				bool fits = usb ? tran == "usb" : tran == "sata" || tran == "ata";
+				bool fits = usb ? tran == "usb" : tran == "sata" || tran == "ata" || tran.empty();
 				if (fits && !list[i].system() && !list[i].uuid.empty() && mountable(list[i])) {
 					printf("CHDDMenuHandler: %s holds the recordings\n", list[i].name.c_str());
 					g_settings.hdd_record_uuid = list[i].uuid;
