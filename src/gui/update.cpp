@@ -689,7 +689,7 @@ int CFlashUpdate::exec(CMenuTarget *parent, const std::string &actionKey)
 			ShowHint(LOCALE_MESSAGEBOX_INFO, LOCALE_FLASHUPDATE_START_OFGWRITE);
 		hide();
 
-		/* unpacked beside the image file: /tmp in RAM is too small for it */
+		/* where ofgwrite_caller unpacks without slot directories: /tmp in RAM is too small */
 		std::string unpack_dir = getPathName(filename);
 		std::string ofgwrite_caller = find_executable("ofgwrite_caller");
 		dprintf(DEBUG_NORMAL, "[update] calling %s %s %s %s\n", ofgwrite_caller.c_str(), unpack_dir.c_str(), filename.c_str(), ofgwrite_options.c_str());

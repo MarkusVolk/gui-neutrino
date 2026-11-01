@@ -9,8 +9,11 @@ for i in $(cat /proc/cmdline); do
 done
 [ -n "$SUB" ] || exit 0
 ROOT=$(awk -v d="$DEV" '$1 == d && $2 != "/" { print $2; exit }' /proc/mounts)
+[ -n "$ROOT" ] || exit 0
+# the image ofgwrite_caller unpacked for the update of this slot
+rm -rf "$ROOT/.ofgwrite"
 BAKF="$ROOT/.neutrino-restore-$SUB.tar.gz"
-[ -n "$ROOT" ] && [ -e "$BAKF" ] || exit 0
+[ -e "$BAKF" ] || exit 0
 
 echo "Restore settings from $BAKF"
 tar -xzf "$BAKF" -C / && rm -f "$BAKF"

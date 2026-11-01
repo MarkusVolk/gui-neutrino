@@ -1,9 +1,19 @@
 #!/bin/sh
-# flashes the image file $2 with ofgwrite and its options $3, unpacked
-# into $1/.ofgwrite. ofgwrite does not come back when it flashes the slot
-# running: it stops Neutrino, writes from RAM and restarts the box
+# flashes the image file $2 with ofgwrite and its options $3. It is
+# unpacked beside the slot directories, which is faster than a stick and
+# where restore_flash.sh removes it, or else into $1. ofgwrite does not
+# come back when it flashes the slot running: it stops Neutrino, writes
+# from RAM and restarts the box
 
-DIR="$1/.ofgwrite"
+for i in $(cat /proc/cmdline); do
+	case "$i" in
+		root=*) DEV=${i#root=} ;;
+		rootsubdir=*) SUB=${i#rootsubdir=} ;;
+	esac
+done
+ROOT=$(awk -v d="$DEV" '$1 == d && $2 != "/" { print $2; exit }' /proc/mounts)
+[ -n "$SUB" ] && [ -n "$ROOT" ] && DIR="$ROOT/.ofgwrite" || DIR="$1/.ofgwrite"
+
 rm -rf "$DIR"
 mkdir -p "$DIR" || exit 1
 case "$2" in
@@ -17,9 +27,6 @@ if [ -z "$IMG" ]; then
 	exit 1
 fi
 
-for i in $(cat /proc/cmdline); do
-	case "$i" in rootsubdir=*) SUB=${i#rootsubdir=} ;; esac
-done
 ofgwrite $3 "$(dirname "$IMG")"
 RET=$?
 [ "${3#-m}" = "$(echo "$SUB" | sed 's/.*[^0-9]//')" ] || rm -rf "$DIR"
