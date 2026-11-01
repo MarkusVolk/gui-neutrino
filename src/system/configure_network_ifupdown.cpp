@@ -100,11 +100,13 @@ bool CNetworkConfig::backendCommit(bool modified, bool nameserver_changed)
 	bool ok = true;
 	if (modified)
 	{
+		/* with iwd a wireless interface is not configured here */
+		std::string wpa_conf = wireless ? WPA_CONFIG : "";
 		ok = addLoopbackDevice("lo", true);
 		if (inet_static)
 		{
 			if (validAddress(address) && validAddress(netmask) && (gateway.empty() || validAddress(gateway)))
-				ok = setStaticAttributes(ifname, automatic_start, address, netmask, broadcast, gateway, wireless) && ok;
+				ok = setStaticAttributes(ifname, automatic_start, address, netmask, broadcast, gateway, wpa_conf) && ok;
 			else
 			{
 				printf("CNetworkConfig::commitConfig: invalid address, %s not written\n", ifname.c_str());
@@ -112,7 +114,7 @@ bool CNetworkConfig::backendCommit(bool modified, bool nameserver_changed)
 			}
 		}
 		else
-			ok = setDhcpAttributes(ifname, automatic_start, wireless) && ok;
+			ok = setDhcpAttributes(ifname, automatic_start, wpa_conf) && ok;
 		if (!ok)
 			printf("CNetworkConfig::commitConfig: /etc/network/interfaces not written\n");
 
