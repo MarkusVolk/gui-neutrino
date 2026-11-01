@@ -335,10 +335,6 @@ int CNetworkSetup::showNetworkSetup()
 	//CNetworkServiceSetup services;
 	CMenuForwarder *mf = NULL;
 
-	//apply button
-	CMenuForwarder *m0 = new CMenuForwarder(LOCALE_NETWORKMENU_SETUPNOW, can_configure, NULL, this, "networkapply", CRCInput::RC_red);
-	m0->setHint("", LOCALE_MENU_HINT_NET_SETUPNOW);
-
 	//eth id
 	CMenuForwarder *mac = new CMenuForwarder("MAC", false, mac_addr);
 
@@ -387,7 +383,6 @@ int CNetworkSetup::showNetworkSetup()
 	CMenuOptionChooser *o2 = new CMenuOptionChooser(LOCALE_NETWORKMENU_DHCP, &network_dhcp, OPTIONS_OFF0_ON1_OPTIONS, OPTIONS_OFF0_ON1_OPTION_COUNT, can_configure, this);
 	o2->setHint("", LOCALE_MENU_HINT_NET_DHCP);
 
-	configEnable.Add(m0);
 	if (o1)
 		configEnable.Add(o1);
 	configEnable.Add(o2);
@@ -395,8 +390,6 @@ int CNetworkSetup::showNetworkSetup()
 
 	//paint menu items
 	networkSettings->addIntroItems(LOCALE_MAINSETTINGS_NETWORK); //intros
-	//-------------------------------------------------
-	networkSettings->addItem(m0);   //apply
 
 	//web interface (nhttpd) submenu
 	mf = new CMenuForwarder(LOCALE_NETWORKMENU_HTTPD, true, NULL, &httpd, NULL, CRCInput::RC_green);

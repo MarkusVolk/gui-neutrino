@@ -1700,7 +1700,6 @@ menu.hint_net_proxypass Proxy užívateľské heslo\nak vyžaduje autorizáciu
 menu.hint_net_proxyserver Názov proxy servera
 menu.hint_net_proxyuser Proxy užívateľský názov\nak vyžaduje autorizáciu
 menu.hint_net_services Konfigurácia sieťových služieb:\nftp, Telnet, uPnp
-menu.hint_net_setupnow Použitie aktuálnych nastavení
 menu.hint_net_setuponstartup Spustenie siete v čase spúštania prijímača
 menu.hint_net_show Zobrazenie aktuálneho sieťového nastavenia
 menu.hint_net_ssid Zadanie SSID wireless siete\npre pripojenie sa k
@@ -2399,7 +2398,6 @@ networkmenu.password Pre-Shared kľúč (PSK)
 networkmenu.reset_settings_now Chcete obnoviť predchádzajúce nastavenia?
 networkmenu.select_if Rozhranie
 networkmenu.services Sieťové služby
-networkmenu.setupnow Použiť nastavenia siete
 networkmenu.setuponstartup Nastavenie siete pri štarte
 networkmenu.show Zobraziť nastavenia siete
 networkmenu.ssid Názov siete (SSID)

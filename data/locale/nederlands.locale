@@ -1700,7 +1700,6 @@ menu.hint_net_proxypass Proxy wachtwoord\n(indien autorisatie vereist is)
 menu.hint_net_proxyserver Proxy servernaam
 menu.hint_net_proxyuser Proxy gebruikersnaam\n(indien autorisatie vereist is)
 menu.hint_net_services Configureer netwerkdiensten\n(Telnet, FTP, uPNP)
-menu.hint_net_setupnow Netwerk herstarten
 menu.hint_net_setuponstartup Netwerk interface
 menu.hint_net_show Netwerk instellingen weergeven
 menu.hint_net_ssid SSID van draadloos netwerk waarmee u \nverbinding wilt maken invoeren
@@ -2399,7 +2398,6 @@ networkmenu.password Pre-Shared Key (PSK)
 networkmenu.reset_settings_now Wilt u de vorige instellingen herstellen?
 networkmenu.select_if Interface
 networkmenu.services Netwerk diensten
-networkmenu.setupnow Netwerk herstarten
 networkmenu.setuponstartup Netwerk interface
 networkmenu.show Netwerk instellingen tonen
 networkmenu.ssid Netwerk naam (SSID)
