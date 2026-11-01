@@ -1279,7 +1279,9 @@ void CRecordManager::RemoveTimeshiftTimers(CTimerd::TimerList &list)
 	mutex.lock();
 	for (CTimerd::TimerList::iterator it = list.begin(); it != list.end();) {
 		CRecordInstance * inst = it->eventType == CTimerd::TIMER_RECORD ? FindInstanceID(it->eventID) : NULL;
-		if (inst && inst->Timeshift())
+		/* a list read before a timeshift ended still holds its timer */
+		bool shift = inst ? inst->Timeshift() : it->eventType == CTimerd::TIMER_RECORD && ended_shift_timers.count(it->eventID);
+		if (shift)
 			it = list.erase(it);
 		else
 			++it;
@@ -1535,6 +1537,8 @@ bool CRecordManager::StopTimeshiftLocked(bool remove_event)
 		return false;
 
 	std::string file = inst->GetFileName();
+	if (inst->GetRecordingId())
+		ended_shift_timers.insert(inst->GetRecordingId());
 	StopInstance(inst, remove_event);
 	CMoviePlayerGui::getInstance().stopTimeshift();
 	/* the player deletes only a timeshift it played; one that was
@@ -1767,6 +1771,7 @@ bool CRecordManager::Stop(const CTimerd::RecordingStopInfo * recinfo)
 	}
 	if(!ret)
 		printf("%s: eventID %d channel_id %" PRIx64 " : not found\n", __func__, recinfo->eventID, recinfo->channel_id);
+	ended_shift_timers.erase(recinfo->eventID);
 
 	mutex.unlock();
 

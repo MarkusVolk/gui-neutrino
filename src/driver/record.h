@@ -26,6 +26,7 @@
 #include <string>
 #include <map>
 #include <list>
+#include <set>
 
 #include <timerdclient/timerdtypes.h>
 
@@ -181,6 +182,8 @@ class CRecordManager : public CMenuTarget /*, public CChangeObserver*/
 		bool		restartTimeshift;
 		int		last_mode;
 		uint32_t	shift_timer;
+		/* timers of ended timeshifts that timerd has not ended yet */
+		std::set<int>	ended_shift_timers;
 		uint32_t	check_timer;
 		bool		error_display;
 		bool		warn_display;
