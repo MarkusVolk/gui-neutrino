@@ -32,7 +32,7 @@ stays under that licence; the author is named in the table.
 | antennebrbg.svg | own wordmark | CC0-1.0 |
 | apunt.svg | [Commons: Logotip d'À Punt (2017-).svg](https://commons.wikimedia.org/wiki/File:Logotip_d%27%C3%80_Punt_%282017-%29.svg) | Public domain (Aftershare; CVMC.), trademark of its owner |
 | aragontvint.svg | own wordmark | CC0-1.0 |
-| ard_alpha.svg | https://www.ardmediathek.de/ (shape of the ARD "1") | logo of the broadcaster, trademark of its owner |
+| ard_alpha.svg | traced from the ARD alpha logo (alpha wordmark with the ARD "1") | logo of the broadcaster, trademark of its owner |
 | ardtest1.svg | own wordmark | CC0-1.0 |
 | arirang.svg | [Commons: Arirang.svg](https://commons.wikimedia.org/wiki/File:Arirang.svg) | Public domain (The original uploader was Strobe z at English Wikipedia.), trademark of its owner |
 | aristo.tv.svg | own wordmark | CC0-1.0 |
