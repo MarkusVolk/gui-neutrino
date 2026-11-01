@@ -5340,6 +5340,10 @@ void CNeutrinoApp::ExitRun(int exit_code, bool ask)
 
 	CVFD::getInstance()->setMode(CVFD::MODE_SHUTDOWN);
 
+	/* the TV goes off with the box, not when Neutrino only ends */
+	if (exit_code == CNeutrinoApp::EXIT_SHUTDOWN)
+		videoDecoder->Standby(true);
+
 	stop_daemons(true); // need here for timer_is_rec before saveSetup
 	g_settings.shutdown_timer_record_type = timer_is_rec;
 	saveSetup(NEUTRINO_SETTINGS_FILE);
