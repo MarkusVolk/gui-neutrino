@@ -31,7 +31,7 @@
 #include <wpe/webkit.h>
 
 #ifndef BACKEND_LIBRARY
-#define BACKEND_LIBRARY "libWPEBackend-neutrino-fbdev.so"
+#define BACKEND_LIBRARY "libWPEBackend-neutrino.so"
 #endif
 #ifndef HBBTV_SCRIPT
 #define HBBTV_SCRIPT "/usr/share/neutrino-hbbtv/hbbtv.js"

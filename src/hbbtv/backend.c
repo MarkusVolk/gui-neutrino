@@ -1,7 +1,8 @@
 /*
-	libwpe backend for EGL drivers that render straight to /dev/fb0, such as
-	the Mali-450 fbdev driver. The web process draws into a window on the
-	framebuffer; there is no compositor in between.
+	libwpe backend for the EGL drivers of set-top boxes, which render
+	straight to the display: the Mali-450 fbdev driver into /dev/fb0, the
+	Broadcom V3D driver (HBBTV_NXPL) into a Nexus graphics window above the
+	video. There is no compositor in between.
 
 	License: GPL
 
@@ -23,6 +24,7 @@
 #include <fcntl.h>
 #include <glib.h>
 #include <linux/fb.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -30,12 +32,43 @@
 #include <wpe/wpe-egl.h>
 #include <wpe/wpe.h>
 
+#ifdef HBBTV_NXPL
+/* the Nexus platform API of the Broadcom V3D driver, which has no header */
+typedef void *NXPL_PlatformHandle;
+typedef struct {
+	int a, b;
+	bool subtract_cd;
+	int c, d;
+	bool subtract_e;
+	int e;
+} NEXUS_BlendEquation;
+typedef struct {
+	uint32_t width;
+	uint32_t height;
+	uint32_t x;
+	uint32_t y;
+	bool stretch;
+	uint32_t clientID;
+	uint32_t zOrder;
+	NEXUS_BlendEquation colorBlend;
+	NEXUS_BlendEquation alphaBlend;
+	uint32_t magic;
+} NXPL_NativeWindowInfoEXT;
+int NEXUS_Platform_AuthenticatedJoin(const void *settings);
+void NXPL_RegisterNexusDisplayPlatform(NXPL_PlatformHandle *handle, void *display);
+void NXPL_UnregisterNexusDisplayPlatform(NXPL_PlatformHandle handle);
+void NXPL_GetDefaultNativeWindowInfoEXT(NXPL_NativeWindowInfoEXT *info);
+void *NXPL_CreateNativeWindowEXT(const NXPL_NativeWindowInfoEXT *info);
+void NXPL_DestroyNativeWindow(void *window);
+#else
 /* the window type of the Mali fbdev EGL platform */
 struct fbdev_window {
 	unsigned short width;
 	unsigned short height;
 };
+#endif
 
+#ifndef HBBTV_NXPL
 static void fb_size(uint32_t *width, uint32_t *height)
 {
 	struct fb_var_screeninfo var;
@@ -51,6 +84,7 @@ static void fb_size(uint32_t *width, uint32_t *height)
 	}
 	close(fd);
 }
+#endif
 
 /* ui process: renderer host */
 
@@ -112,13 +146,16 @@ static void view_destroy(void *data)
 }
 
 /* HbbTV applications lay out for 1280x720; the framebuffer gets the
- * rendering at its own resolution through the device scale factor */
+ * rendering at its own resolution through the device scale factor, the
+ * Nexus window is stretched */
 static void view_initialize(void *data)
 {
 	struct view *view = data;
-	uint32_t width, height;
+	uint32_t width = 1280, height = 720;
 
+#ifndef HBBTV_NXPL
 	fb_size(&width, &height);
+#endif
 	float scale = height / 720.0f;
 	wpe_view_backend_dispatch_set_device_scale_factor(view->backend, scale);
 	wpe_view_backend_dispatch_set_size(view->backend, width / scale, height / scale);
@@ -140,15 +177,26 @@ static const struct wpe_view_backend_interface view_interface = {
 
 /* web process: renderer backend */
 
+#ifdef HBBTV_NXPL
+static NXPL_PlatformHandle nxpl;
+#endif
+
 static void *egl_create(int host_fd)
 {
 	if (host_fd >= 0)
 		close(host_fd);
+#ifdef HBBTV_NXPL
+	NEXUS_Platform_AuthenticatedJoin(NULL);
+	NXPL_RegisterNexusDisplayPlatform(&nxpl, NULL);
+#endif
 	return g_new0(int, 1);
 }
 
 static void egl_destroy(void *data)
 {
+#ifdef HBBTV_NXPL
+	NXPL_UnregisterNexusDisplayPlatform(nxpl);
+#endif
 	g_free(data);
 }
 
@@ -175,7 +223,11 @@ static const struct wpe_renderer_backend_egl_interface egl_interface = {
 
 struct target {
 	struct wpe_renderer_backend_egl_target *target;
+#ifdef HBBTV_NXPL
+	void *window;
+#else
 	struct fbdev_window window;
+#endif
 	GSource *frame_source;
 };
 
@@ -200,6 +252,36 @@ static void target_destroy(void *data)
 	g_free(target);
 }
 
+#ifdef HBBTV_NXPL
+/* the window is stretched over the display, above the video plane */
+static void target_initialize(void *data, void *backend, uint32_t width, uint32_t height)
+{
+	struct target *target = data;
+	NXPL_NativeWindowInfoEXT info;
+
+	(void)backend;
+	NXPL_GetDefaultNativeWindowInfoEXT(&info);
+	info.width = width;
+	info.height = height;
+	info.stretch = true;
+	info.zOrder = 1;
+	target->window = NXPL_CreateNativeWindowEXT(&info);
+}
+
+static EGLNativeWindowType target_get_native_window(void *data)
+{
+	struct target *target = data;
+
+	return (EGLNativeWindowType)target->window;
+}
+
+static void target_resize(void *data, uint32_t width, uint32_t height)
+{
+	(void)data;
+	(void)width;
+	(void)height;
+}
+#else
 static void target_initialize(void *data, void *backend, uint32_t width, uint32_t height)
 {
 	struct target *target = data;
@@ -223,6 +305,7 @@ static void target_resize(void *data, uint32_t width, uint32_t height)
 	target->window.width = width;
 	target->window.height = height;
 }
+#endif
 
 static void target_frame_will_render(void *data)
 {
@@ -255,7 +338,15 @@ static void target_frame_rendered(void *data)
 
 static void target_deinitialize(void *data)
 {
+#ifdef HBBTV_NXPL
+	struct target *target = data;
+
+	if (target->window)
+		NXPL_DestroyNativeWindow(target->window);
+	target->window = NULL;
+#else
 	(void)data;
+#endif
 }
 
 static const struct wpe_renderer_backend_egl_target_interface target_interface = {
